@@ -24,6 +24,7 @@ export interface Anime {
   avg_recommend?: number
   rating_count?: number
   latest_review?: string
+  user_rated?: boolean
 }
 
 export interface Rating {
@@ -105,4 +106,25 @@ export interface CreateRatingRequest {
   anime_score: number
   recommend: number
   review: string
+}
+
+export interface BangumiDetailResponse {
+  bgm_id: number
+  title_cn: string
+  title_jp: string
+  cover_url: string
+  description: string
+  episodes: number
+  status: string
+  season: string
+  air_date: string
+  platform: string
+  tags: string[]
+}
+
+export interface RatingHistoryResponse {
+  items: Rating[]
+  total: number
+  page: number
+  limit: number
 }

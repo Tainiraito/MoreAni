@@ -28,9 +28,15 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Design docs (local only, not for public repo)
+product-design.md
+
 # Database
 *.db
 backend/init_db.py
 
 # Docker
 docker-compose.override.yml
+
+# Temporary scripts
+frontend/*.mjs

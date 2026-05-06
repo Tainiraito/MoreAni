@@ -54,6 +54,7 @@ def list_animes(
     sort: str = Query(default='avg_score'),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
     avg_score_sub = db.query(
@@ -109,6 +110,12 @@ def list_animes(
                 seen.add(aid)
 
     items = []
+    user_rated_ids: set[int] = set()
+    if current_user:
+        user_rated_ids = set(
+            row[0] for row in db.query(Rating.anime_id).filter(Rating.user_id == current_user.id).all()
+        )
+
     for row in rows:
         anime = row[0]
         items.append(AnimeSchema(
@@ -130,7 +137,8 @@ def list_animes(
             avg_anime_score=round(row.avg_score, 1) if row.avg_score else None,
             avg_recommend=round(row.avg_rec, 1) if row.avg_rec else None,
             rating_count=row.rating_count or 0,
-            latest_review=latest_reviews.get(anime.id)
+            latest_review=latest_reviews.get(anime.id),
+            user_rated=anime.id in user_rated_ids if current_user else None
         ))
 
     return AnimeListResponse(items=items, total=total)
@@ -185,6 +193,11 @@ def create_anime(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # 去重：按中文名检查
+    existing = db.query(Anime).filter(Anime.title_cn == data.title_cn).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f'番剧「{data.title_cn}」已存在')
+
     anime = Anime(
         title_cn=data.title_cn,
         title_jp=data.title_jp,
@@ -202,6 +215,21 @@ def create_anime(
     db.commit()
     db.refresh(anime)
     return anime_to_schema(anime, db)
+
+
+@router.delete('/{anime_id}', status_code=204)
+def delete_anime(
+    anime_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    anime = db.query(Anime).filter(Anime.id == anime_id).first()
+    if not anime:
+        raise HTTPException(status_code=404, detail='番剧不存在')
+    # 级联删除相关评分
+    db.query(Rating).filter(Rating.anime_id == anime_id).delete()
+    db.delete(anime)
+    db.commit()
 
 
 @router.put('/{anime_id}', response_model=AnimeSchema)

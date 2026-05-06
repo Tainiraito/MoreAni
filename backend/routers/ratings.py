@@ -49,3 +49,21 @@ def create_or_update_rating(
 def recent_ratings(limit: int = Query(default=5, ge=1, le=50), db: Session = Depends(get_db)):
     ratings = db.query(Rating).order_by(Rating.updated_at.desc()).limit(limit).all()
     return [rating_to_schema(r) for r in ratings]
+
+
+@router.get('/history', response_model=dict)
+def rating_history(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Rating).order_by(Rating.updated_at.desc())
+    total = query.count()
+    offset = (page - 1) * limit
+    items = query.offset(offset).limit(limit).all()
+    return {
+        'items': [rating_to_schema(r) for r in items],
+        'total': total,
+        'page': page,
+        'limit': limit
+    }

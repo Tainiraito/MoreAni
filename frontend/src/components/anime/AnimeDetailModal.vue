@@ -4,6 +4,7 @@
       :width="dialogWidth"
       destroy-on-close
       class="anime-dialog"
+      overlay-class="anime-overlay"
       @update:model-value="$emit('update:visible', $event)"
       @opened="loadDetail"
     >
@@ -49,9 +50,9 @@
           </div>
 
           <!-- Edit Anime Form -->
-          <div v-if="showEdit" class="glass-card p-4 mb-4">
-            <el-form :model="editForm" label-position="top" size="small">
-              <div class="grid grid-cols-2 gap-3">
+          <div v-if="showEdit" class="glass-card p-4 mb-4 edit-form-card">
+            <el-form :model="editForm" label-position="top" size="default">
+              <div class="grid grid-cols-2 gap-x-3 gap-y-0">
                 <el-form-item label="中文名">
                   <el-input v-model="editForm.title_cn" />
                 </el-form-item>
@@ -89,60 +90,152 @@
               <el-form-item label="简介">
                 <el-input v-model="editForm.description" type="textarea" :rows="2" />
               </el-form-item>
-              <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingEdit" @click="saveEdit">
-                保存修改
-              </el-button>
+              <div class="flex gap-2 mt-3">
+                <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingEdit" @click="saveEdit">
+                  保存修改
+                </el-button>
+                <el-button class="btn-soft !text-xs !px-5 !border-red-200 !text-red-500 hover:!bg-red-50 hover:!border-red-300" size="small" @click="handleDelete">
+                  <el-icon :size="13"><Delete /></el-icon>
+                  删除番剧
+                </el-button>
+              </div>
             </el-form>
           </div>
 
-          <!-- Rating Form (only for logged-in) -->
-          <div v-if="isLoggedIn" class="glass-card p-4 mb-4">
-            <h3 class="font-semibold mb-3 text-text-primary flex items-center gap-1.5">
-              <span class="w-0.5 h-3.5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
-              <el-icon :size="15"><EditPen /></el-icon>
-              我的评分
-            </h3>
-            <div class="flex gap-6 mb-3 flex-wrap">
-              <div class="flex items-center gap-2">
-                <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
-                <span class="text-small text-text-secondary">番剧评分</span>
-                <el-input-number v-model="ratingForm.anime_score" :min="1" :max="10" size="small" />
-              </div>
-              <div class="flex items-center gap-2">
-                <el-icon :size="16" class="text-primary-yellow"><GoldMedal /></el-icon>
-                <span class="text-small text-text-secondary">补番推荐度</span>
-                <el-input-number v-model="ratingForm.recommend" :min="1" :max="10" size="small" />
-              </div>
+          <!-- Rating Section (only for logged-in) -->
+          <div
+            v-if="isLoggedIn"
+            class="glass-card p-4 mb-4"
+            :class="{ 'cursor-pointer': hasExistingRating && !showRatingForm }"
+            @click="hasExistingRating && !showRatingForm ? enterRatingMode() : undefined"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-semibold text-text-primary flex items-center gap-1.5">
+                <el-icon :size="15"><EditPen /></el-icon>
+                我的评分
+              </h3>
+              <span
+                v-if="hasExistingRating && !showRatingForm"
+                class="text-xs text-primary-pink/60 flex items-center gap-1"
+              >
+                <el-icon :size="12"><EditPen /></el-icon>
+                点击修改评分
+              </span>
             </div>
-            <el-input
-              v-model="ratingForm.review"
-              type="textarea"
-              :rows="4"
-              placeholder="写写你的感想吧...（支持长评）"
-              class="mb-2"
-            />
-            <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingRating" @click="saveRating">
-              保存评分
-            </el-button>
+
+            <!-- Default state: not editing -->
+            <template v-if="!showRatingForm">
+              <!-- Has existing rating: read-only display -->
+              <div v-if="hasExistingRating && detail?.my_rating">
+                <div class="flex flex-col gap-1 mb-3">
+                  <div class="flex items-center gap-2">
+                    <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
+                    <span class="text-small text-text-secondary whitespace-nowrap">番剧评分</span>
+                    <el-rate
+                      :model-value="detail.my_rating.anime_score"
+                      :max="10"
+                      show-score
+                      size="small"
+                      :score-template="'{value}分'"
+                      :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                      disabled
+                    />
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <el-icon :size="16" class="text-primary-yellow"><GoldMedal /></el-icon>
+                    <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
+                    <el-rate
+                      :model-value="detail.my_rating.recommend"
+                      :max="10"
+                      show-score
+                      size="small"
+                      :score-template="'{value}分'"
+                      :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                      disabled
+                    />
+                  </div>
+                </div>
+                <p v-if="detail.my_rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">
+                  {{ detail.my_rating.review }}
+                </p>
+              </div>
+
+              <!-- No rating: show button -->
+              <el-button v-else class="btn-gradient !text-xs !px-5" size="small" @click="enterRatingMode">
+                去评分
+              </el-button>
+            </template>
+
+            <!-- Edit state: show form -->
+            <template v-else>
+              <div class="flex flex-col gap-1 mb-3">
+                <div class="flex items-center gap-2">
+                  <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
+                  <span class="text-small text-text-secondary whitespace-nowrap">番剧评分</span>
+                  <el-rate
+                    v-model="ratingForm.anime_score"
+                    :max="10"
+                    show-score
+                    size="small"
+                    :score-template="'{value}分'"
+                    :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                  />
+                </div>
+                <div class="flex items-center gap-2">
+                  <el-icon :size="16" class="text-primary-yellow"><GoldMedal /></el-icon>
+                  <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
+                  <el-rate
+                    v-model="ratingForm.recommend"
+                    :max="10"
+                    show-score
+                    size="small"
+                    :score-template="'{value}分'"
+                    :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                  />
+                </div>
+              </div>
+              <el-input
+                v-model="ratingForm.review"
+                type="textarea"
+                :autosize="{ minRows: 4, maxRows: 12 }"
+                placeholder="写写你的感想吧...（支持长评）"
+                class="mb-2"
+              />
+              <div class="flex gap-2">
+                <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingRating" @click.stop="saveRating">
+                  保存评分
+                </el-button>
+                <el-button class="btn-soft !text-xs !px-5" size="small" :disabled="savingRating" @click.stop="cancelRating">
+                  取消
+                </el-button>
+              </div>
+            </template>
           </div>
 
           <!-- Friends Ratings -->
-          <div v-if="detail.ratings.length > 0" class="glass-card p-4">
+          <!-- 大家的评分 — 模块本身无 hover，每条评分独立卡片 + hover -->
+          <div v-if="otherRatings.length > 0" class="bg-white/95 backdrop-blur-md border border-primary-purple/20 rounded-12 p-4">
             <h3 class="font-semibold mb-3 text-text-primary flex items-center gap-1">
               <el-icon :size="15"><ChatDotRound /></el-icon>
               大家的评分
             </h3>
             <div class="space-y-3">
-              <div v-for="rating in detail.ratings" :key="rating.id" class="flex items-start gap-3">
-                <div class="flex-1 min-w-0">
-                  <p class="text-small">
-                    <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
-                    <span class="text-text-secondary ml-1">
-                      <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>{{ rating.anime_score }}
-                      <el-icon :size="13" class="text-primary-yellow"><GoldMedal /></el-icon>{{ rating.recommend }}
-                    </span>
-                  </p>
-                  <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
+              <div
+                v-for="rating in otherRatings"
+                :key="rating.id"
+                class="bg-white/80 backdrop-blur-sm border border-primary-purple/10 rounded-8 p-3 transition-all duration-300 hover:border-primary-purple/30 hover:-translate-y-0.5 hover:shadow-sm hover:bg-white/95"
+              >
+                <div class="flex items-start gap-3">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-small">
+                      <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
+                      <span class="text-text-secondary ml-1">
+                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>{{ rating.anime_score }}
+                        <el-icon :size="13" class="text-primary-yellow"><GoldMedal /></el-icon>{{ rating.recommend }}
+                      </span>
+                    </p>
+                    <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -158,33 +251,59 @@
         @success="loadDetail"
       />
     </el-dialog>
+
+    <!-- Navigation buttons - 放在 el-dialog 外部 + Teleport 到 body 避免 z-index 问题 -->
+    <Teleport to="body">
+      <button
+        v-if="visible && showNav && hasPrevious"
+        class="nav-btn nav-prev"
+        @click.stop="emit('previous')"
+      >
+        <el-icon :size="20"><ArrowLeft /></el-icon>
+      </button>
+      <button
+        v-if="visible && showNav && hasNext"
+        class="nav-btn nav-next"
+        @click.stop="emit('next')"
+      >
+        <el-icon :size="20"><ArrowRight /></el-icon>
+      </button>
+    </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AuthDialog from '@/components/auth/AuthDialog.vue'
 import type { AnimeDetail } from '@/types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   visible: boolean
   animeId: number
-}>()
+  hasPrevious?: boolean
+  hasNext?: boolean
+}>(), {
+  hasPrevious: false,
+  hasNext: false
+})
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   refresh: []
+  previous: []
+  next: []
 }>()
 
 const api = useApi()
-const { isLoggedIn } = useAuth()
+const { isLoggedIn, currentUser } = useAuth()
 const detail = ref<AnimeDetail | null>(null)
 const showEdit = ref(false)
 const savingRating = ref(false)
 const savingEdit = ref(false)
 const showAuthDialog = ref(false)
+const showNav = ref(false)
 const gradientBg = ref('linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)')
 const coverRef = ref<HTMLImageElement | null>(null)
 
@@ -202,11 +321,22 @@ function onResize() {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
+  window.addEventListener('keydown', onKeyDown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('keydown', onKeyDown)
 })
+
+function onKeyDown(e: KeyboardEvent) {
+  if (!props.visible) return
+  if (e.key === 'ArrowLeft' && props.hasPrevious) {
+    emit('previous')
+  } else if (e.key === 'ArrowRight' && props.hasNext) {
+    emit('next')
+  }
+}
 
 const ratingForm = reactive({
   anime_score: 8,
@@ -224,6 +354,15 @@ const editForm = reactive({
   platform: '',
   air_date: '',
   season: ''
+})
+
+const showRatingForm = ref(false)
+const hasExistingRating = computed(() => detail.value?.my_rating != null)
+
+const otherRatings = computed(() => {
+  if (!detail.value) return []
+  if (!currentUser.value?.username) return detail.value.ratings
+  return detail.value.ratings.filter(r => r.username !== currentUser.value!.username)
 })
 
 const parsedTags = computed(() => {
@@ -244,6 +383,7 @@ async function loadDetail() {
   try {
     const data = await api.getAnime(props.animeId)
     detail.value = data
+    showNav.value = true
     if (data.my_rating) {
       ratingForm.anime_score = data.my_rating.anime_score
       ratingForm.recommend = data.my_rating.recommend
@@ -312,6 +452,7 @@ async function saveRating() {
       review: ratingForm.review
     })
     ElMessage.success('评分已保存')
+    showRatingForm.value = false
     emit('refresh')
     await loadDetail()
   } catch (e: unknown) {
@@ -336,22 +477,79 @@ async function saveEdit() {
   }
 }
 
+async function handleDelete() {
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这部番剧吗？相关评分也会一并删除，此操作不可撤销。',
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'btn-gradient !text-xs !px-5',
+        cancelButtonClass: 'btn-soft !text-xs !px-5'
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    await api.deleteAnime(props.animeId)
+    ElMessage.success('番剧已删除')
+    emit('update:visible', false)
+    emit('refresh')
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '删除失败')
+  }
+}
+
+function enterRatingMode() {
+  showRatingForm.value = true
+}
+
+function cancelRating() {
+  showRatingForm.value = false
+  if (detail.value?.my_rating) {
+    ratingForm.anime_score = detail.value.my_rating.anime_score
+    ratingForm.recommend = detail.value.my_rating.recommend
+    ratingForm.review = detail.value.my_rating.review
+  } else {
+    ratingForm.anime_score = 8
+    ratingForm.recommend = 8
+    ratingForm.review = ''
+  }
+}
+
 watch(
   () => props.visible,
   (v) => {
-    if (!v) detail.value = null
+    if (!v) {
+      detail.value = null
+      showRatingForm.value = false
+    }
   }
 )
 
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn && props.visible) loadDetail()
 })
+
+watch(() => props.animeId, () => {
+  if (props.visible) loadDetail()
+})
 </script>
 
 <style scoped>
-.anime-dialog :deep(.el-dialog) {
+.anime-dialog {
   border-radius: 12px;
   overflow: hidden;
+  margin: 0 !important;
+  height: 90vh;
+  max-width: 95vw;
+  width: 600px;
+  display: flex;
+  flex-direction: column;
 }
 .anime-dialog :deep(.el-dialog__header) {
   margin: 0;
@@ -360,6 +558,57 @@ watch(isLoggedIn, (loggedIn) => {
   z-index: 10;
 }
 .anime-dialog :deep(.el-dialog__body) {
+  flex: 1;
+  overflow-y: auto;
+  max-height: none;
   position: relative;
+}
+
+/* 编辑表单 - 压缩 FormItem 间距 */
+.edit-form-card :deep(.el-form-item) {
+  margin-bottom: 8px !important;
+}
+.edit-form-card :deep(.el-form-item__label) {
+  padding-bottom: 2px !important;
+  font-size: 12px !important;
+}
+
+/* ========================================
+   导航按钮 - 弹窗两侧
+   ======================================== */
+.nav-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9999;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(180, 144, 228, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  color: var(--primary-pink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.nav-btn:hover {
+  background: linear-gradient(135deg, var(--primary-pink), var(--primary-purple));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(247, 131, 172, 0.3);
+  transform: translateY(-50%) scale(1.1);
+}
+.nav-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+.nav-prev {
+  left: calc(50% - 352px);
+}
+.nav-next {
+  left: calc(50% + 312px);
 }
 </style>

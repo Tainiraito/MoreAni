@@ -22,13 +22,13 @@ cd backend
 pip install -r requirements.txt --break-system-packages
 
 # （生产环境）设置密钥
-export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+export SECRET_KEY=*** -c 'import secrets; print(secrets.token_hex(32))')
 
 # 初始化邀请码（只需一次）
 python3 scripts/manage_codes.py init
 
 # 启动 API 服务器
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### 2. 启动前端
@@ -39,7 +39,7 @@ cd frontend
 # 安装依赖
 npm install
 
-# 启动开发服务器（自动代理 /api → localhost:8000）
+# 启动开发服务器（自动代理 /api → localhost:8080）
 npm run dev
 ```
 
@@ -53,6 +53,17 @@ npm run dev
 | `ANIME-FRIEND` |
 | `BANGUMI-FAN` |
 
+## 测试账号
+
+| 用户名 | 密码 | 角色 |
+|:------|:-----|:-----|
+| alice | test123 | 资深宅，长评为主 |
+| bob | test123 | 普通观众，简评为主 |
+| carol | test123 | 挑剔型，偶尔长评 |
+| david | test123 | 技术向，关注制作 |
+| erika | test123 | 热情休闲型 |
+| felix | test123 | 分析型，结构化评分 |
+
 ## 项目结构
 
 ```
@@ -60,8 +71,9 @@ MoreAni/
 ├── frontend/                  # Vue 3 前端
 │   ├── src/
 │   │   ├── components/        # 组件
-│   │   │   ├── anime/         # 番剧相关（弹窗 / 添加对话框）
+│   │   │   ├── anime/         # 番剧弹窗 / 添加对话框
 │   │   │   ├── auth/          # 登录/注册弹窗
+│   │   │   ├── RatingsHistoryDialog.vue  # 个人评分历史
 │   │   │   └── EmptyState.vue # 空状态占位
 │   │   ├── composables/       # useAuth / useApi
 │   │   ├── router/            # vue-router 配置
@@ -97,6 +109,7 @@ npm run format      # 代码格式化
 cd backend
 python3 scripts/manage_codes.py list           # 查看邀请码
 python3 scripts/manage_codes.py add CODE1 CODE2 # 添加邀请码
+python3 scripts/seed_users.py                  # 测试用户数据（可选）
 ```
 
 ## API 端点
@@ -106,15 +119,17 @@ python3 scripts/manage_codes.py add CODE1 CODE2 # 添加邀请码
 | `POST` | `/api/auth/register` | 注册 | - |
 | `POST` | `/api/auth/login` | 登录 | - |
 | `GET` | `/api/auth/me` | 当前用户 | ✅ |
-| `GET` | `/api/animes` | 番剧列表（搜索/筛选/排序） | - |
-| `GET` | `/api/animes/{id}` | 番剧详情 + 评分列表（未登录时 `my_rating=null`） | - |
-| `GET` | `/api/animes/random` | 随机番剧（已登录：未评分；未登录：全部） | - |
+| `GET` | `/api/animes` | 番剧列表（搜索/筛选/排序/分页） | - |
+| `GET` | `/api/animes/{id}` | 番剧详情 + 评分列表（含 `my_rating`） | - |
 | `POST` | `/api/animes` | 添加番剧 | ✅ |
 | `PUT` | `/api/animes/{id}` | 编辑番剧 | ✅ |
+| `DELETE` | `/api/animes/{id}` | 删除番剧 | ✅ |
+| `GET` | `/api/animes/random` | 随机推荐番剧 | - |
 | `POST` | `/api/bangumi/search` | Bangumi 搜索 | - |
-| `POST` | `/api/bangumi/import/{bgm_id}` | 导入 Bangumi 番剧 | ✅ |
+| `GET` | `/api/bangumi/detail/{bgm_id}` | Bangumi 番剧详情 | - |
 | `POST` | `/api/ratings` | 创建/更新评分 | ✅ |
 | `GET` | `/api/ratings/recent` | 最近评分动态 | - |
+| `GET` | `/api/ratings` | 当前用户的评分历史 | ✅ |
 
 ## 设计文档
 

@@ -4,7 +4,9 @@ import type {
   AnimeListResponse,
   AnimeDetail,
   Rating,
-  BangumiSearchResponse
+  BangumiSearchResponse,
+  BangumiDetailResponse,
+  RatingHistoryResponse
 } from '@/types'
 
 const BASE = '/api'
@@ -74,6 +76,11 @@ export function useApi() {
         body: JSON.stringify(data)
       })
     },
+    deleteAnime(id: number) {
+      return request<void>(`/animes/${id}`, {
+        method: 'DELETE'
+      })
+    },
     updateAnime(id: number, data: Record<string, unknown>) {
       return request<AnimeDetail['anime']>(`/animes/${id}`, {
         method: 'PUT',
@@ -87,6 +94,9 @@ export function useApi() {
         method: 'POST',
         body: JSON.stringify({ keyword, limit, offset })
       })
+    },
+    getBangumiDetail(bgmId: number) {
+      return request<BangumiDetailResponse>(`/bangumi/detail/${bgmId}`)
     },
     importBangumi(bgmId: number) {
       return request<{ anime_id: number; status: string }>(`/bangumi/import/${bgmId}`, {
@@ -108,6 +118,9 @@ export function useApi() {
     },
     getRecentRatings(limit = 5) {
       return request<Rating[]>(`/ratings/recent?limit=${limit}`)
+    },
+    getRatingHistory(page = 1, limit = 20) {
+      return request<RatingHistoryResponse>(`/ratings/history?page=${page}&limit=${limit}`)
     }
   }
 }

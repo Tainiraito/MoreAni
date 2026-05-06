@@ -1,6 +1,6 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional
 
 
 class UserSchema(BaseModel):
@@ -48,6 +48,7 @@ class AnimeSchema(BaseModel):
     avg_recommend: Optional[float] = None
     rating_count: Optional[int] = None
     latest_review: Optional[str] = None
+    user_rated: Optional[bool] = None
 
     model_config = {'from_attributes': True}
 
@@ -127,9 +128,9 @@ class BangumiSearchItem(BaseModel):
     rank: int
     tags: list[str]
     episodes: int
-    air_date: str
-    platform: str
-    summary: str
+    air_date: Optional[str] = ''
+    platform: Optional[str] = ''
+    summary: Optional[str] = ''
 
 
 class BangumiSearchResponse(BaseModel):
@@ -140,3 +141,17 @@ class BangumiSearchResponse(BaseModel):
 class BangumiImportResponse(BaseModel):
     anime_id: int
     status: str
+
+
+class BangumiDetailResponse(BaseModel):
+    bgm_id: int
+    title_cn: str
+    title_jp: str
+    cover_url: str
+    description: str
+    episodes: int
+    status: str
+    season: str
+    air_date: str
+    platform: str
+    tags: list[str]

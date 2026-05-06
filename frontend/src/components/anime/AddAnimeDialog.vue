@@ -4,6 +4,8 @@
     :width="dialogWidth"
     title="添加番剧"
     destroy-on-close
+    class="add-anime-dialog"
+    overlay-class="add-anime-overlay"
     @update:model-value="$emit('update:visible', $event)"
   >
     <!-- Bangumi Search -->
@@ -50,7 +52,7 @@
 
     <!-- Manual Form -->
     <el-form :model="form" label-position="top" size="default">
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-x-3 gap-y-0">
         <el-form-item label="中文名 *">
           <el-input v-model="form.title_cn" placeholder="必填" />
         </el-form-item>
@@ -93,8 +95,7 @@
       </el-form-item>
 
       <el-button
-        type="primary"
-        class="w-full !bg-primary-pink !border-primary-pink hover:!bg-primary-dark hover:!border-primary-dark !shadow-md hover:!shadow-lg transition-all"
+        class="btn-gradient w-full"
         :loading="submitting"
         :disabled="!form.title_cn"
         @click="submit"
@@ -218,6 +219,23 @@ function selectBangumi(item: BangumiSearchResult) {
   tagsInput.value = item.tags.join(', ')
   searchResults.value = []
   keyword.value = ''
+  // 异步获取详细数据（状态、季度等）
+  fetchBangumiDetail(item.bgm_id)
+}
+
+async function fetchBangumiDetail(bgmId: number) {
+  try {
+    const detail = await api.getBangumiDetail(bgmId)
+    if (detail.status) form.status = detail.status
+    if (detail.season) form.season = detail.season
+    if (detail.description && !form.description) form.description = detail.description
+    // 如果搜到的空字段较多，用详情数据补充
+    if (detail.episodes && !form.episodes) form.episodes = detail.episodes
+    if (detail.platform && !form.platform) form.platform = detail.platform
+    if (detail.tags.length && !tagsInput.value) tagsInput.value = detail.tags.join(', ')
+  } catch {
+    // 详情获取失败不影响手动填写
+  }
 }
 
 async function submit() {
@@ -245,3 +263,27 @@ async function submit() {
 }
 
 </script>
+
+<style scoped>
+.add-anime-dialog {
+  margin: 0 !important;
+  height: 90vh;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.add-anime-dialog :deep(.el-dialog__body) {
+  flex: 1;
+  overflow-y: auto;
+}
+/* 表单间距压缩 */
+.add-anime-dialog :deep(.el-form-item) {
+  margin-bottom: 8px !important;
+}
+.add-anime-dialog :deep(.el-form-item__label) {
+  padding-bottom: 2px !important;
+  font-size: 12px !important;
+}
+</style>

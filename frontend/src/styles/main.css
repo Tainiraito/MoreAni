@@ -44,6 +44,15 @@
   --text-secondary: #9a9a9a;
   --bg-white: #ffffff;
   --bg-page: #faf8fb;
+
+  /* Element Plus 主题色覆盖：蓝色 → 粉紫 */
+  --el-color-primary: var(--primary-pink);
+  --el-color-primary-light-3: #f9a8c7;
+  --el-color-primary-light-5: #fbc4d8;
+  --el-color-primary-light-7: #fddce8;
+  --el-color-primary-light-8: #fee8f0;
+  --el-color-primary-light-9: #fff0f5;
+  --el-color-primary-dark-2: var(--primary-dark);
 }
 
 [data-theme='dark'] {
@@ -57,6 +66,14 @@
   --text-secondary: #7a7288;
   --bg-white: #1a1620;
   --bg-page: #0f0c14;
+
+  --el-color-primary: var(--primary-pink);
+  --el-color-primary-light-3: #4a2a3e;
+  --el-color-primary-light-5: #3d2234;
+  --el-color-primary-light-7: #301b2a;
+  --el-color-primary-light-8: #2a1624;
+  --el-color-primary-light-9: #251220;
+  --el-color-primary-dark-2: #f9a8c7;
 }
 
 /* ========================================
@@ -211,10 +228,110 @@ th {
 }
 
 /* ========================================
-   9. 按钮样式系统（Gleamory 风格统一）
+   9. 弹窗滚动优化 — 内容超出时内部滚动
    ======================================== */
-/* 渐变主按钮 - 重要操作（添加番剧/登录） */
-.btn-gradient {
+.el-dialog {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 弹窗固定高度 — 配合 flex 布局让 body 内部滚动 */
+.anime-dialog,
+.add-anime-dialog {
+  max-height: 90vh !important;
+  height: 90vh !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+}
+.el-dialog__body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 弹窗垂直居中 — 通过 :has() 选择包含 anime-dialog 的 el-overlay-dialog */
+.el-overlay-dialog:has(.anime-dialog),
+.el-overlay-dialog:has(.add-anime-dialog) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* ========================================
+   10. el-rate 组件间距调小至 12px
+   ======================================== */
+.el-rate {
+  gap: 4px !important;
+}
+.el-rate__item {
+  margin-right: 0 !important;
+}
+.el-rate__icon {
+  font-size: 16px !important;
+  margin-right: 2px !important;
+}
+
+/* ========================================
+   11. Element Plus 组件-粉紫主题覆盖
+   ======================================== */
+/* --- Input --- */
+.el-input__wrapper {
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
+  border-color: var(--primary-pink) !important;
+}
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--primary-purple) inset !important;
+}
+
+/* --- Textarea --- */
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
+  border-color: var(--primary-pink) !important;
+}
+.el-textarea__inner:hover {
+  border-color: var(--primary-purple) !important;
+}
+
+/* --- Select --- */
+.el-select__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
+  border-color: var(--primary-pink) !important;
+}
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--primary-purple) inset !important;
+}
+
+/* --- InputNumber --- */
+.el-input-number__increase:hover,
+.el-input-number__decrease:hover {
+  background: var(--primary-pink) !important;
+  color: white !important;
+  border-color: var(--primary-pink) !important;
+}
+.el-input-number__increase:active,
+.el-input-number__decrease:active {
+  background: var(--primary-dark) !important;
+}
+.el-input-number .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
+}
+
+/* ========================================
+   12. 按钮样式系统（Gleamory 风格统一）
+   ========================================
+   注意：el-button 内部使用 `button.el-button`(0,2,0)，
+   所以我们的样式必须用 `button.el-button.btn-gradient`(0,2,1)
+   才能确保覆盖 Element Plus 默认样式。
+   ======================================== */
+
+/* --- 渐变主按钮（重要操作） --- */
+.btn-gradient,
+button.el-button.btn-gradient {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -230,17 +347,29 @@ th {
   box-shadow: 0 2px 8px rgba(247, 131, 172, 0.25);
 }
 
-.btn-gradient:hover {
+.btn-gradient:hover,
+button.el-button.btn-gradient:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(247, 131, 172, 0.4);
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-pink), var(--primary-purple));
 }
 
-.btn-gradient:active {
+.btn-gradient:active,
+button.el-button.btn-gradient:active {
   transform: translateY(0);
 }
 
-/* 次要按钮 - 辅助操作（换一个/去看看） */
-.btn-soft {
+.btn-gradient:disabled,
+button.el-button.btn-gradient:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- 次要按钮（辅助操作） --- */
+.btn-soft,
+button.el-button.btn-soft {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -255,15 +384,17 @@ th {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn-soft:hover {
+.btn-soft:hover,
+button.el-button.btn-soft:hover {
   border-color: rgba(247, 131, 172, 0.4);
   background: rgba(247, 131, 172, 0.08);
   color: var(--primary-pink);
   transform: translateY(-1px);
 }
 
-/* 文本按钮 - 极简操作（退出） */
-.btn-text {
+/* --- 文本按钮（极简操作） --- */
+.btn-text,
+button.el-button.btn-text {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -278,7 +409,97 @@ th {
   transition: all 0.2s;
 }
 
-.btn-text:hover {
+.btn-text:hover,
+button.el-button.btn-text:hover {
   color: var(--primary-pink);
   background: rgba(247, 131, 172, 0.08);
+}
+
+/* ========================================
+   13. ElMessageBox 二次确认弹窗（粉紫主题）
+   ======================================== */
+.el-message-box {
+  border-radius: 12px !important;
+  border: 1px solid rgba(180, 144, 228, 0.2) !important;
+  padding: 20px !important;
+}
+.el-message-box__header {
+  padding: 0 0 12px !important;
+}
+.el-message-box__title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+.el-message-box__status.el-icon--warning {
+  --el-color-warning: var(--primary-pink) !important;
+  font-size: 20px !important;
+}
+.el-message-box__message {
+  font-size: 13px !important;
+  color: var(--text-body) !important;
+  line-height: 1.6 !important;
+}
+.el-message-box__btns {
+  padding-top: 16px !important;
+  display: flex !important;
+  gap: 8px !important;
+  justify-content: flex-end !important;
+}
+.el-message-box__btns .el-button {
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 6px 16px !important;
+}
+
+/* ========================================
+   14. 自定义 Tooltip（粉紫风格半透明底）
+   ======================================== */
+.el-popper.custom-tooltip {
+  background: rgba(40, 35, 50, 0.9) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(180, 144, 228, 0.2) !important;
+  color: #f0ecf5 !important;
+  font-size: 12px !important;
+  border-radius: 8px !important;
+  padding: 6px 12px !important;
+  max-width: 800px !important;
+  line-height: 1.6 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+}
+.el-popper.custom-tooltip[x-placement^='top'] .popper__arrow {
+  border-top-color: rgba(180, 144, 228, 0.25) !important;
+}
+
+/* ========================================
+   15. Select 下拉面板（粉紫主题）
+   ======================================== */
+.el-select-dropdown__item {
+  border-radius: 6px !important;
+  margin: 0 4px !important;
+  font-size: 13px !important;
+  transition: all 0.15s ease;
+}
+.el-select-dropdown__item.hover,
+.el-select-dropdown__item:hover,
+.el-select-dropdown__item.is-focus {
+  background-color: var(--primary-light) !important;
+  color: var(--primary-pink) !important;
+}
+.el-select-dropdown__item.selected,
+.el-select-dropdown__item.is-selected {
+  color: var(--primary-pink) !important;
+  font-weight: 600 !important;
+  background-color: var(--primary-light) !important;
+}
+.el-select-dropdown__item.selected::after {
+  display: none !important;
+}
+.el-select-dropdown {
+  border: 1px solid rgba(180, 144, 228, 0.15) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(247, 131, 172, 0.1) !important;
+  padding: 4px 0 !important;
 }
