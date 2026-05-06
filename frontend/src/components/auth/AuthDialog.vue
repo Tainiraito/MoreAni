@@ -51,6 +51,7 @@
       </el-form-item>
       <el-button
         class="btn-gradient w-full"
+        native-type="submit"
         :loading="loading"
         @click="handleLogin"
       >
@@ -78,6 +79,7 @@
       </el-form-item>
       <el-button
         class="btn-gradient w-full"
+        native-type="submit"
         :loading="loading"
         @click="handleRegister"
       >

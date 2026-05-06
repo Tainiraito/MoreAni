@@ -267,10 +267,7 @@ async function submit() {
 <style scoped>
 .add-anime-dialog {
   margin: 0 !important;
-  height: 90vh;
   max-width: 95vw;
-  display: flex;
-  flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
 }

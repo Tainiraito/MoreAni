@@ -11,7 +11,7 @@
       <div class="absolute inset-0 bg-gradient-to-r from-primary-pink/10 via-white/60 to-primary-purple/10 backdrop-blur-md"></div>
       <!-- 内容 -->
       <div class="relative container mx-auto px-4 py-3 flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-gradient">MoreAni 又看一集</h1>
+        <h1 class="text-2xl font-bold text-gradient">MoreAni</h1>
         <div class="flex items-center gap-4">
           <template v-if="isLoggedIn">
             <span class="text-small text-text-body flex items-center gap-1">
@@ -44,8 +44,8 @@
         <!-- 今天看什么 - 标题（移出卡片外） -->
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-1">
-              <span class="w-0.5 h-4 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+            <div class="flex items-center gap-3">
+              <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
               <h2 class="section-title">今天看什么</h2>
             </div>
             <button
@@ -89,11 +89,11 @@
                 <div class="flex items-center gap-x-2.5 text-xs leading-none" :class="randomAnime.cover_url ? 'opacity-90' : 'text-text-secondary'">
                   <span v-if="randomAnime.avg_anime_score" class="flex items-center gap-1 whitespace-nowrap">
                     <el-icon :size="13"><StarFilled /></el-icon>
-                    <span>均分 {{ randomAnime.avg_anime_score }}</span>
+                    <span>均分 {{ Number(randomAnime.avg_anime_score).toFixed(1) }}</span>
                   </span>
                   <span v-if="randomAnime.avg_recommend" class="flex items-center gap-1 whitespace-nowrap">
                     <el-icon :size="13"><GoldMedal /></el-icon>
-                    <span>推荐 {{ randomAnime.avg_recommend }}</span>
+                    <span>推荐 {{ Number(randomAnime.avg_recommend).toFixed(1) }}</span>
                   </span>
                   <span v-if="randomAnime.rating_count" class="flex items-center gap-1 whitespace-nowrap">
                     <el-icon :size="13"><User /></el-icon>
@@ -118,10 +118,9 @@
         <!-- 大家在看啥 -->
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-1">
-              <span class="w-0.5 h-4 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+            <div class="flex items-center gap-3">
+              <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
               <h2 class="section-title">大家在看啥</h2>
-              <span class="text-xs text-text-secondary ml-1.5 font-medium">最近5条动态</span>
             </div>
             <button class="btn-soft !text-xs !px-3 !py-1" @click="showRatingsHistory = true">
               <el-icon :size="13"><List /></el-icon>
@@ -139,7 +138,7 @@
             >
               <img
                 :src="rating.anime_cover"
-                class="w-10 h-14 object-cover rounded-4 flex-shrink-0"
+                class="w-14 h-20 object-cover rounded-4 flex-shrink-0"
                 @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
               />
               <div class="min-w-0 flex-1">
@@ -149,12 +148,17 @@
                   <span class="text-text-primary">{{ rating.anime_title }}</span>
                 </p>
                 <p class="text-small text-text-secondary">
-                  <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>{{ rating.anime_score }}
-                  <el-icon :size="13" class="text-primary-yellow"><GoldMedal /></el-icon>{{ rating.recommend }}
-                  <span v-if="rating.review" class="text-text-body">
-                    <span class="mx-1">·</span>{{ rating.review }}
+                  <span class="inline-flex items-center gap-1">
+                    <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                    <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+                  </span>
+                  <span class="mx-1 text-text-body">·</span>
+                  <span class="inline-flex items-center gap-1">
+                    <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                    <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
                   </span>
                 </p>
+                <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
               </div>
             </div>
           </div>
@@ -167,13 +171,13 @@
       <!-- Section 2: 评分汇总表 -->
       <section>
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h2 class="section-title flex items-center gap-1">
-            <span class="w-0.5 h-4 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+          <h2 class="section-title flex items-center gap-3">
+            <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
             番剧列表
           </h2>
           <div class="flex gap-2 items-center">
             <button
-              class="btn-gradient h-7"
+              class="btn-gradient h-7 whitespace-nowrap"
               @click="handleAddAnime"
             >
               <el-icon><Plus /></el-icon>
@@ -183,11 +187,14 @@
               v-model="searchKeyword"
               placeholder="搜索番剧..."
               size="small"
+              clearable
               class="!w-40"
               @input="onSearch"
+              @clear="onSearchClear"
             />
-            <el-select v-model="sortBy" size="small" class="!w-28" @change="loadAnimes">
+            <el-select v-model="sortBy" size="small" class="!w-32" @change="loadAnimes">
               <el-option label="按均分" value="avg_score" />
+              <el-option label="按推荐" value="avg_rec" />
               <el-option label="按人数" value="count" />
             </el-select>
           </div>
@@ -204,7 +211,7 @@
                   <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-pink"><StarFilled /></el-icon>均分</span>
                 </th>
                 <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20">
-                  <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-yellow"><GoldMedal /></el-icon>推荐</span>
+                  <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-purple"><GoldMedal /></el-icon>推荐</span>
                 </th>
                 <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-14">人数</th>
                 <th class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[160px] max-w-xs">最新评价</th>
@@ -215,12 +222,24 @@
                 v-for="(anime, i) in animes"
                 :key="anime.id"
                 class="border-b border-gray-50 hover:bg-primary-pink/5 cursor-pointer transition-colors"
-                :class="{ 'bg-pink-100/60': isLoggedIn && anime.user_rated === false }"
+                :class="{ 'bg-gradient-to-r from-primary-pink/[0.07] to-transparent': isLoggedIn && anime.user_rated === false }"
                 @click="openDetail(anime.id)"
               >
-                <td class="py-3 px-4 text-text-primary whitespace-nowrap truncate max-w-[200px]">{{ anime.title_cn }}</td>
-                <td class="py-3 px-4 text-center text-primary-pink font-semibold whitespace-nowrap">{{ anime.avg_anime_score ?? '-' }}</td>
-                <td class="py-3 px-4 text-center text-primary-purple font-semibold whitespace-nowrap">{{ anime.avg_recommend ?? '-' }}</td>
+                <td class="py-3 px-4 min-w-0">
+                  <div class="flex items-center gap-1.5 flex-nowrap">
+                    <span class="text-text-primary truncate">{{ anime.title_cn }}</span>
+                    <el-tag
+                      v-for="t in getAnimeTags(anime)"
+                      :key="t"
+                      size="small"
+                      round
+                      class="tag-type"
+                      @click.stop="filterByTag(t)"
+                    >{{ t }}</el-tag>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-center text-primary-pink font-semibold whitespace-nowrap">{{ anime.avg_anime_score != null ? Number(anime.avg_anime_score).toFixed(1) : '-' }}</td>
+                <td class="py-3 px-4 text-center text-primary-purple font-semibold whitespace-nowrap">{{ anime.avg_recommend != null ? Number(anime.avg_recommend).toFixed(1) : '-' }}</td>
                 <td class="py-3 px-4 text-center text-text-secondary whitespace-nowrap">{{ anime.rating_count ?? 0 }}</td>
                 <td class="py-3 px-4 text-text-body truncate max-w-[220px]">
                   <el-tooltip
@@ -306,6 +325,7 @@ const randomAnime = ref<Anime | null>(null)
 const recentRatings = ref<Rating[]>([])
 const animes = ref<Anime[]>([])
 const searchKeyword = ref('')
+const tagFilter = ref('')
 const sortBy = ref('avg_score')
 
 const selectedAnimeIndex = computed(() =>
@@ -327,6 +347,15 @@ const showRatingsHistory = ref(false)
 const showBackTop = ref(false)
 const headerScrolled = ref(false)
 const reviewRefs = ref<(HTMLElement | null)[]>([])
+
+function getAnimeTags(anime: Anime): string[] {
+  try {
+    const parsed = JSON.parse(anime.tags)
+    return Array.isArray(parsed) ? parsed.slice(0, 3) : []
+  } catch {
+    return []
+  }
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -351,7 +380,21 @@ function handleAddAnime() {
 
 function onSearch() {
   if (searchTimer) clearTimeout(searchTimer)
+  // 手动输入时清除 tagFilter
+  tagFilter.value = ''
   searchTimer = setTimeout(() => loadAnimes(), 300)
+}
+
+function onSearchClear() {
+  searchKeyword.value = ''
+  tagFilter.value = ''
+  loadAnimes()
+}
+
+function filterByTag(tag: string) {
+  searchKeyword.value = tag
+  tagFilter.value = tag
+  loadAnimes()
 }
 
 async function refreshRandom() {
@@ -371,7 +414,8 @@ async function loadAll() {
 async function loadAnimes() {
   try {
     const params: Record<string, string | number> = { limit: 50, sort: sortBy.value }
-    if (searchKeyword.value) params.search = searchKeyword.value
+    if (searchKeyword.value && !tagFilter.value) params.search = searchKeyword.value
+    if (tagFilter.value) params.tag = tagFilter.value
     const res = await api.getAnimes(params)
     animes.value = res.items
     reviewRefs.value = new Array(animes.value.length).fill(null)

@@ -8,9 +8,8 @@ from models import InviteCode
 Base.metadata.create_all(bind=engine)
 
 CODES = [
-    'MOREANI2026',
-    'ANIME-FRIEND',
-    'BANGUMI-FAN',
+    '亲爱的爱莉希雅',
+    'lovelysia',
 ]
 
 

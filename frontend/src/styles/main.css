@@ -196,6 +196,54 @@ th {
 }
 
 /* ========================================
+   7b. 全局滚动条样式（淡粉偏白渐变）
+   ======================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(247,131,172,0.35), rgba(255,255,255,0.5));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(247,131,172,0.55), rgba(255,200,220,0.6));
+}
+
+/* 弹窗和卡片内部滚动条 — 更透明，不显眼 */
+.el-dialog__body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(247,131,172,0.18), rgba(255,255,255,0.3));
+}
+.el-dialog__body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(247,131,172,0.35), rgba(255,200,220,0.4));
+}
+
+/* 用 scrollbar-gutter 代替 overflow-y:scroll，弹窗打开时 body 滚动条消失不掉位置 */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* ========================================
+   7c. 弹窗内部隐藏滚动条（所有弹窗通用）
+   ======================================== */
+.anime-dialog .el-dialog__body::-webkit-scrollbar,
+.ratings-history-dialog .el-dialog__body::-webkit-scrollbar,
+.add-anime-dialog .el-dialog__body::-webkit-scrollbar,
+.auth-dialog .el-dialog__body::-webkit-scrollbar {
+  display: none;
+}
+.anime-dialog .el-dialog__body,
+.ratings-history-dialog .el-dialog__body,
+.add-anime-dialog .el-dialog__body,
+.auth-dialog .el-dialog__body {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* ========================================
    8. 回到顶部按钮
    ======================================== */
 .back-to-top {
@@ -236,14 +284,22 @@ th {
 }
 
 /* 弹窗固定高度 — 配合 flex 布局让 body 内部滚动 */
-.anime-dialog,
-.add-anime-dialog {
+/* anime-dialog(详情) 内容多，固定高度；其他按内容决定 */
+.anime-dialog {
   max-height: 90vh !important;
   height: 90vh !important;
   border-radius: 12px !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
+  margin: 0 !important;
+}
+.add-anime-dialog,
+.ratings-history-dialog,
+.auth-dialog {
+  max-height: 90vh !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
   margin: 0 !important;
 }
 .el-dialog__body {
@@ -253,17 +309,21 @@ th {
 
 /* 弹窗垂直居中 — 通过 :has() 选择包含 anime-dialog 的 el-overlay-dialog */
 .el-overlay-dialog:has(.anime-dialog),
-.el-overlay-dialog:has(.add-anime-dialog) {
+.el-overlay-dialog:has(.add-anime-dialog),
+.el-overlay-dialog:has(.ratings-history-dialog),
+.el-overlay-dialog:has(.auth-dialog) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
 /* ========================================
-   10. el-rate 组件间距调小至 12px
+   10. el-rate 组件间距调小 + 粉紫渐变
    ======================================== */
 .el-rate {
   gap: 4px !important;
+  --el-rate-fill-color: #f783ac !important;
+  --el-rate-void-color: #e8e0ec !important;
 }
 .el-rate__item {
   margin-right: 0 !important;
@@ -271,6 +331,35 @@ th {
 .el-rate__icon {
   font-size: 16px !important;
   margin-right: 2px !important;
+}
+
+/* 行内微型 rate — 更紧凑 */
+.rate-micro .el-rate__icon {
+  font-size: 12px !important;
+  margin-right: 0 !important;
+}
+.rate-micro .el-rate__item {
+  margin-right: 0 !important;
+}
+.rate-micro.el-rate {
+  gap: 1px !important;
+}
+
+/* 类型标签 — 粉紫风格 */
+.tag-type {
+  --el-tag-bg-color: rgba(247, 131, 172, 0.08) !important;
+  --el-tag-border-color: rgba(180, 144, 228, 0.2) !important;
+  --el-tag-text-color: var(--primary-purple) !important;
+  --el-tag-hover-color: var(--primary-pink) !important;
+  --el-tag-font-size: 11px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  line-height: 18px !important;
+  flex-shrink: 0;
+}
+.tag-type:hover {
+  --el-tag-border-color: rgba(247, 131, 172, 0.4) !important;
+  --el-tag-bg-color: rgba(247, 131, 172, 0.12) !important;
 }
 
 /* ========================================
@@ -305,6 +394,13 @@ th {
 .el-select__wrapper:hover {
   box-shadow: 0 0 0 1px var(--primary-purple) inset !important;
 }
+/* 确保 select focus 没有蓝色 — override 所有 focus-visible */
+.el-select__wrapper.is-focus .el-select__placeholder {
+  color: var(--text-secondary) !important;
+}
+.el-select__wrapper {
+  --el-select-input-focus-border-color: var(--primary-pink) !important;
+}
 
 /* --- InputNumber --- */
 .el-input-number__increase:hover,
@@ -328,6 +424,11 @@ th {
    所以我们的样式必须用 `button.el-button.btn-gradient`(0,2,1)
    才能确保覆盖 Element Plus 默认样式。
    ======================================== */
+
+/* 取消 Element Plus 相邻按钮的左边距 — 由 flex gap 控制间距 */
+.el-button + .el-button {
+  margin-left: 0 !important;
+}
 
 /* --- 渐变主按钮（重要操作） --- */
 .btn-gradient,
@@ -502,4 +603,46 @@ button.el-button.btn-text:hover {
   border-radius: 8px !important;
   box-shadow: 0 4px 16px rgba(247, 131, 172, 0.1) !important;
   padding: 4px 0 !important;
+}
+
+/* ========================================
+   16. 弹窗关闭 × 按钮（粉紫主题）
+   ======================================== */
+.el-dialog__headerbtn .el-dialog__close {
+  color: var(--text-secondary) !important;
+  transition: color 0.2s;
+}
+.el-dialog__headerbtn:hover .el-dialog__close,
+.el-dialog__headerbtn:focus .el-dialog__close {
+  color: var(--primary-pink) !important;
+}
+
+/* ========================================
+   17. 移动端适配 — 隐藏所有垂直滚动条
+   ======================================== */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+  }
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+}
+
+/* ========================================
+   18. 移动端 — Rate 组件星级缩小间距
+   ======================================== */
+@media (max-width: 768px) {
+  .el-rate__icon {
+    font-size: 14px !important;
+    margin-right: 0 !important;
+  }
+  .el-rate {
+    gap: 1px !important;
+  }
+  .el-rate__item {
+    margin-right: 0 !important;
+  }
 }

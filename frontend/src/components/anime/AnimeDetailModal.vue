@@ -102,12 +102,36 @@
             </el-form>
           </div>
 
+          <!-- Average Score Cards — 置于我的评分之上 -->
+          <div v-if="detail.anime.avg_anime_score" class="flex gap-3 mb-4">
+            <!-- 均分卡 -->
+            <div class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]">
+              <span class="text-xs text-text-secondary font-medium mb-0.5 flex items-center gap-1">
+                <el-icon :size="12" class="text-primary-pink"><StarFilled /></el-icon>均分
+              </span>
+              <div class="flex items-baseline justify-center gap-0.5">
+                <span class="text-2xl font-bold text-gradient">{{ detail.anime.avg_anime_score }}</span>
+                <span class="text-xs text-text-secondary">/ 10</span>
+              </div>
+            </div>
+            <!-- 推荐度卡 -->
+            <div class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]">
+              <span class="text-xs text-text-secondary font-medium mb-0.5 flex items-center gap-1">
+                <el-icon :size="12" class="text-primary-purple"><GoldMedal /></el-icon>推荐度
+              </span>
+              <div class="flex items-baseline justify-center gap-0.5">
+                <span class="text-2xl font-bold text-gradient">{{ detail.anime.avg_recommend }}</span>
+                <span class="text-xs text-text-secondary">/ 10</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Rating Section (only for logged-in) -->
           <div
             v-if="isLoggedIn"
             class="glass-card p-4 mb-4"
-            :class="{ 'cursor-pointer': hasExistingRating && !showRatingForm }"
-            @click="hasExistingRating && !showRatingForm ? enterRatingMode() : undefined"
+            :class="{ 'cursor-pointer': !showRatingForm }"
+            @click="!showRatingForm ? enterRatingMode() : undefined"
           >
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-semibold text-text-primary flex items-center gap-1.5">
@@ -137,12 +161,12 @@
                       show-score
                       size="small"
                       :score-template="'{value}分'"
-                      :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                      :colors="['#f783ac', '#d087c8', '#b490e4']"
                       disabled
                     />
                   </div>
                   <div class="flex items-center gap-2">
-                    <el-icon :size="16" class="text-primary-yellow"><GoldMedal /></el-icon>
+                    <el-icon :size="16" class="text-primary-purple"><GoldMedal /></el-icon>
                     <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
                     <el-rate
                       :model-value="detail.my_rating.recommend"
@@ -150,7 +174,7 @@
                       show-score
                       size="small"
                       :score-template="'{value}分'"
-                      :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                      :colors="['#f783ac', '#d087c8', '#b490e4']"
                       disabled
                     />
                   </div>
@@ -161,7 +185,7 @@
               </div>
 
               <!-- No rating: show button -->
-              <el-button v-else class="btn-gradient !text-xs !px-5" size="small" @click="enterRatingMode">
+              <el-button v-else class="btn-gradient !text-xs !w-full" size="small" @click="enterRatingMode">
                 去评分
               </el-button>
             </template>
@@ -178,11 +202,11 @@
                     show-score
                     size="small"
                     :score-template="'{value}分'"
-                    :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                    :colors="['#f783ac', '#d087c8', '#b490e4']"
                   />
                 </div>
                 <div class="flex items-center gap-2">
-                  <el-icon :size="16" class="text-primary-yellow"><GoldMedal /></el-icon>
+                  <el-icon :size="16" class="text-primary-purple"><GoldMedal /></el-icon>
                   <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
                   <el-rate
                     v-model="ratingForm.recommend"
@@ -190,7 +214,7 @@
                     show-score
                     size="small"
                     :score-template="'{value}分'"
-                    :colors="['#f783ac', '#e05a8a', '#b490e4']"
+                    :colors="['#f783ac', '#d087c8', '#b490e4']"
                   />
                 </div>
               </div>
@@ -202,11 +226,11 @@
                 class="mb-2"
               />
               <div class="flex gap-2">
-                <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingRating" @click.stop="saveRating">
-                  保存评分
-                </el-button>
-                <el-button class="btn-soft !text-xs !px-5" size="small" :disabled="savingRating" @click.stop="cancelRating">
+                <el-button class="btn-soft !text-xs flex-1" size="small" :disabled="savingRating" @click.stop="cancelRating">
                   取消
+                </el-button>
+                <el-button class="btn-gradient !text-xs flex-1" size="small" :loading="savingRating" @click.stop="saveRating">
+                  保存评分
                 </el-button>
               </div>
             </template>
@@ -227,14 +251,21 @@
               >
                 <div class="flex items-start gap-3">
                   <div class="flex-1 min-w-0">
-                    <p class="text-small">
+                    <p class="text-small mb-1">
                       <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
-                      <span class="text-text-secondary ml-1">
-                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>{{ rating.anime_score }}
-                        <el-icon :size="13" class="text-primary-yellow"><GoldMedal /></el-icon>{{ rating.recommend }}
+                    </p>
+                    <p class="text-small text-text-secondary mb-1 flex items-center gap-1 flex-wrap">
+                      <span class="inline-flex items-center gap-1">
+                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                        <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+                      </span>
+                      <span class="text-text-body">·</span>
+                      <span class="inline-flex items-center gap-1">
+                        <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                        <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
                       </span>
                     </p>
-                    <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
+                    <p v-if="rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
                   </div>
                 </div>
               </div>

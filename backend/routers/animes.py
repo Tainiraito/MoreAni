@@ -23,6 +23,27 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
         Rating.review != ''
     ).order_by(Rating.updated_at.desc()).first()
 
+    avg_score = round(avg_data.avg_score, 1) if avg_data and avg_data.avg_score else None
+    avg_rec = round(avg_data.avg_rec, 1) if avg_data and avg_data.avg_rec else None
+
+    # Calculate rankings using subquery
+    score_rank = None
+    recommend_rank = None
+    total_animes = None
+    if avg_score is not None:
+        # Get per-anime averages
+        per_anime = db.query(
+            Rating.anime_id,
+            func.avg(Rating.anime_score).label('a_score'),
+            func.avg(Rating.recommend).label('a_rec')
+        ).group_by(Rating.anime_id).all()
+        total_animes = len(per_anime) if per_anime else 0
+        if total_animes > 0:
+            scores = sorted([r.a_score for r in per_anime], reverse=True)
+            recs = sorted([r.a_rec for r in per_anime], reverse=True)
+            score_rank = next((i + 1 for i, s in enumerate(scores) if s <= avg_score), total_animes)
+            recommend_rank = next((i + 1 for i, r in enumerate(recs) if r <= avg_rec), total_animes)
+
     return AnimeSchema(
         id=anime.id,
         title_cn=anime.title_cn,
@@ -39,10 +60,13 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
         created_by=anime.created_by,
         created_at=anime.created_at,
         updated_at=anime.updated_at,
-        avg_anime_score=round(avg_data.avg_score, 1) if avg_data and avg_data.avg_score else None,
-        avg_recommend=round(avg_data.avg_rec, 1) if avg_data and avg_data.avg_rec else None,
+        avg_anime_score=avg_score,
+        avg_recommend=avg_rec,
         rating_count=avg_data.count if avg_data else 0,
-        latest_review=latest.review if latest else None
+        latest_review=latest.review if latest else None,
+        score_rank=score_rank,
+        recommend_rank=recommend_rank,
+        total_animes=total_animes
     )
 
 
@@ -53,7 +77,7 @@ def list_animes(
     season: str = Query(default=''),
     sort: str = Query(default='avg_score'),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
     current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
@@ -89,6 +113,8 @@ def list_animes(
 
     if sort == 'count':
         query = query.order_by(desc('rating_count'))
+    elif sort == 'avg_rec':
+        query = query.order_by(desc('avg_rec'))
     else:
         query = query.order_by(desc('avg_score'))
 

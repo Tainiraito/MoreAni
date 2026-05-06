@@ -4,6 +4,7 @@
     :width="dialogWidth"
     title="全部动态"
     destroy-on-close
+    class="ratings-history-dialog"
     @update:model-value="$emit('update:visible', $event)"
     @opened="loadPage(1)"
   >
@@ -25,7 +26,7 @@
       >
         <img
           :src="rating.anime_cover"
-          class="w-10 h-14 object-cover rounded-4 flex-shrink-0 mt-0.5"
+          class="w-14 h-20 object-cover rounded-4 flex-shrink-0 mt-0.5"
           @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
         />
         <div class="min-w-0 flex-1">
@@ -35,12 +36,17 @@
             <span class="text-text-primary">{{ rating.anime_title }}</span>
           </p>
           <p class="text-small text-text-secondary mt-0.5">
-            <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>{{ rating.anime_score }}
-            <el-icon :size="13" class="text-primary-yellow"><GoldMedal /></el-icon>{{ rating.recommend }}
+            <span class="inline-flex items-center gap-1">
+              <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+              <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+            </span>
             <span class="mx-1 text-text-body">·</span>
-            <span class="text-xs text-text-body">{{ timeAgo(rating.updated_at) }}</span>
+            <span class="inline-flex items-center gap-1">
+              <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+              <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
+            </span>
           </p>
-          <p v-if="rating.review" class="text-small text-text-body mt-1 line-clamp-2 whitespace-pre-wrap">{{ rating.review }}</p>
+          <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
         </div>
       </div>
     </div>
@@ -48,6 +54,7 @@
     <!-- Pagination -->
     <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-gray-100">
       <el-button
+        class="btn-soft !text-xs !px-3 !py-1"
         size="small"
         :disabled="currentPage <= 1"
         :loading="loading"
@@ -59,6 +66,7 @@
         {{ currentPage }} / {{ totalPages }}
       </span>
       <el-button
+        class="btn-soft !text-xs !px-3 !py-1"
         size="small"
         :disabled="currentPage >= totalPages"
         :loading="loading"

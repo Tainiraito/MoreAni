@@ -49,6 +49,9 @@ class AnimeSchema(BaseModel):
     rating_count: Optional[int] = None
     latest_review: Optional[str] = None
     user_rated: Optional[bool] = None
+    score_rank: Optional[int] = None
+    recommend_rank: Optional[int] = None
+    total_animes: Optional[int] = None
 
     model_config = {'from_attributes': True}
 
