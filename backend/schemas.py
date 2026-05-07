@@ -1,6 +1,10 @@
-from typing import Optional
 from pydantic import BaseModel, Field
+from typing import Optional
 from datetime import datetime
+
+
+class CheckUsernameRequest(BaseModel):
+    username: str
 
 
 class UserSchema(BaseModel):
@@ -87,8 +91,8 @@ class RatingSchema(BaseModel):
     anime_id: int
     user_id: int
     username: str = ''
-    anime_score: int = Field(ge=1, le=10)
-    recommend: int = Field(ge=1, le=10)
+    anime_score: int = Field(ge=0, le=10)
+    recommend: int = Field(ge=0, le=10)
     review: str = ''
     created_at: datetime
     updated_at: datetime
@@ -100,8 +104,8 @@ class RatingSchema(BaseModel):
 
 class RatingCreate(BaseModel):
     anime_id: int
-    anime_score: int = Field(ge=1, le=10)
-    recommend: int = Field(ge=1, le=10)
+    anime_score: int = Field(ge=0, le=10)
+    recommend: int = Field(ge=0, le=10)
     review: str = ''
 
 
@@ -134,6 +138,8 @@ class BangumiSearchItem(BaseModel):
     air_date: Optional[str] = ''
     platform: Optional[str] = ''
     summary: Optional[str] = ''
+    status: str = ''
+    season: str = ''
 
 
 class BangumiSearchResponse(BaseModel):
@@ -158,3 +164,12 @@ class BangumiDetailResponse(BaseModel):
     air_date: str
     platform: str
     tags: list[str]
+
+
+class ChangeUsernameRequest(BaseModel):
+    new_username: str = Field(..., min_length=2, max_length=50)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=6)

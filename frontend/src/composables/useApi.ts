@@ -1,6 +1,7 @@
 import { useAuth } from './useAuth'
 import type {
   AuthResponse,
+  User,
   AnimeListResponse,
   AnimeDetail,
   Rating,
@@ -26,6 +27,11 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${url}`, { ...options, headers })
 
   if (res.status === 401) {
+    if (url === '/auth/login') {
+      // 登录接口的 401 应由后端报错文案展示
+      const err = await res.json().catch(() => ({ detail: '用户名或密码错误' }))
+      throw new Error(err.detail || '用户名或密码错误')
+    }
     const { clearAuth } = useAuth()
     clearAuth()
     throw new Error('请先登录')
@@ -35,6 +41,9 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     const err = await res.json().catch(() => ({ detail: 'Request failed' }))
     throw new Error(err.detail || 'Request failed')
   }
+
+  // 204 No Content — 返回 null 而非尝试解析空 body
+  if (res.status === 204) return null as T
 
   return res.json()
 }
@@ -117,10 +126,28 @@ export function useApi() {
       })
     },
     getRecentRatings(limit = 5) {
-      return request<Rating[]>(`/ratings/recent?limit=${limit}`)
+      return request<Rating[]>(`/ratings/recent?limit=${limit}&_t=${Date.now()}`)
     },
     getRatingHistory(page = 1, limit = 20) {
       return request<RatingHistoryResponse>(`/ratings/history?page=${page}&limit=${limit}`)
+    },
+    changeUsername(newUsername: string) {
+      return request<User>('/auth/me/username', {
+        method: 'PUT',
+        body: JSON.stringify({ new_username: newUsername })
+      })
+    },
+    checkUsername(username: string) {
+      return request<{ available: boolean }>('/auth/check-username', {
+        method: 'POST',
+        body: JSON.stringify({ username })
+      })
+    },
+    changePassword(oldPassword: string, newPassword: string) {
+      return request<void>('/auth/me/password', {
+        method: 'PUT',
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      })
     }
   }
 }

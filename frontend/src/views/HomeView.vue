@@ -14,17 +14,38 @@
         <h1 class="text-2xl font-bold text-gradient">MoreAni</h1>
         <div class="flex items-center gap-4">
           <template v-if="isLoggedIn">
-            <span class="text-small text-text-body flex items-center gap-1">
-              <el-icon><UserFilled /></el-icon>
-              {{ currentUser?.username }}
-            </span>
-            <button
-              class="btn-text"
-              @click="handleLogout"
-            >
-              <el-icon><SwitchButton /></el-icon>
-              退出
-            </button>
+            <div class="relative group">
+              <div class="flex items-center gap-1.5 cursor-pointer select-none py-1 px-2 -mx-2 rounded-8 hover:bg-primary-pink/10 transition-colors">
+                <el-icon class="text-primary-pink"><UserFilled /></el-icon>
+                <span class="text-small text-text-body">{{ currentUser?.username }}</span>
+                <el-icon class="text-text-secondary text-xs transition-transform group-hover:rotate-180"><ArrowDown /></el-icon>
+              </div>
+              <!-- Dropdown -->
+              <div class="absolute right-0 top-full mt-1 min-w-[160px] bg-white rounded-8 shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-1 group-hover:translate-y-0 z-50">
+                <button
+                  class="w-full text-left px-4 py-2.5 text-small text-text-primary hover:bg-primary-pink/5 transition-colors flex items-center gap-2"
+                  @click="showChangeUsernameDialog = true"
+                >
+                  <el-icon :size="14" class="text-primary-pink"><EditPen /></el-icon>
+                  修改用户名
+                </button>
+                <button
+                  class="w-full text-left px-4 py-2.5 text-small text-text-primary hover:bg-primary-pink/5 transition-colors flex items-center gap-2"
+                  @click="showChangePasswordDialog = true"
+                >
+                  <el-icon :size="14" class="text-primary-purple"><Lock /></el-icon>
+                  修改密码
+                </button>
+                <div class="border-t border-gray-50 my-1"></div>
+                <button
+                  class="w-full text-left px-4 py-2.5 text-small text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                  @click="handleLogout"
+                >
+                  <el-icon :size="14"><SwitchButton /></el-icon>
+                  退出登录
+                </button>
+              </div>
+            </div>
           </template>
           <button
             v-else
@@ -148,15 +169,18 @@
                   <span class="text-text-primary">{{ rating.anime_title }}</span>
                 </p>
                 <p class="text-small text-text-secondary">
-                  <span class="inline-flex items-center gap-1">
-                    <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                    <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
-                  </span>
-                  <span class="mx-1 text-text-body">·</span>
-                  <span class="inline-flex items-center gap-1">
-                    <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                    <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
-                  </span>
+                  <template v-if="rating.anime_score > 0">
+                    <span class="inline-flex items-center gap-1">
+                      <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                      <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+                    </span>
+                    <span class="mx-1 text-text-body">·</span>
+                    <span class="inline-flex items-center gap-1">
+                      <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                      <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
+                    </span>
+                  </template>
+                  <span v-else class="text-text-secondary text-xs">暂不打分</span>
                 </p>
                 <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
               </div>
@@ -192,7 +216,7 @@
               @input="onSearch"
               @clear="onSearchClear"
             />
-            <el-select v-model="sortBy" size="small" class="!w-32" @change="loadAnimes">
+            <el-select v-model="sortBy" size="small" class="!w-32" @change="onSortChange">
               <el-option label="按均分" value="avg_score" />
               <el-option label="按推荐" value="avg_rec" />
               <el-option label="按人数" value="count" />
@@ -206,6 +230,7 @@
           <table class="w-full text-small">
             <thead>
               <tr class="border-b border-gray-100">
+                <th class="text-center py-3 px-2 text-text-secondary font-medium whitespace-nowrap w-10 text-xs">#</th>
                 <th class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[120px]">番剧名</th>
                 <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20">
                   <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-pink"><StarFilled /></el-icon>均分</span>
@@ -225,6 +250,7 @@
                 :class="{ 'bg-gradient-to-r from-primary-pink/[0.07] to-transparent': isLoggedIn && anime.user_rated === false }"
                 @click="openDetail(anime.id)"
               >
+                <td class="text-center py-3 px-2 text-text-secondary text-xs whitespace-nowrap">{{ i + 1 }}</td>
                 <td class="py-3 px-4 min-w-0">
                   <div class="flex items-center gap-1.5 flex-nowrap">
                     <span class="text-text-primary truncate">{{ anime.title_cn }}</span>
@@ -257,6 +283,13 @@
               </tr>
             </tbody>
           </table>
+          <!-- 底部加载指示 -->
+          <div v-if="loadingMore" class="py-4 text-center text-text-secondary text-xs">
+            <el-icon class="is-loading"><Loading /></el-icon> 加载更多...
+          </div>
+          <div v-else-if="!hasMore && animes.length > 0" class="py-4 text-center text-text-secondary text-xs">
+            — 已显示全部 {{ totalCount }} 部番剧 —
+          </div>
         </div>
       </section>
     </main>
@@ -265,6 +298,83 @@
     <footer class="py-6 text-center text-text-secondary text-sm border-t border-gray-100 font-normal">
       <p>© 2026 MoreAni</p>
     </footer>
+
+    <!-- Change Username Dialog -->
+    <el-dialog
+      v-model="showChangeUsernameDialog"
+      title="修改用户名"
+      :width="userDialogWidth"
+      destroy-on-close
+      @closed="usernameUniqueError = ''"
+    >
+      <el-form label-position="top">
+        <el-form-item
+          label="新用户名"
+          :error="usernameUniqueError"
+        >
+          <el-input
+            v-model="changeUsernameForm.newUsername"
+            placeholder="输入新用户名"
+            :maxlength="50"
+            @blur="checkUsernameUnique"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button class="btn-soft !text-xs" @click="showChangeUsernameDialog = false">取消</el-button>
+          <el-button class="btn-gradient !text-xs" :loading="changingUsername" @click="handleChangeUsername">
+            确认修改
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Change Password Dialog -->
+    <el-dialog
+      v-model="showChangePasswordDialog"
+      title="修改密码"
+      :width="userDialogWidth"
+      destroy-on-close
+      @opened="onPasswordDialogOpened"
+    >
+      <el-form label-position="top">
+        <el-form-item label="原密码">
+          <el-input
+            v-model="changePasswordForm.oldPassword"
+            type="password"
+            placeholder="输入原密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="新密码" :error="newPasswordError">
+          <el-input
+            v-model="changePasswordForm.newPassword"
+            type="password"
+            placeholder="输入新密码（至少6位）"
+            show-password
+            @input="onNewPasswordInput"
+          />
+        </el-form-item>
+        <el-form-item label="再次输入新密码" :error="passwordConfirmError">
+          <el-input
+            v-model="changePasswordForm.confirmPassword"
+            type="password"
+            placeholder="再次输入新密码确认"
+            show-password
+            @input="onPasswordConfirmInput"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button class="btn-soft !text-xs" @click="showChangePasswordDialog = false">取消</el-button>
+          <el-button class="btn-gradient !text-xs" :loading="changingPassword" @click="handleChangePassword">
+            确认修改
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- Anime Detail Modal -->
     <AnimeDetailModal
@@ -311,6 +421,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
+import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/EmptyState.vue'
 import AnimeDetailModal from '@/components/anime/AnimeDetailModal.vue'
 import AddAnimeDialog from '@/components/anime/AddAnimeDialog.vue'
@@ -319,7 +430,7 @@ import RatingsHistoryDialog from '@/components/RatingsHistoryDialog.vue'
 import type { Anime, Rating } from '@/types'
 
 const api = useApi()
-const { currentUser, clearAuth, isLoggedIn, token } = useAuth()
+const { currentUser, clearAuth, setAuth, isLoggedIn, token } = useAuth()
 const loading = ref(true)
 const randomAnime = ref<Anime | null>(null)
 const recentRatings = ref<Rating[]>([])
@@ -346,7 +457,22 @@ const showAuthDialog = ref(false)
 const showRatingsHistory = ref(false)
 const showBackTop = ref(false)
 const headerScrolled = ref(false)
+const showChangeUsernameDialog = ref(false)
+const showChangePasswordDialog = ref(false)
+const changeUsernameForm = ref({ newUsername: '' })
+const changePasswordForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const changingUsername = ref(false)
+const changingPassword = ref(false)
+const usernameUniqueError = ref('')
+const usernameCheckTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const passwordConfirmError = ref('')
+const newPasswordError = ref('')
+const userDialogWidth = ref(window.innerWidth < 768 ? '95%' : '400px')
 const reviewRefs = ref<(HTMLElement | null)[]>([])
+const page = ref(1)
+const hasMore = ref(true)
+const loadingMore = ref(false)
+const totalCount = ref(0)
 
 function getAnimeTags(anime: Anime): string[] {
   try {
@@ -382,18 +508,24 @@ function onSearch() {
   if (searchTimer) clearTimeout(searchTimer)
   // 手动输入时清除 tagFilter
   tagFilter.value = ''
+  page.value = 1
+  hasMore.value = true
   searchTimer = setTimeout(() => loadAnimes(), 300)
 }
 
 function onSearchClear() {
   searchKeyword.value = ''
   tagFilter.value = ''
+  page.value = 1
+  hasMore.value = true
   loadAnimes()
 }
 
 function filterByTag(tag: string) {
   searchKeyword.value = tag
   tagFilter.value = tag
+  page.value = 1
+  hasMore.value = true
   loadAnimes()
 }
 
@@ -407,21 +539,48 @@ async function refreshRandom() {
 
 async function loadAll() {
   loading.value = true
-  await Promise.all([loadAnimes(), loadRandom(), loadRecent()])
-  loading.value = false
+  page.value = 1
+  hasMore.value = true
+  try {
+    await Promise.all([loadAnimes(), loadRandom(), loadRecent()])
+  } catch {
+    // 各子函数已有自己的错误处理
+  } finally {
+    loading.value = false
+  }
 }
 
-async function loadAnimes() {
+async function loadAnimes(append = false) {
   try {
-    const params: Record<string, string | number> = { limit: 50, sort: sortBy.value }
+    const params: Record<string, string | number> = { limit: 50, sort: sortBy.value, page: page.value }
     if (searchKeyword.value && !tagFilter.value) params.search = searchKeyword.value
     if (tagFilter.value) params.tag = tagFilter.value
     const res = await api.getAnimes(params)
-    animes.value = res.items
+    totalCount.value = res.total
+    if (append) {
+      animes.value = [...animes.value, ...res.items]
+    } else {
+      animes.value = res.items
+    }
+    hasMore.value = animes.value.length < res.total
     reviewRefs.value = new Array(animes.value.length).fill(null)
   } catch {
-    animes.value = []
+    if (!append) animes.value = []
   }
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  page.value++
+  await loadAnimes(true)
+  loadingMore.value = false
+}
+
+function onSortChange() {
+  page.value = 1
+  hasMore.value = true
+  loadAnimes()
 }
 
 async function loadRandom() {
@@ -445,11 +604,122 @@ function handleLogout() {
   // 退出后留在首页，登录按钮自动切换为显示状态
 }
 
+async function checkUsernameUnique() {
+  const val = changeUsernameForm.value.newUsername.trim()
+  if (!val || val.length < 2) {
+    usernameUniqueError.value = ''
+    return
+  }
+  if (usernameCheckTimer.value) clearTimeout(usernameCheckTimer.value)
+  usernameCheckTimer.value = setTimeout(async () => {
+    try {
+      const result = await api.checkUsername(val)
+      usernameUniqueError.value = result.available ? '' : '该用户名已被使用'
+    } catch {
+      usernameUniqueError.value = ''
+    }
+  }, 500)
+}
+
+async function handleChangeUsername() {
+  const form = changeUsernameForm.value
+  if (!form.newUsername || form.newUsername.length < 2) {
+    ElMessage.warning('用户名至少2个字符')
+    return
+  }
+  if (usernameUniqueError.value) {
+    ElMessage.warning('用户名已被使用，请换一个')
+    return
+  }
+  changingUsername.value = true
+  try {
+    const user = await api.changeUsername(form.newUsername)
+    // 强制更新当前用户信息
+    setAuth(token.value!, user)
+    // 额外确保：如果 setAuth 的 ref 更新未被追踪，直接赋值
+    if (currentUser.value) currentUser.value.username = user.username
+    ElMessage.success('用户名修改成功')
+    // 刷新页面数据 — 让 "大家在看啥"、"大家的评分" 等展示最新用户名
+    await loadRecent()
+    showChangeUsernameDialog.value = false
+    changeUsernameForm.value = { newUsername: '' }
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '修改失败')
+  } finally {
+    changingUsername.value = false
+  }
+}
+
+async function handleChangePassword() {
+  const form = changePasswordForm.value
+  if (!form.oldPassword) {
+    ElMessage.warning('请输入原密码')
+    return
+  }
+  if (!form.newPassword || form.newPassword.length < 6) {
+    ElMessage.warning('新密码至少6位')
+    return
+  }
+  if (passwordConfirmError.value) {
+    ElMessage.warning('两次输入的密码不一致')
+    return
+  }
+  changingPassword.value = true
+  try {
+    await api.changePassword(form.oldPassword, form.newPassword)
+    ElMessage.success('密码修改成功，请重新登录')
+    showChangePasswordDialog.value = false
+    changePasswordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+    // 强制重新登录
+    clearAuth()
+    showAuthDialog.value = true
+  } catch (e: unknown) {
+    ElMessage.error((e as Error).message || '修改失败')
+  } finally {
+    changingPassword.value = false
+  }
+}
+
+function onPasswordDialogOpened() {
+  newPasswordError.value = ''
+  passwordConfirmError.value = ''
+  changePasswordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+}
+
+function onNewPasswordInput() {
+  const newPwd = changePasswordForm.value.newPassword
+  if (newPwd && newPwd.length < 6) {
+    newPasswordError.value = '新密码至少6位'
+  } else {
+    newPasswordError.value = ''
+  }
+  // 新密码改变时也重新校验确认密码一致性
+  onPasswordConfirmInput()
+}
+
+function onPasswordConfirmInput() {
+  const confirm = changePasswordForm.value.confirmPassword
+  const newPwd = changePasswordForm.value.newPassword
+  if (confirm && newPwd && confirm !== newPwd) {
+    passwordConfirmError.value = '两次输入的密码不一致'
+  } else {
+    passwordConfirmError.value = ''
+  }
+}
+
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 const handleScroll = () => {
   showBackTop.value = window.scrollY > 400
   headerScrolled.value = window.scrollY > 60
+  // 滚动加载：距底部 300px 时触发
+  if (!loadingMore.value && hasMore.value) {
+    const scrollBottom = window.innerHeight + window.scrollY
+    const docHeight = document.documentElement.scrollHeight
+    if (docHeight - scrollBottom < 300) {
+      loadMore()
+    }
+  }
 }
 
 onMounted(() => {

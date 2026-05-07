@@ -36,15 +36,18 @@
             <span class="text-text-primary">{{ rating.anime_title }}</span>
           </p>
           <p class="text-small text-text-secondary mt-0.5">
-            <span class="inline-flex items-center gap-1">
-              <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-              <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
-            </span>
-            <span class="mx-1 text-text-body">·</span>
-            <span class="inline-flex items-center gap-1">
-              <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-              <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
-            </span>
+            <template v-if="rating.anime_score > 0">
+              <span class="inline-flex items-center gap-1">
+                <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+              </span>
+              <span class="mx-1 text-text-body">·</span>
+              <span class="inline-flex items-center gap-1">
+                <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
+              </span>
+            </template>
+            <span v-else class="text-text-secondary text-xs">暂不打分</span>
           </p>
           <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
         </div>

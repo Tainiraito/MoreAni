@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, InviteCode
-from schemas import LoginRequest, RegisterRequest, AuthResponse, UserSchema
+from schemas import LoginRequest, RegisterRequest, AuthResponse, UserSchema, ChangeUsernameRequest, ChangePasswordRequest, CheckUsernameRequest
 from auth import hash_password, verify_password, create_access_token, get_current_user
 
 router = APIRouter(prefix='/auth', tags=['auth'])
@@ -56,3 +56,39 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @router.get('/me', response_model=UserSchema)
 def me(current_user: User = Depends(get_current_user)):
     return UserSchema.model_validate(current_user)
+
+
+@router.post('/check-username', response_model=dict)
+def check_username(
+    req: CheckUsernameRequest,
+    db: Session = Depends(get_db)
+):
+    existing = db.query(User).filter(User.username == req.username).first()
+    return {'available': existing is None}
+
+
+@router.put('/me/username', response_model=UserSchema)
+def change_username(
+    req: ChangeUsernameRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    existing = db.query(User).filter(User.username == req.new_username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail='用户名已被使用')
+    current_user.username = req.new_username
+    db.commit()
+    db.refresh(current_user)
+    return UserSchema.model_validate(current_user)
+
+
+@router.put('/me/password', status_code=204)
+def change_password(
+    req: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not verify_password(req.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail='原密码错误')
+    current_user.password_hash = hash_password(req.new_password)
+    db.commit()

@@ -1,10 +1,15 @@
 import httpx
 from typing import Optional
+from time import time
 
 BANGUMI_V0 = 'https://api.bgm.tv/v0'
 BANGUMI_OLD = 'https://api.bgm.tv'
 
 _client: Optional[httpx.AsyncClient] = None
+
+# 简单缓存：subject_id -> (timestamp, data)
+_cache: dict[int, tuple[float, dict]] = {}
+CACHE_TTL = 600  # 10分钟
 
 
 def get_client() -> httpx.AsyncClient:
@@ -35,9 +40,18 @@ async def search_subjects(keyword: str, limit: int = 10, offset: int = 0) -> dic
 
 
 async def get_subject(subject_id: int) -> dict:
+    """获取番剧详情（含简介），带10分钟缓存"""
+    now = time()
+    if subject_id in _cache:
+        ts, data = _cache[subject_id]
+        if now - ts < CACHE_TTL:
+            return data
+
     resp = await get_client().get(f'{BANGUMI_V0}/subjects/{subject_id}')
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    _cache[subject_id] = (now, data)
+    return data
 
 
 async def get_subject_summary(subject_id: int) -> Optional[str]:

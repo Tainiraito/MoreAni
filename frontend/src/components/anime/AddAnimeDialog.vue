@@ -22,8 +22,13 @@
         </template>
       </el-input>
 
+      <!-- Loading State -->
+      <div v-if="searching" class="mt-2 text-xs text-text-secondary text-center py-4">
+        <el-icon class="is-loading"><Loading /></el-icon> 正在搜索...
+      </div>
+
       <!-- Search Results Dropdown -->
-      <div v-if="searchResults.length > 0" class="mt-2 border border-gray-200 rounded-8 max-h-64 overflow-y-auto">
+      <div v-else-if="searchResults.length > 0" class="mt-2 border border-gray-200 rounded-8 max-h-64 overflow-y-auto">
         <div
           v-for="item in searchResults"
           :key="item.bgm_id"
@@ -87,7 +92,7 @@
           <el-input v-model="form.season" placeholder="如 2024年冬" />
         </el-form-item>
       </div>
-      <el-form-item label="标签（逗号分隔）">
+      <el-form-item label="标签（中、英文逗号分隔）">
         <el-input v-model="tagsInput" placeholder="科幻, 悬疑, 催泪" />
       </el-form-item>
       <el-form-item label="简介">
@@ -212,29 +217,32 @@ function selectBangumi(item: BangumiSearchResult) {
   form.title_cn = item.title_cn
   form.title_jp = item.title_jp
   form.cover_url = item.cover_url
-  form.description = item.summary
   form.episodes = item.episodes
   form.air_date = item.air_date
   form.platform = item.platform
+  form.status = item.status
+  form.season = item.season
+  form.description = ''
   tagsInput.value = item.tags.join(', ')
   searchResults.value = []
   keyword.value = ''
-  // 异步获取详细数据（状态、季度等）
+  importMessage.value = ''
+  // 非阻塞获取摘要等详情数据
   fetchBangumiDetail(item.bgm_id)
 }
 
 async function fetchBangumiDetail(bgmId: number) {
+  form.description = '⌛ 正在获取简介...'
   try {
     const detail = await api.getBangumiDetail(bgmId)
-    if (detail.status) form.status = detail.status
-    if (detail.season) form.season = detail.season
-    if (detail.description && !form.description) form.description = detail.description
-    // 如果搜到的空字段较多，用详情数据补充
+    if (detail.description) form.description = detail.description
+    if (detail.status && !form.status) form.status = detail.status
+    if (detail.season && !form.season) form.season = detail.season
     if (detail.episodes && !form.episodes) form.episodes = detail.episodes
     if (detail.platform && !form.platform) form.platform = detail.platform
     if (detail.tags.length && !tagsInput.value) tagsInput.value = detail.tags.join(', ')
   } catch {
-    // 详情获取失败不影响手动填写
+    form.description = ''
   }
 }
 

@@ -40,3 +40,9 @@ docker-compose.override.yml
 
 # Temporary scripts
 frontend/*.mjs
+
+# Local review docs (not for public repo)
+docs/review/
+
+# Hermes skills (local agent knowledge, not project files)
+skills/

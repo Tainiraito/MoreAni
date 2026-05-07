@@ -2,13 +2,25 @@
     <el-dialog
       :model-value="visible"
       :width="dialogWidth"
-      destroy-on-close
       class="anime-dialog"
       overlay-class="anime-overlay"
       @update:model-value="$emit('update:visible', $event)"
-      @opened="loadDetail"
     >
-      <template v-if="detail">
+      <div class="loading-content relative min-h-[350px] rounded-8">
+        <!-- 自定义 Loading 覆盖层 — 粉紫主题，绝对居中，不跳动 -->
+        <div
+          v-if="loading"
+          class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-8"
+          style="background: rgba(255, 255, 255, 0.85)"
+        >
+          <svg class="animate-spin h-8 w-8" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="var(--primary-purple)" stroke-width="3" fill="none" />
+            <path class="opacity-75" fill="var(--primary-pink)" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span class="text-xs" style="color: var(--primary-purple)">加载中...</span>
+        </div>
+
+        <template v-if="detail">
         <!-- 封面取色渐变背景（淡色，不溢出） -->
         <div
           class="absolute inset-0 transition-colors duration-700 rounded-12 pointer-events-none"
@@ -18,14 +30,23 @@
         <div class="relative z-10">
           <!-- Anime Info -->
           <div class="flex gap-4 mb-6 flex-col sm:flex-row">
-            <img
+            <el-image
               ref="coverRef"
               :src="detail.anime.cover_url"
               :alt="detail.anime.title_cn"
-              class="w-24 h-32 object-cover rounded-8 flex-shrink-0 shadow-md mx-auto sm:mx-0"
+              :preview-src-list="[detail.anime.cover_url]"
+              hide-on-click-modal
+              class="w-24 h-32 flex-shrink-0 shadow-md mx-auto sm:mx-0"
+              fit="cover"
               @load="extractColor"
               @error="onCoverError"
-            />
+            >
+              <template #error>
+                <div class="w-24 h-32 flex items-center justify-center bg-gray-100 rounded-8">
+                  <el-icon :size="24" class="text-text-secondary"><PictureFilled /></el-icon>
+                </div>
+              </template>
+            </el-image>
             <div class="flex-1 min-w-0">
               <h2 class="text-card-title mb-1">{{ detail.anime.title_cn }}</h2>
               <p class="text-small text-text-secondary mb-2">{{ detail.anime.title_jp }}</p>
@@ -51,6 +72,50 @@
 
           <!-- Edit Anime Form -->
           <div v-if="showEdit" class="glass-card p-4 mb-4 edit-form-card">
+            <!-- Bangumi Search -->
+            <div class="mb-3">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="搜索 Bangumi 自动填充..."
+                size="small"
+                :loading="searching"
+                clearable
+                @input="onSearchInput"
+                @clear="searchResults = []; searchError = ''"
+              >
+                <template #prefix>
+                  <el-icon class="text-text-secondary"><Search /></el-icon>
+                </template>
+              </el-input>
+
+              <div v-if="searching" class="mt-2 text-xs text-text-secondary text-center py-4">
+                <el-icon class="is-loading"><Loading /></el-icon> 正在搜索...
+              </div>
+              <div v-else-if="searchResults.length > 0" class="mt-2 border border-gray-200 rounded-8 max-h-48 overflow-y-auto bg-white">
+                <div
+                  v-for="item in searchResults"
+                  :key="item.bgm_id"
+                  class="flex items-center gap-2 p-2 hover:bg-primary-pink/5 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
+                  @click="selectBangumi(item)"
+                >
+                  <img
+                    :src="item.cover_url"
+                    class="w-8 h-11 object-cover rounded-4 flex-shrink-0"
+                    @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="text-xs font-semibold text-text-primary truncate">{{ item.title_cn }}</p>
+                    <p class="text-xs text-text-secondary">
+                      {{ item.rating || '-' }}分 · {{ item.platform || '未知' }}
+                      <template v-if="item.episodes"> · {{ item.episodes }}集</template>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p v-if="searchError" class="text-xs text-primary-pink mt-1">{{ searchError }}</p>
+            </div>
+            <el-divider class="!my-3 !border-gray-100" />
             <el-form :model="editForm" label-position="top" size="default">
               <div class="grid grid-cols-2 gap-x-3 gap-y-0">
                 <el-form-item label="中文名">
@@ -87,6 +152,9 @@
                   <el-input v-model="editForm.season" />
                 </el-form-item>
               </div>
+              <el-form-item label="标签（中、英文逗号分隔）">
+                <el-input v-model="tagsInput" placeholder="科幻, 悬疑, 催泪" />
+              </el-form-item>
               <el-form-item label="简介">
                 <el-input v-model="editForm.description" type="textarea" :rows="2" />
               </el-form-item>
@@ -151,34 +219,37 @@
             <template v-if="!showRatingForm">
               <!-- Has existing rating: read-only display -->
               <div v-if="hasExistingRating && detail?.my_rating">
-                <div class="flex flex-col gap-1 mb-3">
-                  <div class="flex items-center gap-2">
-                    <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
-                    <span class="text-small text-text-secondary whitespace-nowrap">番剧评分</span>
-                    <el-rate
-                      :model-value="detail.my_rating.anime_score"
-                      :max="10"
-                      show-score
-                      size="small"
-                      :score-template="'{value}分'"
-                      :colors="['#f783ac', '#d087c8', '#b490e4']"
-                      disabled
-                    />
+                <template v-if="detail.my_rating.anime_score > 0">
+                  <div class="flex flex-col gap-1 mb-3">
+                    <div class="flex items-center gap-2">
+                      <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
+                      <span class="text-small text-text-secondary whitespace-nowrap">番剧评分</span>
+                      <el-rate
+                        :model-value="detail.my_rating.anime_score"
+                        :max="10"
+                        show-score
+                        size="small"
+                        :score-template="'{value}分'"
+                        :colors="['#f783ac', '#d087c8', '#b490e4']"
+                        disabled
+                      />
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <el-icon :size="16" class="text-primary-purple"><GoldMedal /></el-icon>
+                      <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
+                      <el-rate
+                        :model-value="detail.my_rating.recommend"
+                        :max="10"
+                        show-score
+                        size="small"
+                        :score-template="'{value}分'"
+                        :colors="['#f783ac', '#d087c8', '#b490e4']"
+                        disabled
+                      />
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <el-icon :size="16" class="text-primary-purple"><GoldMedal /></el-icon>
-                    <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
-                    <el-rate
-                      :model-value="detail.my_rating.recommend"
-                      :max="10"
-                      show-score
-                      size="small"
-                      :score-template="'{value}分'"
-                      :colors="['#f783ac', '#d087c8', '#b490e4']"
-                      disabled
-                    />
-                  </div>
-                </div>
+                </template>
+                <p v-else class="text-small text-text-secondary mb-3">暂不打分</p>
                 <p v-if="detail.my_rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">
                   {{ detail.my_rating.review }}
                 </p>
@@ -192,7 +263,12 @@
 
             <!-- Edit state: show form -->
             <template v-else>
-              <div class="flex flex-col gap-1 mb-3">
+              <div class="flex items-center gap-2 mb-3">
+                <el-checkbox v-model="ratingForm.unwatched" size="small" @change="onUnwatchedToggle">
+                  <span class="text-xs text-text-secondary">暂不打分（评分为0，不计入均分计算）</span>
+                </el-checkbox>
+              </div>
+              <div v-if="!ratingForm.unwatched" class="flex flex-col gap-1 mb-3">
                 <div class="flex items-center gap-2">
                   <el-icon :size="16" class="text-primary-pink"><StarFilled /></el-icon>
                   <span class="text-small text-text-secondary whitespace-nowrap">番剧评分</span>
@@ -255,15 +331,18 @@
                       <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
                     </p>
                     <p class="text-small text-text-secondary mb-1 flex items-center gap-1 flex-wrap">
-                      <span class="inline-flex items-center gap-1">
-                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                        <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
-                      </span>
-                      <span class="text-text-body">·</span>
-                      <span class="inline-flex items-center gap-1">
-                        <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                        <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
-                      </span>
+                      <template v-if="rating.anime_score > 0">
+                        <span class="inline-flex items-center gap-1">
+                          <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                          <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+                        </span>
+                        <span class="text-text-body">·</span>
+                        <span class="inline-flex items-center gap-1">
+                          <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                          <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
+                        </span>
+                      </template>
+                      <span v-else class="text-text-secondary text-xs">暂不打分</span>
                     </p>
                     <p v-if="rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
                   </div>
@@ -272,34 +351,30 @@
             </div>
           </div>
         </div>
-      </template>
-      <div v-else class="flex items-center justify-center py-20">
-        <p class="text-text-secondary">加载中...</p>
+        </template>
       </div>
 
-      <AuthDialog
-        v-model:visible="showAuthDialog"
-        @success="loadDetail"
-      />
-    </el-dialog>
-
-    <!-- Navigation buttons - 放在 el-dialog 外部 + Teleport 到 body 避免 z-index 问题 -->
-    <Teleport to="body">
+      <!-- Navigation buttons - 放在 el-dialog 内部，与弹窗同生命周期，无延迟 -->
       <button
-        v-if="visible && showNav && hasPrevious"
+        v-show="hasPrevious"
         class="nav-btn nav-prev"
         @click.stop="emit('previous')"
       >
         <el-icon :size="20"><ArrowLeft /></el-icon>
       </button>
       <button
-        v-if="visible && showNav && hasNext"
+        v-show="hasNext"
         class="nav-btn nav-next"
         @click.stop="emit('next')"
       >
         <el-icon :size="20"><ArrowRight /></el-icon>
       </button>
-    </Teleport>
+
+      <AuthDialog
+        v-model:visible="showAuthDialog"
+        @success="loadDetail"
+      />
+    </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -308,7 +383,7 @@ import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AuthDialog from '@/components/auth/AuthDialog.vue'
-import type { AnimeDetail } from '@/types'
+import type { AnimeDetail, BangumiSearchResult } from '@/types'
 
 const props = withDefaults(defineProps<{
   visible: boolean
@@ -330,11 +405,17 @@ const emit = defineEmits<{
 const api = useApi()
 const { isLoggedIn, currentUser } = useAuth()
 const detail = ref<AnimeDetail | null>(null)
+const loading = ref(true)
 const showEdit = ref(false)
 const savingRating = ref(false)
 const savingEdit = ref(false)
 const showAuthDialog = ref(false)
-const showNav = ref(false)
+const searchKeyword = ref('')
+const searching = ref(false)
+const searchResults = ref<BangumiSearchResult[]>([])
+const searchError = ref('')
+const tagsInput = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 const gradientBg = ref('linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)')
 const coverRef = ref<HTMLImageElement | null>(null)
 
@@ -358,6 +439,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
+  if (searchTimer) clearTimeout(searchTimer)
 })
 
 function onKeyDown(e: KeyboardEvent) {
@@ -372,7 +454,8 @@ function onKeyDown(e: KeyboardEvent) {
 const ratingForm = reactive({
   anime_score: 8,
   recommend: 8,
-  review: ''
+  review: '',
+  unwatched: false
 })
 
 const editForm = reactive({
@@ -409,20 +492,22 @@ const parsedTags = computed(() => {
 
 async function loadDetail() {
   if (!props.animeId) return
-  detail.value = null
   showEdit.value = false
+  loading.value = true
   try {
     const data = await api.getAnime(props.animeId)
     detail.value = data
-    showNav.value = true
+    loading.value = false
     if (data.my_rating) {
       ratingForm.anime_score = data.my_rating.anime_score
       ratingForm.recommend = data.my_rating.recommend
       ratingForm.review = data.my_rating.review
+      ratingForm.unwatched = data.my_rating.anime_score === 0
     } else {
       ratingForm.anime_score = 8
       ratingForm.recommend = 8
       ratingForm.review = ''
+      ratingForm.unwatched = false
     }
     const anime = data.anime
     editForm.title_cn = anime.title_cn
@@ -434,8 +519,10 @@ async function loadDetail() {
     editForm.platform = anime.platform
     editForm.air_date = anime.air_date
     editForm.season = anime.season
+    setTagsInput(anime.tags)
   } catch {
     detail.value = null
+    loading.value = false
   }
 }
 
@@ -496,7 +583,11 @@ async function saveRating() {
 async function saveEdit() {
   savingEdit.value = true
   try {
-    await api.updateAnime(props.animeId, { ...editForm })
+    const tags = tagsInput.value
+      .split(/[,，]/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+    await api.updateAnime(props.animeId, { ...editForm, tags: JSON.stringify(tags) })
     ElMessage.success('番剧信息已更新')
     showEdit.value = false
     emit('refresh')
@@ -505,6 +596,73 @@ async function saveEdit() {
     ElMessage.error((e as Error).message || '更新失败')
   } finally {
     savingEdit.value = false
+  }
+}
+
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  const val = searchKeyword.value.trim()
+  if (!val) {
+    searchResults.value = []
+    searchError.value = ''
+    return
+  }
+  searchTimer = setTimeout(async () => {
+    searching.value = true
+    searchError.value = ''
+    try {
+      const res = await api.searchBangumi(val)
+      searchResults.value = res.animes
+      if (res.animes.length === 0) searchError.value = '未找到，试试换关键词'
+    } catch {
+      searchResults.value = []
+      searchError.value = '搜索暂不可用，请手动填写'
+    } finally {
+      searching.value = false
+    }
+  }, 300)
+}
+
+function selectBangumi(item: BangumiSearchResult) {
+  editForm.title_cn = item.title_cn
+  editForm.title_jp = item.title_jp
+  editForm.cover_url = item.cover_url
+  editForm.episodes = item.episodes
+  editForm.air_date = item.air_date
+  editForm.platform = item.platform
+  editForm.status = item.status
+  editForm.season = item.season
+  editForm.description = ''
+  tagsInput.value = item.tags.join(', ')
+  searchResults.value = []
+  searchKeyword.value = ''
+  searchError.value = ''
+  // 非阻塞获取摘要等详情数据
+  fetchBangumiDetail(item.bgm_id)
+}
+
+async function fetchBangumiDetail(bgmId: number) {
+  editForm.description = '⌛ 正在获取简介...'
+  try {
+    const detail = await api.getBangumiDetail(bgmId)
+    if (detail.description) editForm.description = detail.description
+    // 如果详情有更准确的数据，也补充
+    if (detail.status && !editForm.status) editForm.status = detail.status
+    if (detail.season && !editForm.season) editForm.season = detail.season
+    if (detail.episodes && !editForm.episodes) editForm.episodes = detail.episodes
+    if (detail.platform && !editForm.platform) editForm.platform = detail.platform
+    if (detail.tags.length && !tagsInput.value) tagsInput.value = detail.tags.join(', ')
+  } catch {
+    editForm.description = ''
+  }
+}
+
+function setTagsInput(tags: string) {
+  try {
+    const parsed = JSON.parse(tags)
+    tagsInput.value = Array.isArray(parsed) ? parsed.join(', ') : tags
+  } catch {
+    tagsInput.value = tags.split(/[,，]/).filter(Boolean).join(', ')
   }
 }
 
@@ -539,16 +697,28 @@ function enterRatingMode() {
   showRatingForm.value = true
 }
 
+function onUnwatchedToggle(val: boolean) {
+  if (val) {
+    ratingForm.anime_score = 0
+    ratingForm.recommend = 0
+  } else {
+    ratingForm.anime_score = 8
+    ratingForm.recommend = 8
+  }
+}
+
 function cancelRating() {
   showRatingForm.value = false
   if (detail.value?.my_rating) {
     ratingForm.anime_score = detail.value.my_rating.anime_score
     ratingForm.recommend = detail.value.my_rating.recommend
     ratingForm.review = detail.value.my_rating.review
+    ratingForm.unwatched = detail.value.my_rating.anime_score === 0
   } else {
     ratingForm.anime_score = 8
     ratingForm.recommend = 8
     ratingForm.review = ''
+    ratingForm.unwatched = false
   }
 }
 
@@ -568,6 +738,11 @@ watch(isLoggedIn, (loggedIn) => {
 
 watch(() => props.animeId, () => {
   if (props.visible) loadDetail()
+})
+
+// 弹窗打开时首次加载
+watch(() => props.visible, (v) => {
+  if (v) loadDetail()
 })
 </script>
 
@@ -642,4 +817,8 @@ watch(() => props.animeId, () => {
 .nav-next {
   left: calc(50% + 312px);
 }
+
+/* ========================================
+   Loading 覆盖层 — 粉紫主题 + 防跳动 - 已迁移为自定义组件
+   ======================================== */
 </style>

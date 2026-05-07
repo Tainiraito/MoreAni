@@ -417,6 +417,22 @@ html {
   box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
 }
 
+/* --- Checkbox 粉紫主题覆盖 --- */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--primary-pink) !important;
+  border-color: var(--primary-pink) !important;
+}
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: var(--primary-pink) !important;
+}
+.el-checkbox__inner:hover {
+  border-color: var(--primary-purple) !important;
+}
+.el-checkbox__input.is-focus .el-checkbox__inner {
+  border-color: var(--primary-pink) !important;
+  box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
+}
+
 /* ========================================
    12. 按钮样式系统（Gleamory 风格统一）
    ========================================

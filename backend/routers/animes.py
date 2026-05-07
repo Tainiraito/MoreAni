@@ -13,8 +13,8 @@ router = APIRouter(prefix='/animes', tags=['animes'])
 
 def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
     avg_data = db.query(
-        func.avg(Rating.anime_score).label('avg_score'),
-        func.avg(Rating.recommend).label('avg_rec'),
+        func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
+        func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
         func.count(Rating.id).label('count')
     ).filter(Rating.anime_id == anime.id).first()
 
@@ -34,8 +34,8 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
         # Get per-anime averages
         per_anime = db.query(
             Rating.anime_id,
-            func.avg(Rating.anime_score).label('a_score'),
-            func.avg(Rating.recommend).label('a_rec')
+            func.avg(func.nullif(Rating.anime_score, 0)).label('a_score'),
+            func.avg(func.nullif(Rating.recommend, 0)).label('a_rec')
         ).group_by(Rating.anime_id).all()
         total_animes = len(per_anime) if per_anime else 0
         if total_animes > 0:
@@ -83,8 +83,12 @@ def list_animes(
 ):
     avg_score_sub = db.query(
         Rating.anime_id,
-        func.avg(Rating.anime_score).label('avg_score'),
-        func.avg(Rating.recommend).label('avg_rec'),
+        func.avg(
+            func.nullif(Rating.anime_score, 0)
+        ).label('avg_score'),
+        func.avg(
+            func.nullif(Rating.recommend, 0)
+        ).label('avg_rec'),
         func.count(Rating.id).label('rating_count')
     ).group_by(Rating.anime_id).subquery()
 

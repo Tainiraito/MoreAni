@@ -64,6 +64,8 @@ export interface BangumiSearchResult {
   air_date: string
   platform: string
   summary: string
+  status: string
+  season: string
 }
 
 export interface BangumiSearchResponse {

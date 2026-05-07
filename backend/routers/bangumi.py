@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Anime
 from schemas import BangumiSearchRequest, BangumiSearchResponse, BangumiSearchItem, BangumiImportResponse, BangumiDetailResponse
-from services.bangumi import search_subjects, get_subject, get_subject_summary
+from services.bangumi import search_subjects, get_subject
 from services.infobox import extract_episodes, extract_status, extract_air_date, extract_season
 from auth import get_current_user
 
@@ -20,6 +20,24 @@ async def search(req: BangumiSearchRequest):
 
     results = []
     for item in data.get('data', []):
+        # 从 date 推导状态和季度
+        import re
+        from datetime import datetime as _dt
+        air_date = item.get('date', '') or ''
+        _status = ''
+        _season = ''
+        if air_date:
+            try:
+                d = _dt.strptime(air_date[:10], '%Y-%m-%d')
+                _status = '已完结' if d < _dt(2025, 6, 1) else '连载中'
+            except:
+                pass
+            m = re.search(r'(\d{4})-(\d{2})', air_date)
+            if m:
+                y, mo = m.group(1), int(m.group(2))
+                s = {1:'冬',2:'冬',3:'冬',4:'春',5:'春',6:'春',7:'夏',8:'夏',9:'夏',10:'秋',11:'秋',12:'秋'}
+                _season = f"{y}年{s.get(mo, '')}"
+
         results.append(BangumiSearchItem(
             bgm_id=item['id'],
             title_cn=item.get('name_cn') or item['name'],
@@ -29,9 +47,11 @@ async def search(req: BangumiSearchRequest):
             rank=item.get('rating', {}).get('rank') or 0,
             tags=[t['name'] for t in item.get('tags', [])],
             episodes=item.get('eps', 0),
-            air_date=item.get('date', ''),
+            air_date=air_date,
             platform=item.get('platform', ''),
-            summary=''
+            summary='',
+            status=_status,
+            season=_season
         ))
 
     return BangumiSearchResponse(
@@ -52,10 +72,10 @@ async def import_anime(
 
     try:
         subject = await get_subject(bgm_id)
-        summary = await get_subject_summary(bgm_id)
     except Exception:
         raise HTTPException(status_code=502, detail='无法从 Bangumi 获取数据')
 
+    summary = subject.get('summary', '') or ''
     infobox = subject.get('infobox', [])
     tags_list = [t['name'] for t in subject.get('tags', [])]
 
@@ -63,7 +83,7 @@ async def import_anime(
         title_cn=subject.get('name_cn') or subject['name'],
         title_jp=subject['name'],
         cover_url=subject.get('images', {}).get('large', ''),
-        description=summary or '',
+        description=summary,
         episodes=extract_episodes(infobox),
         status=extract_status(infobox),
         tags=json.dumps(tags_list, ensure_ascii=False),
@@ -83,10 +103,10 @@ async def import_anime(
 async def bangumi_detail(bgm_id: int):
     try:
         subject = await get_subject(bgm_id)
-        summary = await get_subject_summary(bgm_id)
     except Exception:
         raise HTTPException(status_code=502, detail='无法从 Bangumi 获取数据')
 
+    summary = subject.get('summary', '') or ''
     infobox = subject.get('infobox', [])
     tags_list = [t['name'] for t in subject.get('tags', [])]
 
@@ -95,7 +115,7 @@ async def bangumi_detail(bgm_id: int):
         title_cn=subject.get('name_cn') or subject['name'],
         title_jp=subject['name'],
         cover_url=subject.get('images', {}).get('large', ''),
-        description=summary or '',
+        description=summary,
         episodes=extract_episodes(infobox),
         status=extract_status(infobox),
         season=extract_season(infobox),
