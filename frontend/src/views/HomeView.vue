@@ -275,7 +275,6 @@
               size="small"
               clearable
               class="!w-40"
-              @input="onSearch"
               @clear="onSearchClear"
             />
             <el-select v-model="sortBy" size="small" class="!w-32" @change="onSortChange">
@@ -536,7 +535,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
 import { ElMessage } from 'element-plus'
@@ -561,6 +560,7 @@ const animes = ref<Anime[]>([])
 const searchKeyword = ref('')
 const tagFilter = ref('')
 const sortBy = ref('avg_score')
+const isTagFiltering = ref(false)
 
 const selectedAnimeIndex = computed(() =>
   animes.value.findIndex((a) => a.id === selectedAnimeId.value)
@@ -627,16 +627,8 @@ function handleAddAnime() {
   }
 }
 
-function onSearch() {
-  if (searchTimer) clearTimeout(searchTimer)
-  // 手动输入时清除 tagFilter
-  tagFilter.value = ''
-  page.value = 1
-  hasMore.value = true
-  searchTimer = setTimeout(() => loadAnimes(), 300)
-}
-
 function onSearchClear() {
+  if (searchTimer) clearTimeout(searchTimer)
   searchKeyword.value = ''
   tagFilter.value = ''
   page.value = 1
@@ -644,7 +636,23 @@ function onSearchClear() {
   loadAnimes()
 }
 
+watch(searchKeyword, (val) => {
+  if (isTagFiltering.value) {
+    isTagFiltering.value = false
+    return
+  }
+  if (searchTimer) clearTimeout(searchTimer)
+  tagFilter.value = ''
+  page.value = 1
+  hasMore.value = true
+  if (val) {
+    searchTimer = setTimeout(() => loadAnimes(), 300)
+  }
+})
+
 function filterByTag(tag: string) {
+  if (searchTimer) clearTimeout(searchTimer)
+  isTagFiltering.value = true
   searchKeyword.value = tag
   tagFilter.value = tag
   page.value = 1
