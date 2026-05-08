@@ -1,8 +1,9 @@
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import SessionLocal, engine, Base
+from database import Base, SessionLocal, engine
 from models import InviteCode
 
 Base.metadata.create_all(bind=engine)

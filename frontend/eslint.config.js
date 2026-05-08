@@ -20,5 +20,17 @@ export default [
   },
   {
     ignores: ['dist/**', 'node_modules/**']
+  },
+  {
+    files: ['*.mjs'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        localStorage: 'readonly'
+      }
+    }
   }
 ]

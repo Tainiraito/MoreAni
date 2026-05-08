@@ -1,9 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from auth import create_access_token, get_current_user, hash_password, verify_password
 from database import get_db
-from models import User, InviteCode
-from schemas import LoginRequest, RegisterRequest, AuthResponse, UserSchema, ChangeUsernameRequest, ChangePasswordRequest, CheckUsernameRequest
-from auth import hash_password, verify_password, create_access_token, get_current_user
+from models import InviteCode, User
+from schemas import (
+    AuthResponse,
+    ChangePasswordRequest,
+    ChangeUsernameRequest,
+    CheckUsernameRequest,
+    LoginRequest,
+    RegisterRequest,
+    UserSchema,
+)
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -23,19 +32,14 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if not invite:
         raise HTTPException(status_code=400, detail='邀请码无效')
 
-    user = User(
-        username=req.username,
-        password_hash=hash_password(req.password)
-    )
+    user = User(username=req.username, password_hash=hash_password(req.password))
     db.add(user)
     db.commit()
     db.refresh(user)
 
     token = create_access_token({'sub': user.id})
     return AuthResponse(
-        access_token=token,
-        token_type='bearer',
-        user=UserSchema.model_validate(user)
+        access_token=token, token_type='bearer', user=UserSchema.model_validate(user)
     )
 
 
@@ -47,9 +51,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token({'sub': user.id})
     return AuthResponse(
-        access_token=token,
-        token_type='bearer',
-        user=UserSchema.model_validate(user)
+        access_token=token, token_type='bearer', user=UserSchema.model_validate(user)
     )
 
 
@@ -59,10 +61,7 @@ def me(current_user: User = Depends(get_current_user)):
 
 
 @router.post('/check-username', response_model=dict)
-def check_username(
-    req: CheckUsernameRequest,
-    db: Session = Depends(get_db)
-):
+def check_username(req: CheckUsernameRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == req.username).first()
     return {'available': existing is None}
 
@@ -71,7 +70,7 @@ def check_username(
 def change_username(
     req: ChangeUsernameRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     existing = db.query(User).filter(User.username == req.new_username).first()
     if existing:
@@ -86,7 +85,7 @@ def change_username(
 def change_password(
     req: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     if not verify_password(req.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail='原密码错误')

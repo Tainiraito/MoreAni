@@ -1,10 +1,10 @@
 <template>
-    <el-dialog
-      :model-value="visible"
-      :width="dialogWidth"
-      destroy-on-close
-      class="auth-dialog"
-      @update:model-value="$emit('update:visible', $event)"
+  <el-dialog
+    :model-value="visible"
+    :width="dialogWidth"
+    destroy-on-close
+    class="auth-dialog"
+    @update:model-value="$emit('update:visible', $event)"
   >
     <!-- Tab Switcher -->
     <div class="flex mb-6 bg-gray-50 rounded-8 p-1 relative">
@@ -47,7 +47,12 @@
         <el-input v-model="loginForm.username" placeholder="请输入用户名" />
       </el-form-item>
       <el-form-item label="密码" prop="password">
-        <el-input v-model="loginForm.password" type="password" show-password placeholder="请输入密码" />
+        <el-input
+          v-model="loginForm.password"
+          type="password"
+          show-password
+          placeholder="请输入密码"
+        />
       </el-form-item>
       <el-button
         class="btn-gradient w-full"
@@ -72,7 +77,12 @@
         <el-input v-model="registerForm.username" placeholder="请输入用户名" />
       </el-form-item>
       <el-form-item label="密码" prop="password">
-        <el-input v-model="registerForm.password" type="password" show-password placeholder="至少 6 位密码" />
+        <el-input
+          v-model="registerForm.password"
+          type="password"
+          show-password
+          placeholder="至少 6 位密码"
+        />
       </el-form-item>
       <el-form-item label="邀请码" prop="invite_code">
         <el-input v-model="registerForm.invite_code" placeholder="请输入邀请码" />
@@ -165,7 +175,11 @@ async function handleRegister() {
 
   loading.value = true
   try {
-    const res = await api.register(registerForm.username, registerForm.password, registerForm.invite_code)
+    const res = await api.register(
+      registerForm.username,
+      registerForm.password,
+      registerForm.invite_code
+    )
     setAuth(res.access_token, res.user)
     ElMessage.success('注册成功')
     emit('success')

@@ -1,4 +1,3 @@
-
 def extract_episodes(infobox: list[dict]) -> int:
     for item in infobox:
         if item.get('key') == '话数':
@@ -52,6 +51,7 @@ def extract_season(infobox: list[dict]) -> str:
             return item.get('value', '')
     # 兜底：从 放送开始 日期推导季度
     import re
+
     for item in infobox:
         if item.get('key') == '放送开始':
             date_str = item.get('value', '')

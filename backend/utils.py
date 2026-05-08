@@ -14,5 +14,5 @@ def rating_to_schema(rating: Rating) -> RatingSchema:
         created_at=rating.created_at,
         updated_at=rating.updated_at,
         anime_title=rating.anime.title_cn if rating.anime else None,
-        anime_cover=rating.anime.cover_url if rating.anime else None
+        anime_cover=rating.anime.cover_url if rating.anime else None,
     )

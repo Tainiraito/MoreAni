@@ -1,29 +1,43 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
-from typing import Optional
-from database import get_db
-from models import User, Anime, Rating
-from schemas import AnimeSchema, AnimeCreate, AnimeUpdate, AnimeDetail, AnimeListResponse, RatingSchema
+
 from auth import get_current_user, get_optional_user
+from database import get_db
+from models import Anime, Rating, User
+from schemas import (
+    AnimeCreate,
+    AnimeDetail,
+    AnimeListResponse,
+    AnimeSchema,
+    AnimeUpdate,
+)
 from utils import rating_to_schema
 
 router = APIRouter(prefix='/animes', tags=['animes'])
 
 
 def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
-    avg_data = db.query(
-        func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
-        func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
-        func.count(Rating.id).label('count')
-    ).filter(Rating.anime_id == anime.id).first()
+    avg_data = (
+        db.query(
+            func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
+            func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
+            func.count(Rating.id).label('count'),
+        )
+        .filter(Rating.anime_id == anime.id)
+        .first()
+    )
 
-    latest = db.query(Rating).filter(
-        Rating.anime_id == anime.id,
-        Rating.review != ''
-    ).order_by(Rating.updated_at.desc()).first()
+    latest = (
+        db.query(Rating)
+        .filter(Rating.anime_id == anime.id, Rating.review != '')
+        .order_by(Rating.updated_at.desc())
+        .first()
+    )
 
-    avg_score = round(avg_data.avg_score, 1) if avg_data and avg_data.avg_score else None
+    avg_score = (
+        round(avg_data.avg_score, 1) if avg_data and avg_data.avg_score else None
+    )
     avg_rec = round(avg_data.avg_rec, 1) if avg_data and avg_data.avg_rec else None
 
     # Calculate rankings using subquery
@@ -32,17 +46,25 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
     total_animes = None
     if avg_score is not None:
         # Get per-anime averages
-        per_anime = db.query(
-            Rating.anime_id,
-            func.avg(func.nullif(Rating.anime_score, 0)).label('a_score'),
-            func.avg(func.nullif(Rating.recommend, 0)).label('a_rec')
-        ).group_by(Rating.anime_id).all()
+        per_anime = (
+            db.query(
+                Rating.anime_id,
+                func.avg(func.nullif(Rating.anime_score, 0)).label('a_score'),
+                func.avg(func.nullif(Rating.recommend, 0)).label('a_rec'),
+            )
+            .group_by(Rating.anime_id)
+            .all()
+        )
         total_animes = len(per_anime) if per_anime else 0
         if total_animes > 0:
             scores = sorted([r.a_score for r in per_anime], reverse=True)
             recs = sorted([r.a_rec for r in per_anime], reverse=True)
-            score_rank = next((i + 1 for i, s in enumerate(scores) if s <= avg_score), total_animes)
-            recommend_rank = next((i + 1 for i, r in enumerate(recs) if r <= avg_rec), total_animes)
+            score_rank = next(
+                (i + 1 for i, s in enumerate(scores) if s <= avg_score), total_animes
+            )
+            recommend_rank = next(
+                (i + 1 for i, r in enumerate(recs) if r <= avg_rec), total_animes
+            )
 
     return AnimeSchema(
         id=anime.id,
@@ -66,7 +88,7 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
         latest_review=latest.review if latest else None,
         score_rank=score_rank,
         recommend_rank=recommend_rank,
-        total_animes=total_animes
+        total_animes=total_animes,
     )
 
 
@@ -78,30 +100,25 @@ def list_animes(
     sort: str = Query(default='avg_score'),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
-    current_user: Optional[User] = Depends(get_optional_user),
-    db: Session = Depends(get_db)
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ):
-    avg_score_sub = db.query(
-        Rating.anime_id,
-        func.avg(
-            func.nullif(Rating.anime_score, 0)
-        ).label('avg_score'),
-        func.avg(
-            func.nullif(Rating.recommend, 0)
-        ).label('avg_rec'),
-        func.count(Rating.id).label('rating_count')
-    ).group_by(Rating.anime_id).subquery()
-
-    latest_review_sub = db.query(
-        Rating.anime_id,
-        func.max(Rating.updated_at).label('max_updated')
-    ).filter(Rating.review != '').group_by(Rating.anime_id).subquery()
+    avg_score_sub = (
+        db.query(
+            Rating.anime_id,
+            func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
+            func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
+            func.count(Rating.id).label('rating_count'),
+        )
+        .group_by(Rating.anime_id)
+        .subquery()
+    )
 
     query = db.query(
         Anime,
         func.coalesce(avg_score_sub.c.avg_score, 0).label('avg_score'),
         func.coalesce(avg_score_sub.c.avg_rec, 0).label('avg_rec'),
-        func.coalesce(avg_score_sub.c.rating_count, 0).label('rating_count')
+        func.coalesce(avg_score_sub.c.rating_count, 0).label('rating_count'),
     ).outerjoin(avg_score_sub, Anime.id == avg_score_sub.c.anime_id)
 
     if search:
@@ -128,10 +145,12 @@ def list_animes(
     anime_ids = [row[0].id for row in rows]
     latest_reviews = {}
     if anime_ids:
-        latest_rows = db.query(Rating.anime_id, Rating.review).filter(
-            Rating.anime_id.in_(anime_ids),
-            Rating.review != ''
-        ).order_by(Rating.anime_id, Rating.updated_at.desc()).all()
+        latest_rows = (
+            db.query(Rating.anime_id, Rating.review)
+            .filter(Rating.anime_id.in_(anime_ids), Rating.review != '')
+            .order_by(Rating.anime_id, Rating.updated_at.desc())
+            .all()
+        )
 
         seen = set()
         for aid, review in latest_rows:
@@ -142,46 +161,56 @@ def list_animes(
     items = []
     user_rated_ids: set[int] = set()
     if current_user:
-        user_rated_ids = set(
-            row[0] for row in db.query(Rating.anime_id).filter(Rating.user_id == current_user.id).all()
-        )
+        user_rated_ids = {
+            row[0]
+            for row in db.query(Rating.anime_id)
+            .filter(Rating.user_id == current_user.id)
+            .all()
+        }
 
     for row in rows:
         anime = row[0]
-        items.append(AnimeSchema(
-            id=anime.id,
-            title_cn=anime.title_cn,
-            title_jp=anime.title_jp,
-            cover_url=anime.cover_url,
-            description=anime.description,
-            episodes=anime.episodes,
-            status=anime.status,
-            tags=anime.tags,
-            season=anime.season,
-            air_date=anime.air_date,
-            platform=anime.platform,
-            bgm_id=anime.bgm_id,
-            created_by=anime.created_by,
-            created_at=anime.created_at,
-            updated_at=anime.updated_at,
-            avg_anime_score=round(row.avg_score, 1) if row.avg_score else None,
-            avg_recommend=round(row.avg_rec, 1) if row.avg_rec else None,
-            rating_count=row.rating_count or 0,
-            latest_review=latest_reviews.get(anime.id),
-            user_rated=anime.id in user_rated_ids if current_user else None
-        ))
+        items.append(
+            AnimeSchema(
+                id=anime.id,
+                title_cn=anime.title_cn,
+                title_jp=anime.title_jp,
+                cover_url=anime.cover_url,
+                description=anime.description,
+                episodes=anime.episodes,
+                status=anime.status,
+                tags=anime.tags,
+                season=anime.season,
+                air_date=anime.air_date,
+                platform=anime.platform,
+                bgm_id=anime.bgm_id,
+                created_by=anime.created_by,
+                created_at=anime.created_at,
+                updated_at=anime.updated_at,
+                avg_anime_score=round(row.avg_score, 1) if row.avg_score else None,
+                avg_recommend=round(row.avg_rec, 1) if row.avg_rec else None,
+                rating_count=row.rating_count or 0,
+                latest_review=latest_reviews.get(anime.id),
+                user_rated=anime.id in user_rated_ids if current_user else None,
+            )
+        )
 
     return AnimeListResponse(items=items, total=total)
 
 
 @router.get('/random', response_model=AnimeSchema)
 def random_unrated(
-    current_user: Optional[User] = Depends(get_optional_user),
-    db: Session = Depends(get_db)
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ):
     if current_user:
         rated_ids = db.query(Rating.anime_id).filter(Rating.user_id == current_user.id)
-        anime = db.query(Anime).filter(~Anime.id.in_(rated_ids)).order_by(func.random()).first()
+        anime = (
+            db.query(Anime)
+            .filter(~Anime.id.in_(rated_ids))
+            .order_by(func.random())
+            .first()
+        )
         if not anime:
             raise HTTPException(status_code=404, detail='没有未评分的番剧了')
     else:
@@ -194,8 +223,8 @@ def random_unrated(
 @router.get('/{anime_id}', response_model=AnimeDetail)
 def get_anime(
     anime_id: int,
-    current_user: Optional[User] = Depends(get_optional_user),
-    db: Session = Depends(get_db)
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
 ):
     anime = db.query(Anime).filter(Anime.id == anime_id).first()
     if not anime:
@@ -203,17 +232,18 @@ def get_anime(
 
     my_rating = None
     if current_user:
-        my_rating = db.query(Rating).filter(
-            Rating.anime_id == anime_id,
-            Rating.user_id == current_user.id
-        ).first()
+        my_rating = (
+            db.query(Rating)
+            .filter(Rating.anime_id == anime_id, Rating.user_id == current_user.id)
+            .first()
+        )
 
     all_ratings = db.query(Rating).filter(Rating.anime_id == anime_id).all()
 
     return AnimeDetail(
         anime=anime_to_schema(anime, db),
         my_rating=rating_to_schema(my_rating) if my_rating else None,
-        ratings=[rating_to_schema(r) for r in all_ratings]
+        ratings=[rating_to_schema(r) for r in all_ratings],
     )
 
 
@@ -221,7 +251,7 @@ def get_anime(
 def create_anime(
     data: AnimeCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     # 去重：按中文名检查
     existing = db.query(Anime).filter(Anime.title_cn == data.title_cn).first()
@@ -239,7 +269,7 @@ def create_anime(
         season=data.season,
         air_date=data.air_date,
         platform=data.platform,
-        created_by=current_user.id
+        created_by=current_user.id,
     )
     db.add(anime)
     db.commit()
@@ -251,7 +281,7 @@ def create_anime(
 def delete_anime(
     anime_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     anime = db.query(Anime).filter(Anime.id == anime_id).first()
     if not anime:
@@ -267,7 +297,7 @@ def update_anime(
     anime_id: int,
     data: AnimeUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     anime = db.query(Anime).filter(Anime.id == anime_id).first()
     if not anime:

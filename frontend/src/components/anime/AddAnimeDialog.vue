@@ -28,7 +28,10 @@
       </div>
 
       <!-- Search Results Dropdown -->
-      <div v-else-if="searchResults.length > 0" class="mt-2 border border-gray-200 rounded-8 max-h-64 overflow-y-auto">
+      <div
+        v-else-if="searchResults.length > 0"
+        class="mt-2 border border-gray-200 rounded-8 max-h-64 overflow-y-auto"
+      >
         <div
           v-for="item in searchResults"
           :key="item.bgm_id"
@@ -269,7 +272,6 @@ async function submit() {
     submitting.value = false
   }
 }
-
 </script>
 
 <style scoped>

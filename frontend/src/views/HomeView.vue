@@ -8,20 +8,29 @@
         :style="{ opacity: headerScrolled ? 0.82 : 0 }"
       ></div>
       <!-- 原始渐变背景（始终存在） -->
-      <div class="absolute inset-0 bg-gradient-to-r from-primary-pink/10 via-white/60 to-primary-purple/10 backdrop-blur-md"></div>
+      <div
+        class="absolute inset-0 bg-gradient-to-r from-primary-pink/10 via-white/60 to-primary-purple/10 backdrop-blur-md"
+      ></div>
       <!-- 内容 -->
       <div class="relative container mx-auto px-4 py-3 flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gradient">MoreAni</h1>
         <div class="flex items-center gap-4">
           <template v-if="isLoggedIn">
             <div class="relative group">
-              <div class="flex items-center gap-1.5 cursor-pointer select-none py-1 px-2 -mx-2 rounded-8 hover:bg-primary-pink/10 transition-colors">
+              <div
+                class="flex items-center gap-1.5 cursor-pointer select-none py-1 px-2 -mx-2 rounded-8 hover:bg-primary-pink/10 transition-colors"
+              >
                 <el-icon class="text-primary-pink"><UserFilled /></el-icon>
                 <span class="text-small text-text-body">{{ currentUser?.username }}</span>
-                <el-icon class="text-text-secondary text-xs transition-transform group-hover:rotate-180"><ArrowDown /></el-icon>
+                <el-icon
+                  class="text-text-secondary text-xs transition-transform group-hover:rotate-180"
+                  ><ArrowDown
+                /></el-icon>
               </div>
               <!-- Dropdown -->
-              <div class="absolute right-0 top-full mt-1 min-w-[160px] bg-white rounded-8 shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-1 group-hover:translate-y-0 z-50">
+              <div
+                class="absolute right-0 top-full mt-1 min-w-[160px] bg-white rounded-8 shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-1 group-hover:translate-y-0 z-50"
+              >
                 <button
                   class="w-full text-left px-4 py-2.5 text-small text-text-primary hover:bg-primary-pink/5 transition-colors flex items-center gap-2"
                   @click="showChangeUsernameDialog = true"
@@ -47,11 +56,7 @@
               </div>
             </div>
           </template>
-          <button
-            v-else
-            class="btn-gradient"
-            @click="showAuthDialog = true"
-          >
+          <button v-else class="btn-gradient" @click="showAuthDialog = true">
             <el-icon><User /></el-icon>
             登录
           </button>
@@ -66,19 +71,21 @@
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
-              <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+              <span
+                class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"
+              ></span>
               <h2 class="section-title">今天看什么</h2>
             </div>
-            <button
-              class="btn-soft !text-xs !px-3 !py-1"
-              @click.stop="refreshRandom"
-            >
+            <button class="btn-soft !text-xs !px-3 !py-1" @click.stop="refreshRandom">
               <el-icon :size="13"><RefreshRight /></el-icon>
               换一个
             </button>
           </div>
 
-          <section class="glass-card overflow-hidden relative cursor-pointer group flex-1 min-h-[220px]" @click="randomAnime && openDetail(randomAnime.id)">
+          <section
+            class="glass-card overflow-hidden relative cursor-pointer group flex-1 min-h-[220px]"
+            @click="randomAnime && openDetail(randomAnime.id)"
+          >
             <!-- 封面图背景 -->
             <template v-if="randomAnime">
               <div v-if="randomAnime.cover_url" class="absolute inset-0">
@@ -86,37 +93,65 @@
                   :src="randomAnime.cover_url"
                   :alt="randomAnime.title_cn"
                   class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+                  @error="onImageError"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+                <div
+                  class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"
+                ></div>
               </div>
-              <div v-else class="absolute inset-0 bg-gradient-to-br from-primary-pink/20 to-primary-purple/20">
-                <div class="absolute inset-0 bg-gradient-to-t from-primary-pink/15 to-transparent"></div>
+              <div
+                v-else
+                class="absolute inset-0 bg-gradient-to-br from-primary-pink/20 to-primary-purple/20"
+              >
+                <div
+                  class="absolute inset-0 bg-gradient-to-t from-primary-pink/15 to-transparent"
+                ></div>
               </div>
             </template>
 
             <!-- 内容区域 -->
-            <div class="relative z-10 flex flex-col justify-end h-full p-5" :class="randomAnime?.cover_url ? 'text-white' : ''">
+            <div
+              class="relative z-10 flex flex-col justify-end h-full p-5"
+              :class="randomAnime?.cover_url ? 'text-white' : ''"
+            >
               <!-- 信息 - 底部 -->
               <div v-if="randomAnime" class="mt-auto">
-                <h3 class="font-semibold leading-tight mb-0.5" :class="randomAnime.cover_url ? 'text-lg' : 'text-card-title text-text-primary'">
+                <h3
+                  class="font-semibold leading-tight mb-0.5"
+                  :class="randomAnime.cover_url ? 'text-lg' : 'text-card-title text-text-primary'"
+                >
                   {{ randomAnime.title_cn }}
                 </h3>
                 <p class="text-xs opacity-70 mb-1.5">{{ randomAnime.title_jp }}</p>
-                <p class="text-xs leading-relaxed line-clamp-2 mb-2" :class="randomAnime.cover_url ? 'opacity-85' : 'text-text-body'">
+                <p
+                  class="text-xs leading-relaxed line-clamp-2 mb-2"
+                  :class="randomAnime.cover_url ? 'opacity-85' : 'text-text-body'"
+                >
                   {{ randomAnime.description }}
                 </p>
                 <!-- 评分 -->
-                <div class="flex items-center gap-x-2.5 text-xs leading-none" :class="randomAnime.cover_url ? 'opacity-90' : 'text-text-secondary'">
-                  <span v-if="randomAnime.avg_anime_score" class="flex items-center gap-1 whitespace-nowrap">
+                <div
+                  class="flex items-center gap-x-2.5 text-xs leading-none"
+                  :class="randomAnime.cover_url ? 'opacity-90' : 'text-text-secondary'"
+                >
+                  <span
+                    v-if="randomAnime.avg_anime_score"
+                    class="flex items-center gap-1 whitespace-nowrap"
+                  >
                     <el-icon :size="13"><StarFilled /></el-icon>
                     <span>均分 {{ Number(randomAnime.avg_anime_score).toFixed(1) }}</span>
                   </span>
-                  <span v-if="randomAnime.avg_recommend" class="flex items-center gap-1 whitespace-nowrap">
+                  <span
+                    v-if="randomAnime.avg_recommend"
+                    class="flex items-center gap-1 whitespace-nowrap"
+                  >
                     <el-icon :size="13"><GoldMedal /></el-icon>
                     <span>推荐 {{ Number(randomAnime.avg_recommend).toFixed(1) }}</span>
                   </span>
-                  <span v-if="randomAnime.rating_count" class="flex items-center gap-1 whitespace-nowrap">
+                  <span
+                    v-if="randomAnime.rating_count"
+                    class="flex items-center gap-1 whitespace-nowrap"
+                  >
                     <el-icon :size="13"><User /></el-icon>
                     <span>{{ randomAnime.rating_count }}人已评</span>
                   </span>
@@ -124,14 +159,31 @@
               </div>
 
               <!-- 加载/空状态 -->
-              <EmptyState v-if="!randomAnime && loading" type="loading" title="加载中..." description="" />
-              <EmptyState v-else-if="!randomAnime" type="empty" title="暂无推荐" description="添加一些番剧后再来看看吧～" />
+              <EmptyState
+                v-if="!randomAnime && loading"
+                type="loading"
+                title="加载中..."
+                description=""
+              />
+              <EmptyState
+                v-else-if="!randomAnime"
+                type="empty"
+                title="暂无推荐"
+                description="添加一些番剧后再来看看吧～"
+              />
             </div>
 
             <!-- 悬停光效 -->
-            <div v-if="randomAnime?.cover_url" class="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-              <div class="absolute -top-16 -right-16 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
-              <div class="absolute -bottom-16 -left-16 w-32 h-32 bg-primary-purple/15 rounded-full blur-3xl"></div>
+            <div
+              v-if="randomAnime?.cover_url"
+              class="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            >
+              <div
+                class="absolute -top-16 -right-16 w-32 h-32 bg-white/10 rounded-full blur-3xl"
+              ></div>
+              <div
+                class="absolute -bottom-16 -left-16 w-32 h-32 bg-primary-purple/15 rounded-full blur-3xl"
+              ></div>
             </div>
           </section>
         </div>
@@ -140,7 +192,9 @@
         <div class="flex flex-col">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
-              <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+              <span
+                class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"
+              ></span>
               <h2 class="section-title">大家在看啥</h2>
             </div>
             <button class="btn-soft !text-xs !px-3 !py-1" @click="showRatingsHistory = true">
@@ -150,45 +204,54 @@
           </div>
 
           <section class="glass-card p-5 flex-1">
-          <div v-if="recentRatings.length > 0" class="space-y-3">
-            <div
-              v-for="rating in recentRatings"
-              :key="rating.id"
-              class="flex items-center gap-3 p-2 rounded-8 hover:bg-primary-pink/5 cursor-pointer transition-colors"
-              @click="openDetail(rating.anime_id)"
-            >
-              <img
-                :src="rating.anime_cover"
-                class="w-14 h-20 object-cover rounded-4 flex-shrink-0"
-                @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
-              />
-              <div class="min-w-0 flex-1">
-                <p class="text-small">
-                  <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
-                  <span class="text-text-secondary"> → </span>
-                  <span class="text-text-primary">{{ rating.anime_title }}</span>
-                </p>
-                <p class="text-small text-text-secondary">
-                  <template v-if="rating.anime_score > 0">
-                    <span class="inline-flex items-center gap-1">
-                      <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                      <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
-                    </span>
-                    <span class="mx-1 text-text-body">·</span>
-                    <span class="inline-flex items-center gap-1">
-                      <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                      <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
-                    </span>
-                  </template>
-                  <span v-else class="text-text-secondary text-xs">暂不打分</span>
-                </p>
-                <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
+            <div v-if="recentRatings.length > 0" class="space-y-3">
+              <div
+                v-for="rating in recentRatings"
+                :key="rating.id"
+                class="flex items-center gap-3 p-2 rounded-8 hover:bg-primary-pink/5 cursor-pointer transition-colors"
+                @click="openDetail(rating.anime_id)"
+              >
+                <img
+                  :src="rating.anime_cover"
+                  class="w-14 h-20 object-cover rounded-4 flex-shrink-0"
+                  @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="text-small">
+                    <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
+                    <span class="text-text-secondary"> → </span>
+                    <span class="text-text-primary">{{ rating.anime_title }}</span>
+                  </p>
+                  <p class="text-small text-text-secondary">
+                    <template v-if="rating.anime_score > 0">
+                      <span class="inline-flex items-center gap-1">
+                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
+                        <span class="text-primary-pink font-medium"
+                          >{{ rating.anime_score }}分</span
+                        >
+                      </span>
+                      <span class="mx-1 text-text-body">·</span>
+                      <span class="inline-flex items-center gap-1">
+                        <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
+                        <span class="text-primary-purple font-medium"
+                          >{{ rating.recommend }}分</span
+                        >
+                      </span>
+                    </template>
+                    <span v-else class="text-text-secondary text-xs">暂不打分</span>
+                  </p>
+                  <p
+                    v-if="rating.review"
+                    class="text-small text-text-body mt-1 whitespace-pre-wrap break-words"
+                  >
+                    {{ rating.review }}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <EmptyState v-else-if="loading" type="loading" title="加载中..." description="" />
-          <EmptyState v-else type="empty" title="暂无动态" description="还没有评分哦～" />
-        </section>
+            <EmptyState v-else-if="loading" type="loading" title="加载中..." description="" />
+            <EmptyState v-else type="empty" title="暂无动态" description="还没有评分哦～" />
+          </section>
         </div>
       </div>
 
@@ -196,14 +259,13 @@
       <section>
         <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 class="section-title flex items-center gap-3">
-            <span class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"></span>
+            <span
+              class="w-1.5 h-5 bg-gradient-to-b from-primary-pink to-primary-purple rounded-full shrink-0"
+            ></span>
             番剧列表
           </h2>
           <div class="flex gap-2 items-center">
-            <button
-              class="btn-gradient h-7 whitespace-nowrap"
-              @click="handleAddAnime"
-            >
+            <button class="btn-gradient h-7 whitespace-nowrap" @click="handleAddAnime">
               <el-icon><Plus /></el-icon>
               添加番剧
             </button>
@@ -225,21 +287,52 @@
         </div>
 
         <EmptyState v-if="loading" type="loading" title="加载中..." description="" />
-        <EmptyState v-else-if="animes.length === 0" type="empty" title="暂无番剧" description="点击右上角添加第一个番剧吧～" />
+        <EmptyState
+          v-else-if="animes.length === 0"
+          type="empty"
+          title="暂无番剧"
+          description="点击右上角添加第一个番剧吧～"
+        />
         <div v-else class="glass-card overflow-x-auto">
           <table class="w-full text-small">
             <thead>
               <tr class="border-b border-gray-100">
-                <th class="text-center py-3 px-2 text-text-secondary font-medium whitespace-nowrap w-10 text-xs">#</th>
-                <th class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[120px]">番剧名</th>
-                <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20">
-                  <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-pink"><StarFilled /></el-icon>均分</span>
+                <th
+                  class="text-center py-3 px-2 text-text-secondary font-medium whitespace-nowrap w-10 text-xs"
+                >
+                  #
                 </th>
-                <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20">
-                  <span class="inline-flex items-center gap-0.5"><el-icon :size="14" class="text-primary-purple"><GoldMedal /></el-icon>推荐</span>
+                <th
+                  class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[120px]"
+                >
+                  番剧名
                 </th>
-                <th class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-14">人数</th>
-                <th class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[160px] max-w-xs">最新评价</th>
+                <th
+                  class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20"
+                >
+                  <span class="inline-flex items-center gap-0.5"
+                    ><el-icon :size="14" class="text-primary-pink"><StarFilled /></el-icon
+                    >均分</span
+                  >
+                </th>
+                <th
+                  class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-20"
+                >
+                  <span class="inline-flex items-center gap-0.5"
+                    ><el-icon :size="14" class="text-primary-purple"><GoldMedal /></el-icon
+                    >推荐</span
+                  >
+                </th>
+                <th
+                  class="text-center py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-14"
+                >
+                  人数
+                </th>
+                <th
+                  class="text-left py-3 px-4 text-text-secondary font-medium whitespace-nowrap w-auto min-w-[160px] max-w-xs"
+                >
+                  最新评价
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -247,10 +340,15 @@
                 v-for="(anime, i) in animes"
                 :key="anime.id"
                 class="border-b border-gray-50 hover:bg-primary-pink/5 cursor-pointer transition-colors"
-                :class="{ 'bg-gradient-to-r from-primary-pink/[0.07] to-transparent': isLoggedIn && anime.user_rated === false }"
+                :class="{
+                  'bg-gradient-to-r from-primary-pink/[0.07] to-transparent':
+                    isLoggedIn && anime.user_rated === false
+                }"
                 @click="openDetail(anime.id)"
               >
-                <td class="text-center py-3 px-2 text-text-secondary text-xs whitespace-nowrap">{{ i + 1 }}</td>
+                <td class="text-center py-3 px-2 text-text-secondary text-xs whitespace-nowrap">
+                  {{ i + 1 }}
+                </td>
                 <td class="py-3 px-4 min-w-0">
                   <div class="flex items-center gap-1.5 flex-nowrap">
                     <span class="text-text-primary truncate">{{ anime.title_cn }}</span>
@@ -261,12 +359,23 @@
                       round
                       class="tag-type"
                       @click.stop="filterByTag(t)"
-                    >{{ t }}</el-tag>
+                      >{{ t }}</el-tag
+                    >
                   </div>
                 </td>
-                <td class="py-3 px-4 text-center text-primary-pink font-semibold whitespace-nowrap">{{ anime.avg_anime_score != null ? Number(anime.avg_anime_score).toFixed(1) : '-' }}</td>
-                <td class="py-3 px-4 text-center text-primary-purple font-semibold whitespace-nowrap">{{ anime.avg_recommend != null ? Number(anime.avg_recommend).toFixed(1) : '-' }}</td>
-                <td class="py-3 px-4 text-center text-text-secondary whitespace-nowrap">{{ anime.rating_count ?? 0 }}</td>
+                <td class="py-3 px-4 text-center text-primary-pink font-semibold whitespace-nowrap">
+                  {{
+                    anime.avg_anime_score != null ? Number(anime.avg_anime_score).toFixed(1) : '-'
+                  }}
+                </td>
+                <td
+                  class="py-3 px-4 text-center text-primary-purple font-semibold whitespace-nowrap"
+                >
+                  {{ anime.avg_recommend != null ? Number(anime.avg_recommend).toFixed(1) : '-' }}
+                </td>
+                <td class="py-3 px-4 text-center text-text-secondary whitespace-nowrap">
+                  {{ anime.rating_count ?? 0 }}
+                </td>
                 <td class="py-3 px-4 text-text-body truncate max-w-[220px]">
                   <el-tooltip
                     v-if="anime.latest_review"
@@ -276,7 +385,11 @@
                     popper-class="custom-tooltip"
                     :disabled="!isReviewOverflowing(i)"
                   >
-                    <span :ref="el => reviewRefs[i] = el as HTMLElement" class="block truncate">{{ anime.latest_review }}</span>
+                    <span
+                      :ref="(el) => (reviewRefs[i] = el as HTMLElement)"
+                      class="block truncate"
+                      >{{ anime.latest_review }}</span
+                    >
                   </el-tooltip>
                   <span v-else>-</span>
                 </td>
@@ -287,7 +400,10 @@
           <div v-if="loadingMore" class="py-4 text-center text-text-secondary text-xs">
             <el-icon class="is-loading"><Loading /></el-icon> 加载更多...
           </div>
-          <div v-else-if="!hasMore && animes.length > 0" class="py-4 text-center text-text-secondary text-xs">
+          <div
+            v-else-if="!hasMore && animes.length > 0"
+            class="py-4 text-center text-text-secondary text-xs"
+          >
             — 已显示全部 {{ totalCount }} 部番剧 —
           </div>
         </div>
@@ -295,7 +411,9 @@
     </main>
 
     <!-- 页面底部 -->
-    <footer class="py-6 text-center text-text-secondary text-sm border-t border-gray-100 font-normal">
+    <footer
+      class="py-6 text-center text-text-secondary text-sm border-t border-gray-100 font-normal"
+    >
       <p>© 2026 MoreAni</p>
     </footer>
 
@@ -308,10 +426,7 @@
       @closed="usernameUniqueError = ''"
     >
       <el-form label-position="top">
-        <el-form-item
-          label="新用户名"
-          :error="usernameUniqueError"
-        >
+        <el-form-item label="新用户名" :error="usernameUniqueError">
           <el-input
             v-model="changeUsernameForm.newUsername"
             placeholder="输入新用户名"
@@ -322,8 +437,14 @@
       </el-form>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <el-button class="btn-soft !text-xs" @click="showChangeUsernameDialog = false">取消</el-button>
-          <el-button class="btn-gradient !text-xs" :loading="changingUsername" @click="handleChangeUsername">
+          <el-button class="btn-soft !text-xs" @click="showChangeUsernameDialog = false"
+            >取消</el-button
+          >
+          <el-button
+            class="btn-gradient !text-xs"
+            :loading="changingUsername"
+            @click="handleChangeUsername"
+          >
             确认修改
           </el-button>
         </div>
@@ -368,8 +489,14 @@
       </el-form>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <el-button class="btn-soft !text-xs" @click="showChangePasswordDialog = false">取消</el-button>
-          <el-button class="btn-gradient !text-xs" :loading="changingPassword" @click="handleChangePassword">
+          <el-button class="btn-soft !text-xs" @click="showChangePasswordDialog = false"
+            >取消</el-button
+          >
+          <el-button
+            class="btn-gradient !text-xs"
+            :loading="changingPassword"
+            @click="handleChangePassword"
+          >
             确认修改
           </el-button>
         </div>
@@ -388,29 +515,20 @@
     />
 
     <!-- Add Anime Dialog -->
-    <AddAnimeDialog
-      v-model:visible="showAddDialog"
-      @added="loadAll"
-    />
+    <AddAnimeDialog v-model:visible="showAddDialog" @added="loadAll" />
 
     <!-- Auth Dialog -->
-    <AuthDialog
-      v-model:visible="showAuthDialog"
-      @success="loadAll"
-    />
+    <AuthDialog v-model:visible="showAuthDialog" @success="loadAll" />
 
     <!-- Ratings History Dialog -->
-    <RatingsHistoryDialog
-      v-model:visible="showRatingsHistory"
-      @update="loadAll"
-    />
+    <RatingsHistoryDialog v-model:visible="showRatingsHistory" @update="loadAll" />
 
     <!-- 回到顶部按钮 -->
     <button
       class="back-to-top"
-      @click="scrollToTop"
-      :class="{ visible: showBackTop }"
       aria-label="回到顶部"
+      :class="{ visible: showBackTop }"
+      @click="scrollToTop"
     >
       ↑
     </button>
@@ -418,7 +536,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
 import { ElMessage } from 'element-plus'
@@ -433,6 +551,11 @@ const api = useApi()
 const { currentUser, clearAuth, setAuth, isLoggedIn, token } = useAuth()
 const loading = ref(true)
 const randomAnime = ref<Anime | null>(null)
+
+function onImageError(e: Event) {
+  ;(e.target as HTMLImageElement).style.display = 'none'
+}
+
 const recentRatings = ref<Rating[]>([])
 const animes = ref<Anime[]>([])
 const searchKeyword = ref('')
@@ -440,7 +563,7 @@ const tagFilter = ref('')
 const sortBy = ref('avg_score')
 
 const selectedAnimeIndex = computed(() =>
-  animes.value.findIndex(a => a.id === selectedAnimeId.value)
+  animes.value.findIndex((a) => a.id === selectedAnimeId.value)
 )
 
 function navigateAnime(direction: number) {
@@ -552,7 +675,11 @@ async function loadAll() {
 
 async function loadAnimes(append = false) {
   try {
-    const params: Record<string, string | number> = { limit: 50, sort: sortBy.value, page: page.value }
+    const params: Record<string, string | number> = {
+      limit: 50,
+      sort: sortBy.value,
+      page: page.value
+    }
     if (searchKeyword.value && !tagFilter.value) params.search = searchKeyword.value
     if (tagFilter.value) params.tag = tagFilter.value
     const res = await api.getAnimes(params)

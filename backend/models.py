@@ -1,6 +1,16 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, UniqueConstraint
+from datetime import UTC, datetime
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+
 from database import Base
 
 
@@ -10,7 +20,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(128), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     ratings = relationship('Rating', back_populates='user')
 
@@ -20,7 +30,7 @@ class InviteCode(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class Anime(Base):
@@ -39,8 +49,12 @@ class Anime(Base):
     platform = Column(String(20), default='')
     bgm_id = Column(Integer, unique=True, nullable=True)
     created_by = Column(Integer, ForeignKey('users.id'))
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
     ratings = relationship('Rating', back_populates='anime')
 
@@ -54,8 +68,12 @@ class Rating(Base):
     anime_score = Column(Integer, nullable=False)
     recommend = Column(Integer, nullable=False)
     review = Column(Text, default='')
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
     anime = relationship('Anime', back_populates='ratings')
     user = relationship('User', back_populates='ratings')

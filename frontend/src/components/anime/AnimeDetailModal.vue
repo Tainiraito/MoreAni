@@ -1,26 +1,38 @@
 <template>
-    <el-dialog
-      :model-value="visible"
-      :width="dialogWidth"
-      class="anime-dialog"
-      overlay-class="anime-overlay"
-      @update:model-value="$emit('update:visible', $event)"
-    >
-      <div class="loading-content relative min-h-[350px] rounded-8">
-        <!-- 自定义 Loading 覆盖层 — 粉紫主题，绝对居中，不跳动 -->
-        <div
-          v-if="loading"
-          class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-8"
-          style="background: rgba(255, 255, 255, 0.85)"
-        >
-          <svg class="animate-spin h-8 w-8" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="var(--primary-purple)" stroke-width="3" fill="none" />
-            <path class="opacity-75" fill="var(--primary-pink)" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <span class="text-xs" style="color: var(--primary-purple)">加载中...</span>
-        </div>
+  <el-dialog
+    :model-value="visible"
+    :width="dialogWidth"
+    class="anime-dialog"
+    overlay-class="anime-overlay"
+    @update:model-value="$emit('update:visible', $event)"
+  >
+    <div class="loading-content relative min-h-[350px] rounded-8">
+      <!-- 自定义 Loading 覆盖层 — 粉紫主题，绝对居中，不跳动 -->
+      <div
+        v-if="loading"
+        class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-8"
+        style="background: rgba(255, 255, 255, 0.85)"
+      >
+        <svg class="animate-spin h-8 w-8" viewBox="0 0 24 24">
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="var(--primary-purple)"
+            stroke-width="3"
+            fill="none"
+          />
+          <path
+            class="opacity-75"
+            fill="var(--primary-pink)"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+        <span class="text-xs" style="color: var(--primary-purple)">加载中...</span>
+      </div>
 
-        <template v-if="detail">
+      <template v-if="detail">
         <!-- 封面取色渐变背景（淡色，不溢出） -->
         <div
           class="absolute inset-0 transition-colors duration-700 rounded-12 pointer-events-none"
@@ -58,7 +70,9 @@
               <p v-if="parsedTags.length" class="text-small text-text-secondary mb-2">
                 类型：{{ parsedTags.join(' · ') }}
               </p>
-              <p class="text-small text-text-body leading-relaxed">{{ detail.anime.description || '暂无简介' }}</p>
+              <p class="text-small text-text-body leading-relaxed">
+                {{ detail.anime.description || '暂无简介' }}
+              </p>
               <button
                 v-if="isLoggedIn"
                 class="text-small text-primary-pink hover:text-primary-dark mt-2 transition-colors flex items-center gap-1"
@@ -81,7 +95,7 @@
                 :loading="searching"
                 clearable
                 @input="onSearchInput"
-                @clear="searchResults = []; searchError = ''"
+                @clear="onClearSearch"
               >
                 <template #prefix>
                   <el-icon class="text-text-secondary"><Search /></el-icon>
@@ -91,7 +105,10 @@
               <div v-if="searching" class="mt-2 text-xs text-text-secondary text-center py-4">
                 <el-icon class="is-loading"><Loading /></el-icon> 正在搜索...
               </div>
-              <div v-else-if="searchResults.length > 0" class="mt-2 border border-gray-200 rounded-8 max-h-48 overflow-y-auto bg-white">
+              <div
+                v-else-if="searchResults.length > 0"
+                class="mt-2 border border-gray-200 rounded-8 max-h-48 overflow-y-auto bg-white"
+              >
                 <div
                   v-for="item in searchResults"
                   :key="item.bgm_id"
@@ -104,7 +121,9 @@
                     @error="(e: Event) => ((e.target as HTMLImageElement).style.opacity = '0')"
                   />
                   <div class="min-w-0 flex-1">
-                    <p class="text-xs font-semibold text-text-primary truncate">{{ item.title_cn }}</p>
+                    <p class="text-xs font-semibold text-text-primary truncate">
+                      {{ item.title_cn }}
+                    </p>
                     <p class="text-xs text-text-secondary">
                       {{ item.rating || '-' }}分 · {{ item.platform || '未知' }}
                       <template v-if="item.episodes"> · {{ item.episodes }}集</template>
@@ -159,10 +178,19 @@
                 <el-input v-model="editForm.description" type="textarea" :rows="2" />
               </el-form-item>
               <div class="flex gap-2 mt-3">
-                <el-button class="btn-gradient !text-xs !px-5" size="small" :loading="savingEdit" @click="saveEdit">
+                <el-button
+                  class="btn-gradient !text-xs !px-5"
+                  size="small"
+                  :loading="savingEdit"
+                  @click="saveEdit"
+                >
                   保存修改
                 </el-button>
-                <el-button class="btn-soft !text-xs !px-5 !border-red-200 !text-red-500 hover:!bg-red-50 hover:!border-red-300" size="small" @click="handleDelete">
+                <el-button
+                  class="btn-soft !text-xs !px-5 !border-red-200 !text-red-500 hover:!bg-red-50 hover:!border-red-300"
+                  size="small"
+                  @click="handleDelete"
+                >
                   <el-icon :size="13"><Delete /></el-icon>
                   删除番剧
                 </el-button>
@@ -173,22 +201,30 @@
           <!-- Average Score Cards — 置于我的评分之上 -->
           <div v-if="detail.anime.avg_anime_score" class="flex gap-3 mb-4">
             <!-- 均分卡 -->
-            <div class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]">
+            <div
+              class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]"
+            >
               <span class="text-xs text-text-secondary font-medium mb-0.5 flex items-center gap-1">
                 <el-icon :size="12" class="text-primary-pink"><StarFilled /></el-icon>均分
               </span>
               <div class="flex items-baseline justify-center gap-0.5">
-                <span class="text-2xl font-bold text-gradient">{{ detail.anime.avg_anime_score }}</span>
+                <span class="text-2xl font-bold text-gradient">{{
+                  detail.anime.avg_anime_score
+                }}</span>
                 <span class="text-xs text-text-secondary">/ 10</span>
               </div>
             </div>
             <!-- 推荐度卡 -->
-            <div class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]">
+            <div
+              class="flex-1 glass-card p-3 flex flex-col items-center justify-center text-center min-h-[80px]"
+            >
               <span class="text-xs text-text-secondary font-medium mb-0.5 flex items-center gap-1">
                 <el-icon :size="12" class="text-primary-purple"><GoldMedal /></el-icon>推荐度
               </span>
               <div class="flex items-baseline justify-center gap-0.5">
-                <span class="text-2xl font-bold text-gradient">{{ detail.anime.avg_recommend }}</span>
+                <span class="text-2xl font-bold text-gradient">{{
+                  detail.anime.avg_recommend
+                }}</span>
                 <span class="text-xs text-text-secondary">/ 10</span>
               </div>
             </div>
@@ -236,7 +272,9 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <el-icon :size="16" class="text-primary-purple"><GoldMedal /></el-icon>
-                      <span class="text-small text-text-secondary whitespace-nowrap">补番推荐度</span>
+                      <span class="text-small text-text-secondary whitespace-nowrap"
+                        >补番推荐度</span
+                      >
                       <el-rate
                         :model-value="detail.my_rating.recommend"
                         :max="10"
@@ -250,13 +288,21 @@
                   </div>
                 </template>
                 <p v-else class="text-small text-text-secondary mb-3">暂不打分</p>
-                <p v-if="detail.my_rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">
+                <p
+                  v-if="detail.my_rating.review"
+                  class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed"
+                >
                   {{ detail.my_rating.review }}
                 </p>
               </div>
 
               <!-- No rating: show button -->
-              <el-button v-else class="btn-gradient !text-xs !w-full" size="small" @click="enterRatingMode">
+              <el-button
+                v-else
+                class="btn-gradient !text-xs !w-full"
+                size="small"
+                @click="enterRatingMode"
+              >
                 去评分
               </el-button>
             </template>
@@ -264,8 +310,14 @@
             <!-- Edit state: show form -->
             <template v-else>
               <div class="flex items-center gap-2 mb-3">
-                <el-checkbox v-model="ratingForm.unwatched" size="small" @change="onUnwatchedToggle">
-                  <span class="text-xs text-text-secondary">暂不打分（评分为0，不计入均分计算）</span>
+                <el-checkbox
+                  v-model="ratingForm.unwatched"
+                  size="small"
+                  @change="onUnwatchedToggle"
+                >
+                  <span class="text-xs text-text-secondary"
+                    >暂不打分（评分为0，不计入均分计算）</span
+                  >
                 </el-checkbox>
               </div>
               <div v-if="!ratingForm.unwatched" class="flex flex-col gap-1 mb-3">
@@ -302,10 +354,20 @@
                 class="mb-2"
               />
               <div class="flex gap-2">
-                <el-button class="btn-soft !text-xs flex-1" size="small" :disabled="savingRating" @click.stop="cancelRating">
+                <el-button
+                  class="btn-soft !text-xs flex-1"
+                  size="small"
+                  :disabled="savingRating"
+                  @click.stop="cancelRating"
+                >
                   取消
                 </el-button>
-                <el-button class="btn-gradient !text-xs flex-1" size="small" :loading="savingRating" @click.stop="saveRating">
+                <el-button
+                  class="btn-gradient !text-xs flex-1"
+                  size="small"
+                  :loading="savingRating"
+                  @click.stop="saveRating"
+                >
                   保存评分
                 </el-button>
               </div>
@@ -314,7 +376,10 @@
 
           <!-- Friends Ratings -->
           <!-- 大家的评分 — 模块本身无 hover，每条评分独立卡片 + hover -->
-          <div v-if="otherRatings.length > 0" class="bg-white/95 backdrop-blur-md border border-primary-purple/20 rounded-12 p-4">
+          <div
+            v-if="otherRatings.length > 0"
+            class="bg-white/95 backdrop-blur-md border border-primary-purple/20 rounded-12 p-4"
+          >
             <h3 class="font-semibold mb-3 text-text-primary flex items-center gap-1">
               <el-icon :size="15"><ChatDotRound /></el-icon>
               大家的评分
@@ -330,51 +395,51 @@
                     <p class="text-small mb-1">
                       <span class="font-semibold text-primary-pink">{{ rating.username }}</span>
                     </p>
-                    <p class="text-small text-text-secondary mb-1 flex items-center gap-1 flex-wrap">
+                    <p
+                      class="text-small text-text-secondary mb-1 flex items-center gap-1 flex-wrap"
+                    >
                       <template v-if="rating.anime_score > 0">
                         <span class="inline-flex items-center gap-1">
                           <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                          <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
+                          <span class="text-primary-pink font-medium"
+                            >{{ rating.anime_score }}分</span
+                          >
                         </span>
                         <span class="text-text-body">·</span>
                         <span class="inline-flex items-center gap-1">
                           <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                          <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
+                          <span class="text-primary-purple font-medium"
+                            >{{ rating.recommend }}分</span
+                          >
                         </span>
                       </template>
                       <span v-else class="text-text-secondary text-xs">暂不打分</span>
                     </p>
-                    <p v-if="rating.review" class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed">{{ rating.review }}</p>
+                    <p
+                      v-if="rating.review"
+                      class="text-small text-text-body whitespace-pre-wrap break-words leading-relaxed"
+                    >
+                      {{ rating.review }}
+                    </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        </template>
-      </div>
+      </template>
+    </div>
 
-      <!-- Navigation buttons - 放在 el-dialog 内部，与弹窗同生命周期，无延迟 -->
-      <button
-        v-show="hasPrevious"
-        class="nav-btn nav-prev"
-        @click.stop="emit('previous')"
-      >
-        <el-icon :size="20"><ArrowLeft /></el-icon>
-      </button>
-      <button
-        v-show="hasNext"
-        class="nav-btn nav-next"
-        @click.stop="emit('next')"
-      >
-        <el-icon :size="20"><ArrowRight /></el-icon>
-      </button>
+    <!-- Navigation buttons - 放在 el-dialog 内部，与弹窗同生命周期，无延迟 -->
+    <button v-show="hasPrevious" class="nav-btn nav-prev" @click.stop="emit('previous')">
+      <el-icon :size="20"><ArrowLeft /></el-icon>
+    </button>
+    <button v-show="hasNext" class="nav-btn nav-next" @click.stop="emit('next')">
+      <el-icon :size="20"><ArrowRight /></el-icon>
+    </button>
 
-      <AuthDialog
-        v-model:visible="showAuthDialog"
-        @success="loadDetail"
-      />
-    </el-dialog>
+    <AuthDialog v-model:visible="showAuthDialog" @success="loadDetail" />
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -385,15 +450,18 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import AuthDialog from '@/components/auth/AuthDialog.vue'
 import type { AnimeDetail, BangumiSearchResult } from '@/types'
 
-const props = withDefaults(defineProps<{
-  visible: boolean
-  animeId: number
-  hasPrevious?: boolean
-  hasNext?: boolean
-}>(), {
-  hasPrevious: false,
-  hasNext: false
-})
+const props = withDefaults(
+  defineProps<{
+    visible: boolean
+    animeId: number
+    hasPrevious?: boolean
+    hasNext?: boolean
+  }>(),
+  {
+    hasPrevious: false,
+    hasNext: false
+  }
+)
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
@@ -416,13 +484,16 @@ const searchResults = ref<BangumiSearchResult[]>([])
 const searchError = ref('')
 const tagsInput = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
-const gradientBg = ref('linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)')
+const gradientBg = ref(
+  'linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)'
+)
 const coverRef = ref<HTMLImageElement | null>(null)
 
 function onCoverError(e: Event) {
   const img = e.target as HTMLImageElement
   img.style.opacity = '0.3'
-  gradientBg.value = 'linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)'
+  gradientBg.value =
+    'linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)'
 }
 
 const dialogWidth = ref(window.innerWidth < 768 ? '95%' : '600px')
@@ -476,7 +547,7 @@ const hasExistingRating = computed(() => detail.value?.my_rating != null)
 const otherRatings = computed(() => {
   if (!detail.value) return []
   if (!currentUser.value?.username) return detail.value.ratings
-  return detail.value.ratings.filter(r => r.username !== currentUser.value!.username)
+  return detail.value.ratings.filter((r) => r.username !== currentUser.value!.username)
 })
 
 const parsedTags = computed(() => {
@@ -597,6 +668,11 @@ async function saveEdit() {
   } finally {
     savingEdit.value = false
   }
+}
+
+function onClearSearch() {
+  searchResults.value = []
+  searchError.value = ''
 }
 
 function onSearchInput() {
@@ -736,14 +812,20 @@ watch(isLoggedIn, (loggedIn) => {
   if (loggedIn && props.visible) loadDetail()
 })
 
-watch(() => props.animeId, () => {
-  if (props.visible) loadDetail()
-})
+watch(
+  () => props.animeId,
+  () => {
+    if (props.visible) loadDetail()
+  }
+)
 
 // 弹窗打开时首次加载
-watch(() => props.visible, (v) => {
-  if (v) loadDetail()
-})
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) loadDetail()
+  }
+)
 </script>
 
 <style scoped>
@@ -799,7 +881,7 @@ watch(() => props.visible, (v) => {
   align-items: center;
   justify-content: center;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .nav-btn:hover {
   background: linear-gradient(135deg, var(--primary-pink), var(--primary-purple));

@@ -1,15 +1,16 @@
-from datetime import datetime, timedelta, timezone
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from database import get_db
-from models import User
+import logging
 import os
 import secrets
-import logging
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from database import get_db
+from models import User
 
 logger = logging.getLogger('uvicorn')
 
@@ -41,7 +42,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     to_encode.update({'exp': expire})
     if 'sub' in to_encode:
         to_encode['sub'] = str(to_encode['sub'])
@@ -50,28 +51,34 @@ def create_access_token(data: dict) -> str:
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> User:
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str = payload.get('sub')
         if user_id_str is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token')
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token'
+            )
         user_id = int(user_id_str)
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token')
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token'
+        ) from e
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User not found')
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail='User not found'
+        )
     return user
 
 
 def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
-    db: Session = Depends(get_db)
-) -> Optional[User]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
+    db: Session = Depends(get_db),
+) -> User | None:
     if credentials is None:
         return None
     token = credentials.credentials

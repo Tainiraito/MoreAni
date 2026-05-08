@@ -8,8 +8,12 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint . --ext .vue,.ts",
-    "format": "prettier --write \"src/**/*.{vue,ts,css}\" \"*.{js,ts,json,md}\""
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{vue,ts,css}\" \"*.{js,ts,json,md}\"",
+    "lint:backend": "cd ../backend && ruff check .",
+    "format:backend": "cd ../backend && ruff format .",
+    "lint:all": "npm run lint && npm run typecheck && npm run lint:backend",
+    "format:all": "npm run format && npm run format:backend"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

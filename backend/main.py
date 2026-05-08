@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base
-from routers import auth, animes, ratings, bangumi
+
+from database import Base, engine
+from routers import animes, auth, bangumi, ratings
 
 Base.metadata.create_all(bind=engine)
 

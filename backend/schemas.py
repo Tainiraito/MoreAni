@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class CheckUsernameRequest(BaseModel):
@@ -44,18 +44,18 @@ class AnimeSchema(BaseModel):
     season: str
     air_date: str
     platform: str
-    bgm_id: Optional[int] = None
+    bgm_id: int | None = None
     created_by: int
     created_at: datetime
     updated_at: datetime
-    avg_anime_score: Optional[float] = None
-    avg_recommend: Optional[float] = None
-    rating_count: Optional[int] = None
-    latest_review: Optional[str] = None
-    user_rated: Optional[bool] = None
-    score_rank: Optional[int] = None
-    recommend_rank: Optional[int] = None
-    total_animes: Optional[int] = None
+    avg_anime_score: float | None = None
+    avg_recommend: float | None = None
+    rating_count: int | None = None
+    latest_review: str | None = None
+    user_rated: bool | None = None
+    score_rank: int | None = None
+    recommend_rank: int | None = None
+    total_animes: int | None = None
 
     model_config = {'from_attributes': True}
 
@@ -74,16 +74,16 @@ class AnimeCreate(BaseModel):
 
 
 class AnimeUpdate(BaseModel):
-    title_cn: Optional[str] = None
-    title_jp: Optional[str] = None
-    cover_url: Optional[str] = None
-    description: Optional[str] = None
-    episodes: Optional[int] = None
-    status: Optional[str] = None
-    tags: Optional[str] = None
-    season: Optional[str] = None
-    air_date: Optional[str] = None
-    platform: Optional[str] = None
+    title_cn: str | None = None
+    title_jp: str | None = None
+    cover_url: str | None = None
+    description: str | None = None
+    episodes: int | None = None
+    status: str | None = None
+    tags: str | None = None
+    season: str | None = None
+    air_date: str | None = None
+    platform: str | None = None
 
 
 class RatingSchema(BaseModel):
@@ -96,8 +96,8 @@ class RatingSchema(BaseModel):
     review: str = ''
     created_at: datetime
     updated_at: datetime
-    anime_title: Optional[str] = None
-    anime_cover: Optional[str] = None
+    anime_title: str | None = None
+    anime_cover: str | None = None
 
     model_config = {'from_attributes': True}
 
@@ -111,7 +111,7 @@ class RatingCreate(BaseModel):
 
 class AnimeDetail(BaseModel):
     anime: AnimeSchema
-    my_rating: Optional[RatingSchema] = None
+    my_rating: RatingSchema | None = None
     ratings: list[RatingSchema] = []
 
 
@@ -135,9 +135,9 @@ class BangumiSearchItem(BaseModel):
     rank: int
     tags: list[str]
     episodes: int
-    air_date: Optional[str] = ''
-    platform: Optional[str] = ''
-    summary: Optional[str] = ''
+    air_date: str | None = ''
+    platform: str | None = ''
+    summary: str | None = ''
     status: str = ''
     season: str = ''
 

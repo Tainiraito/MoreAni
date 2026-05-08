@@ -49,13 +49,21 @@
             </template>
             <span v-else class="text-text-secondary text-xs">暂不打分</span>
           </p>
-          <p v-if="rating.review" class="text-small text-text-body mt-1 whitespace-pre-wrap break-words">{{ rating.review }}</p>
+          <p
+            v-if="rating.review"
+            class="text-small text-text-body mt-1 whitespace-pre-wrap break-words"
+          >
+            {{ rating.review }}
+          </p>
         </div>
       </div>
     </div>
 
     <!-- Pagination -->
-    <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-gray-100">
+    <div
+      v-if="totalPages > 1"
+      class="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-gray-100"
+    >
       <el-button
         class="btn-soft !text-xs !px-3 !py-1"
         size="small"
@@ -65,9 +73,7 @@
       >
         上一页
       </el-button>
-      <span class="text-xs text-text-secondary px-2">
-        {{ currentPage }} / {{ totalPages }}
-      </span>
+      <span class="text-xs text-text-secondary px-2"> {{ currentPage }} / {{ totalPages }} </span>
       <el-button
         class="btn-soft !text-xs !px-3 !py-1"
         size="small"
@@ -95,8 +101,8 @@ import EmptyState from '@/components/EmptyState.vue'
 import AnimeDetailModal from '@/components/anime/AnimeDetailModal.vue'
 import type { Rating } from '@/types'
 
-const props = defineProps<{ visible: boolean }>()
-const emit = defineEmits<{
+defineProps<{ visible: boolean }>()
+defineEmits<{
   'update:visible': [value: boolean]
   update: []
 }>()
@@ -125,17 +131,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
 })
-
-function timeAgo(dateStr: string): string {
-  const now = Date.now()
-  const time = new Date(dateStr).getTime()
-  const diff = Math.floor((now - time) / 1000)
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`
-  return new Date(dateStr).toLocaleDateString('zh-CN')
-}
 
 function openDetail(animeId: number) {
   selectedAnimeId.value = animeId

@@ -206,19 +206,19 @@ th {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(247,131,172,0.35), rgba(255,255,255,0.5));
+  background: linear-gradient(180deg, rgba(247, 131, 172, 0.35), rgba(255, 255, 255, 0.5));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(247,131,172,0.55), rgba(255,200,220,0.6));
+  background: linear-gradient(180deg, rgba(247, 131, 172, 0.55), rgba(255, 200, 220, 0.6));
 }
 
 /* 弹窗和卡片内部滚动条 — 更透明，不显眼 */
 .el-dialog__body::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(247,131,172,0.18), rgba(255,255,255,0.3));
+  background: linear-gradient(180deg, rgba(247, 131, 172, 0.18), rgba(255, 255, 255, 0.3));
 }
 .el-dialog__body::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(247,131,172,0.35), rgba(255,200,220,0.4));
+  background: linear-gradient(180deg, rgba(247, 131, 172, 0.35), rgba(255, 200, 220, 0.4));
 }
 
 /* 用 scrollbar-gutter 代替 overflow-y:scroll，弹窗打开时 body 滚动条消失不掉位置 */
@@ -367,7 +367,9 @@ html {
    ======================================== */
 /* --- Input --- */
 .el-input__wrapper {
-  transition: box-shadow 0.25s, border-color 0.25s;
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s;
 }
 .el-input__wrapper.is-focus {
   box-shadow: 0 0 0 1px var(--primary-pink) inset !important;
