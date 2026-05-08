@@ -36,18 +36,7 @@
             <span class="text-text-primary">{{ rating.anime_title }}</span>
           </p>
           <p class="text-small text-text-secondary mt-0.5">
-            <template v-if="rating.anime_score > 0">
-              <span class="inline-flex items-center gap-1">
-                <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                <span class="text-primary-pink font-medium">{{ rating.anime_score }}分</span>
-              </span>
-              <span class="mx-1 text-text-body">·</span>
-              <span class="inline-flex items-center gap-1">
-                <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                <span class="text-primary-purple font-medium">{{ rating.recommend }}分</span>
-              </span>
-            </template>
-            <span v-else class="text-text-secondary text-xs">暂不打分</span>
+            <RatingScores :score="rating.anime_score" :recommend="rating.recommend" />
           </p>
           <p
             v-if="rating.review"
@@ -95,10 +84,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
+import { useResponsiveDialog } from '@/composables/useResponsiveDialog'
 import { useApi } from '@/composables/useApi'
 import EmptyState from '@/components/EmptyState.vue'
 import AnimeDetailModal from '@/components/anime/AnimeDetailModal.vue'
+import RatingScores from '@/components/RatingScores.vue'
 import type { Rating } from '@/types'
 
 defineProps<{ visible: boolean }>()
@@ -118,19 +109,7 @@ const totalPages = ref(1)
 const showDetail = ref(false)
 const selectedAnimeId = ref(0)
 
-const dialogWidth = ref(window.innerWidth < 768 ? '95%' : '600px')
-
-function onResize() {
-  dialogWidth.value = window.innerWidth < 768 ? '95%' : '600px'
-}
-
-onMounted(() => {
-  window.addEventListener('resize', onResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-})
+const { dialogWidth } = useResponsiveDialog('600px')
 
 function openDetail(animeId: number) {
   selectedAnimeId.value = animeId

@@ -52,20 +52,23 @@ export interface AnimeListResponse {
   total: number
 }
 
-export interface BangumiSearchResult {
+export interface BaseBangumiEntry {
   bgm_id: number
   title_cn: string
   title_jp: string
   cover_url: string
-  rating: number
-  rank: number
-  tags: string[]
   episodes: number
-  air_date: string
-  platform: string
-  summary: string
   status: string
   season: string
+  air_date: string
+  platform: string
+  tags: string[]
+}
+
+export interface BangumiSearchResult extends BaseBangumiEntry {
+  rating: number
+  rank: number
+  summary: string
 }
 
 export interface BangumiSearchResponse {
@@ -110,18 +113,8 @@ export interface CreateRatingRequest {
   review: string
 }
 
-export interface BangumiDetailResponse {
-  bgm_id: number
-  title_cn: string
-  title_jp: string
-  cover_url: string
+export interface BangumiDetailResponse extends BaseBangumiEntry {
   description: string
-  episodes: number
-  status: string
-  season: string
-  air_date: string
-  platform: string
-  tags: string[]
 }
 
 export interface RatingHistoryResponse {

@@ -100,7 +100,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch } from 'vue'
+import { useResponsiveDialog } from '@/composables/useResponsiveDialog'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
 import { ElMessage, type FormInstance } from 'element-plus'
@@ -140,14 +141,7 @@ const registerRules = {
   invite_code: [{ required: true, message: '请输入邀请码', trigger: 'blur' }]
 }
 
-const dialogWidth = ref(window.innerWidth < 768 ? '95%' : '400px')
-
-function onResize() {
-  dialogWidth.value = window.innerWidth < 768 ? '95%' : '400px'
-}
-
-onMounted(() => window.addEventListener('resize', onResize))
-onUnmounted(() => window.removeEventListener('resize', onResize))
+const { dialogWidth } = useResponsiveDialog('400px')
 
 async function handleLogin() {
   if (!loginFormRef.value) return

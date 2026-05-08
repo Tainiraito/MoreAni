@@ -119,7 +119,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onUnmounted, onMounted } from 'vue'
+import { ref, reactive, watch } from 'vue'
+import { useResponsiveDialog } from '@/composables/useResponsiveDialog'
+import { useBangumiSearch } from '@/composables/useBangumiSearch'
 import { useApi } from '@/composables/useApi'
 import { ElMessage } from 'element-plus'
 import type { BangumiSearchResult } from '@/types'
@@ -131,28 +133,11 @@ const emit = defineEmits<{
 }>()
 
 const api = useApi()
-const keyword = ref('')
-const searching = ref(false)
 const submitting = ref(false)
-const searchResults = ref<BangumiSearchResult[]>([])
-const searchError = ref('')
 const tagsInput = ref('')
 const importMessage = ref('')
 
-const dialogWidth = ref(window.innerWidth < 768 ? '95%' : '550px')
-
-function onResize() {
-  dialogWidth.value = window.innerWidth < 768 ? '95%' : '550px'
-}
-
-onMounted(() => {
-  window.addEventListener('resize', onResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-  if (searchTimer) clearTimeout(searchTimer)
-})
+const { dialogWidth } = useResponsiveDialog('550px')
 
 const form = reactive({
   title_cn: '',
@@ -166,7 +151,20 @@ const form = reactive({
   season: ''
 })
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null
+const {
+  keyword,
+  searching,
+  searchResults,
+  searchError,
+  onSearchInput,
+  clearSearch,
+  applyBangumiItem
+} = useBangumiSearch(form, tagsInput)
+
+function selectBangumi(item: BangumiSearchResult) {
+  importMessage.value = ''
+  applyBangumiItem(item)
+}
 
 function resetForm() {
   form.title_cn = ''
@@ -179,10 +177,8 @@ function resetForm() {
   form.air_date = ''
   form.season = ''
   tagsInput.value = ''
-  searchResults.value = []
-  searchError.value = ''
   importMessage.value = ''
-  keyword.value = ''
+  clearSearch()
 }
 
 watch(
@@ -191,63 +187,6 @@ watch(
     if (v) resetForm()
   }
 )
-
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer)
-  const val = keyword.value.trim()
-  if (!val) {
-    searchResults.value = []
-    searchError.value = ''
-    return
-  }
-  searchTimer = setTimeout(async () => {
-    searching.value = true
-    searchError.value = ''
-    try {
-      const res = await api.searchBangumi(val)
-      searchResults.value = res.animes
-      if (res.animes.length === 0) searchError.value = '未找到，试试手动填写'
-    } catch {
-      searchResults.value = []
-      searchError.value = '搜索暂不可用，请尝试手动填写'
-    } finally {
-      searching.value = false
-    }
-  }, 300)
-}
-
-function selectBangumi(item: BangumiSearchResult) {
-  form.title_cn = item.title_cn
-  form.title_jp = item.title_jp
-  form.cover_url = item.cover_url
-  form.episodes = item.episodes
-  form.air_date = item.air_date
-  form.platform = item.platform
-  form.status = item.status
-  form.season = item.season
-  form.description = ''
-  tagsInput.value = item.tags.join(', ')
-  searchResults.value = []
-  keyword.value = ''
-  importMessage.value = ''
-  // 非阻塞获取摘要等详情数据
-  fetchBangumiDetail(item.bgm_id)
-}
-
-async function fetchBangumiDetail(bgmId: number) {
-  form.description = '⌛ 正在获取简介...'
-  try {
-    const detail = await api.getBangumiDetail(bgmId)
-    if (detail.description) form.description = detail.description
-    if (detail.status && !form.status) form.status = detail.status
-    if (detail.season && !form.season) form.season = detail.season
-    if (detail.episodes && !form.episodes) form.episodes = detail.episodes
-    if (detail.platform && !form.platform) form.platform = detail.platform
-    if (detail.tags.length && !tagsInput.value) tagsInput.value = detail.tags.join(', ')
-  } catch {
-    form.description = ''
-  }
-}
 
 async function submit() {
   if (!form.title_cn) return

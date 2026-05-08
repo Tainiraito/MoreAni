@@ -4,13 +4,14 @@
     :width="dialogWidth"
     class="anime-dialog"
     overlay-class="anime-overlay"
+    :style="{ background: gradientBg }"
     @update:model-value="$emit('update:visible', $event)"
   >
-    <div class="loading-content relative min-h-[350px] rounded-8">
+    <div class="relative min-h-[350px] rounded-12 p-5">
       <!-- 自定义 Loading 覆盖层 — 粉紫主题，绝对居中，不跳动 -->
       <div
         v-if="loading"
-        class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-8"
+        class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-12"
         style="background: rgba(255, 255, 255, 0.85)"
       >
         <svg class="animate-spin h-8 w-8" viewBox="0 0 24 24">
@@ -33,12 +34,6 @@
       </div>
 
       <template v-if="detail">
-        <!-- 封面取色渐变背景（淡色，不溢出） -->
-        <div
-          class="absolute inset-0 transition-colors duration-700 rounded-12 pointer-events-none"
-          :style="{ background: gradientBg }"
-        ></div>
-
         <div class="relative z-10">
           <!-- Anime Info -->
           <div class="flex gap-4 mb-6 flex-col sm:flex-row">
@@ -95,7 +90,7 @@
                 :loading="searching"
                 clearable
                 @input="onSearchInput"
-                @clear="onClearSearch"
+                @clear="clearSearch"
               >
                 <template #prefix>
                   <el-icon class="text-text-secondary"><Search /></el-icon>
@@ -113,7 +108,7 @@
                   v-for="item in searchResults"
                   :key="item.bgm_id"
                   class="flex items-center gap-2 p-2 hover:bg-primary-pink/5 cursor-pointer transition-colors border-b border-gray-50 last:border-0"
-                  @click="selectBangumi(item)"
+                  @click="applyBangumiItem(item)"
                 >
                   <img
                     :src="item.cover_url"
@@ -132,7 +127,9 @@
                 </div>
               </div>
 
-              <p v-if="searchError" class="text-xs text-primary-pink mt-1">{{ searchError }}</p>
+              <p v-if="searchError" class="text-xs text-primary-pink mt-1">
+                {{ searchError }}
+              </p>
             </div>
             <el-divider class="!my-3 !border-gray-100" />
             <el-form :model="editForm" label-position="top" size="default">
@@ -398,22 +395,7 @@
                     <p
                       class="text-small text-text-secondary mb-1 flex items-center gap-1 flex-wrap"
                     >
-                      <template v-if="rating.anime_score > 0">
-                        <span class="inline-flex items-center gap-1">
-                          <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                          <span class="text-primary-pink font-medium"
-                            >{{ rating.anime_score }}分</span
-                          >
-                        </span>
-                        <span class="text-text-body">·</span>
-                        <span class="inline-flex items-center gap-1">
-                          <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                          <span class="text-primary-purple font-medium"
-                            >{{ rating.recommend }}分</span
-                          >
-                        </span>
-                      </template>
-                      <span v-else class="text-text-secondary text-xs">暂不打分</span>
+                      <RatingScores :score="rating.anime_score" :recommend="rating.recommend" />
                     </p>
                     <p
                       v-if="rating.review"
@@ -444,11 +426,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useResponsiveDialog } from '@/composables/useResponsiveDialog'
+import { useBangumiSearch } from '@/composables/useBangumiSearch'
 import { useApi } from '@/composables/useApi'
 import { useAuth } from '@/composables/useAuth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AuthDialog from '@/components/auth/AuthDialog.vue'
-import type { AnimeDetail, BangumiSearchResult } from '@/types'
+import RatingScores from '@/components/RatingScores.vue'
+import type { AnimeDetail } from '@/types'
 
 const props = withDefaults(
   defineProps<{
@@ -478,14 +463,9 @@ const showEdit = ref(false)
 const savingRating = ref(false)
 const savingEdit = ref(false)
 const showAuthDialog = ref(false)
-const searchKeyword = ref('')
-const searching = ref(false)
-const searchResults = ref<BangumiSearchResult[]>([])
-const searchError = ref('')
 const tagsInput = ref('')
-let searchTimer: ReturnType<typeof setTimeout> | null = null
 const gradientBg = ref(
-  'linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)'
+  'linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff'
 )
 const coverRef = ref<HTMLImageElement | null>(null)
 
@@ -493,24 +473,17 @@ function onCoverError(e: Event) {
   const img = e.target as HTMLImageElement
   img.style.opacity = '0.3'
   gradientBg.value =
-    'linear-gradient(135deg, rgba(247,131,172,0.06) 0%, rgba(180,144,228,0.04) 50%, rgba(255,255,255,0.98) 100%)'
+    'linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff'
 }
 
-const dialogWidth = ref(window.innerWidth < 768 ? '95%' : '600px')
-
-function onResize() {
-  dialogWidth.value = window.innerWidth < 768 ? '95%' : '600px'
-}
+const { dialogWidth } = useResponsiveDialog('600px')
 
 onMounted(() => {
-  window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeyDown)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeyDown)
-  if (searchTimer) clearTimeout(searchTimer)
 })
 
 function onKeyDown(e: KeyboardEvent) {
@@ -542,6 +515,15 @@ const editForm = reactive({
 })
 
 const showRatingForm = ref(false)
+const {
+  keyword: searchKeyword,
+  searching,
+  searchResults,
+  searchError,
+  onSearchInput,
+  clearSearch,
+  applyBangumiItem
+} = useBangumiSearch(editForm, tagsInput)
 const hasExistingRating = computed(() => detail.value?.my_rating != null)
 
 const otherRatings = computed(() => {
@@ -624,7 +606,7 @@ function extractColor() {
     g = Math.round(g / count)
     b = Math.round(b / count)
 
-    gradientBg.value = `linear-gradient(135deg, rgba(${r},${g},${b},0.12) 0%, rgba(${r},${g},${b},0.06) 40%, rgba(255,255,255,0.96) 100%)`
+    gradientBg.value = `linear-gradient(135deg, rgba(${r},${g},${b},0.10) 0%, transparent 40%), #fff`
   } catch {
     // CORS 或取色失败，保持默认淡色渐变
   }
@@ -667,69 +649,6 @@ async function saveEdit() {
     ElMessage.error((e as Error).message || '更新失败')
   } finally {
     savingEdit.value = false
-  }
-}
-
-function onClearSearch() {
-  searchResults.value = []
-  searchError.value = ''
-}
-
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer)
-  const val = searchKeyword.value.trim()
-  if (!val) {
-    searchResults.value = []
-    searchError.value = ''
-    return
-  }
-  searchTimer = setTimeout(async () => {
-    searching.value = true
-    searchError.value = ''
-    try {
-      const res = await api.searchBangumi(val)
-      searchResults.value = res.animes
-      if (res.animes.length === 0) searchError.value = '未找到，试试换关键词'
-    } catch {
-      searchResults.value = []
-      searchError.value = '搜索暂不可用，请手动填写'
-    } finally {
-      searching.value = false
-    }
-  }, 300)
-}
-
-function selectBangumi(item: BangumiSearchResult) {
-  editForm.title_cn = item.title_cn
-  editForm.title_jp = item.title_jp
-  editForm.cover_url = item.cover_url
-  editForm.episodes = item.episodes
-  editForm.air_date = item.air_date
-  editForm.platform = item.platform
-  editForm.status = item.status
-  editForm.season = item.season
-  editForm.description = ''
-  tagsInput.value = item.tags.join(', ')
-  searchResults.value = []
-  searchKeyword.value = ''
-  searchError.value = ''
-  // 非阻塞获取摘要等详情数据
-  fetchBangumiDetail(item.bgm_id)
-}
-
-async function fetchBangumiDetail(bgmId: number) {
-  editForm.description = '⌛ 正在获取简介...'
-  try {
-    const detail = await api.getBangumiDetail(bgmId)
-    if (detail.description) editForm.description = detail.description
-    // 如果详情有更准确的数据，也补充
-    if (detail.status && !editForm.status) editForm.status = detail.status
-    if (detail.season && !editForm.season) editForm.season = detail.season
-    if (detail.episodes && !editForm.episodes) editForm.episodes = detail.episodes
-    if (detail.platform && !editForm.platform) editForm.platform = detail.platform
-    if (detail.tags.length && !tagsInput.value) tagsInput.value = detail.tags.join(', ')
-  } catch {
-    editForm.description = ''
   }
 }
 
@@ -844,12 +763,15 @@ watch(
   padding: 16px 24px 0;
   position: relative;
   z-index: 10;
+  background: transparent;
 }
 .anime-dialog :deep(.el-dialog__body) {
   flex: 1;
   overflow-y: auto;
   max-height: none;
   position: relative;
+  padding: 0;
+  background: transparent;
 }
 
 /* 编辑表单 - 压缩 FormItem 间距 */

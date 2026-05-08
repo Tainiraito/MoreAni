@@ -49,19 +49,19 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 }
 
 export function useApi() {
+  const post = <T>(url: string, body?: Record<string, unknown>) =>
+    request<T>(url, { method: 'POST', body: JSON.stringify(body) })
+
+  const put = <T>(url: string, body?: Record<string, unknown>) =>
+    request<T>(url, { method: 'PUT', body: JSON.stringify(body) })
+
   return {
     // Auth
     login(username: string, password: string) {
-      return request<AuthResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password })
-      })
+      return post<AuthResponse>('/auth/login', { username, password })
     },
     register(username: string, password: string, invite_code: string) {
-      return request<AuthResponse>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ username, password, invite_code })
-      })
+      return post<AuthResponse>('/auth/register', { username, password, invite_code })
     },
     getMe() {
       return request<AuthResponse['user']>('/auth/me')
@@ -80,37 +80,24 @@ export function useApi() {
       return request<AnimeDetail['anime']>('/animes/random')
     },
     createAnime(data: Record<string, unknown>) {
-      return request<AnimeDetail['anime']>('/animes', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      })
+      return post<AnimeDetail['anime']>('/animes', data)
     },
     deleteAnime(id: number) {
-      return request<void>(`/animes/${id}`, {
-        method: 'DELETE'
-      })
+      return request<void>(`/animes/${id}`, { method: 'DELETE' })
     },
     updateAnime(id: number, data: Record<string, unknown>) {
-      return request<AnimeDetail['anime']>(`/animes/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data)
-      })
+      return put<AnimeDetail['anime']>(`/animes/${id}`, data)
     },
 
     // Bangumi
     searchBangumi(keyword: string, limit = 10, offset = 0) {
-      return request<BangumiSearchResponse>('/bangumi/search', {
-        method: 'POST',
-        body: JSON.stringify({ keyword, limit, offset })
-      })
+      return post<BangumiSearchResponse>('/bangumi/search', { keyword, limit, offset })
     },
     getBangumiDetail(bgmId: number) {
       return request<BangumiDetailResponse>(`/bangumi/detail/${bgmId}`)
     },
     importBangumi(bgmId: number) {
-      return request<{ anime_id: number; status: string }>(`/bangumi/import/${bgmId}`, {
-        method: 'POST'
-      })
+      return post<{ anime_id: number; status: string }>(`/bangumi/import/${bgmId}`)
     },
 
     // Ratings
@@ -120,10 +107,7 @@ export function useApi() {
       recommend: number
       review: string
     }) {
-      return request<Rating>('/ratings', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      })
+      return post<Rating>('/ratings', data)
     },
     getRecentRatings(limit = 5) {
       return request<Rating[]>(`/ratings/recent?limit=${limit}&_t=${Date.now()}`)
@@ -132,21 +116,15 @@ export function useApi() {
       return request<RatingHistoryResponse>(`/ratings/history?page=${page}&limit=${limit}`)
     },
     changeUsername(newUsername: string) {
-      return request<User>('/auth/me/username', {
-        method: 'PUT',
-        body: JSON.stringify({ new_username: newUsername })
-      })
+      return put<User>('/auth/me/username', { new_username: newUsername })
     },
     checkUsername(username: string) {
-      return request<{ available: boolean }>('/auth/check-username', {
-        method: 'POST',
-        body: JSON.stringify({ username })
-      })
+      return post<{ available: boolean }>('/auth/check-username', { username })
     },
     changePassword(oldPassword: string, newPassword: string) {
-      return request<void>('/auth/me/password', {
-        method: 'PUT',
-        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      return put<void>('/auth/me/password', {
+        old_password: oldPassword,
+        new_password: newPassword
       })
     }
   }

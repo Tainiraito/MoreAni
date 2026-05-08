@@ -1,5 +1,15 @@
 # Changelog
 
+## dev (2026-05-07)
+
+### 重构
+- 提取 `RatingScores.vue` 评分展示组件
+- 提取 `useBangumiSearch.ts` composable，封装 Bangumi 搜索逻辑
+- 提取 `useResponsiveDialog.ts` composable，封装弹窗响应式尺寸逻辑
+- 各弹窗组件精简，移除重复代码约 300 行
+
+---
+
 ## v0.3.0 (2026-05-07)
 
 ### 弹窗体验优化

@@ -223,22 +223,7 @@
                     <span class="text-text-primary">{{ rating.anime_title }}</span>
                   </p>
                   <p class="text-small text-text-secondary">
-                    <template v-if="rating.anime_score > 0">
-                      <span class="inline-flex items-center gap-1">
-                        <el-icon :size="13" class="text-primary-pink"><StarFilled /></el-icon>
-                        <span class="text-primary-pink font-medium"
-                          >{{ rating.anime_score }}分</span
-                        >
-                      </span>
-                      <span class="mx-1 text-text-body">·</span>
-                      <span class="inline-flex items-center gap-1">
-                        <el-icon :size="13" class="text-primary-purple"><GoldMedal /></el-icon>
-                        <span class="text-primary-purple font-medium"
-                          >{{ rating.recommend }}分</span
-                        >
-                      </span>
-                    </template>
-                    <span v-else class="text-text-secondary text-xs">暂不打分</span>
+                    <RatingScores :score="rating.anime_score" :recommend="rating.recommend" />
                   </p>
                   <p
                     v-if="rating.review"
@@ -544,6 +529,7 @@ import AnimeDetailModal from '@/components/anime/AnimeDetailModal.vue'
 import AddAnimeDialog from '@/components/anime/AddAnimeDialog.vue'
 import AuthDialog from '@/components/auth/AuthDialog.vue'
 import RatingsHistoryDialog from '@/components/RatingsHistoryDialog.vue'
+import RatingScores from '@/components/RatingScores.vue'
 import type { Anime, Rating } from '@/types'
 
 const api = useApi()
