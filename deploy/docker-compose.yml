@@ -1,0 +1,27 @@
+services:
+  moreani-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: moreani-app
+    restart: unless-stopped
+    volumes:
+      - ../data:/app/data
+      - ../logs/nginx:/var/log/nginx
+      - ../logs/app:/var/log/app
+    networks:
+      - moreani
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: moreani-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    networks:
+      - moreani
+
+networks:
+  moreani:
+    driver: bridge

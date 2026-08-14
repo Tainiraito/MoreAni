@@ -37,6 +37,11 @@ backend/init_db.py
 
 # Docker
 docker-compose.override.yml
+deploy/.env
+
+# Deployment data (NAS-side only)
+data/
+logs/
 
 # Temporary scripts
 frontend/*.mjs

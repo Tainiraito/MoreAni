@@ -1,0 +1,20 @@
+# 构建产物
+frontend/dist/
+frontend/node_modules/
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+
+# 本地数据
+backend/*.db
+data/
+logs/
+
+# 开发文件
+.git/
+.github/
+*.md
+!backend/requirements.txt
+.vscode/
+.idea/
+.pre-commit-config.yaml

@@ -22,7 +22,7 @@ def anime_to_schema(anime: Anime, db: Session) -> AnimeSchema:
         db.query(
             func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
             func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
-            func.count(Rating.id).label('count'),
+            func.count(func.nullif(Rating.anime_score, 0)).label('count'),
         )
         .filter(Rating.anime_id == anime.id)
         .first()
@@ -108,7 +108,7 @@ def list_animes(
             Rating.anime_id,
             func.avg(func.nullif(Rating.anime_score, 0)).label('avg_score'),
             func.avg(func.nullif(Rating.recommend, 0)).label('avg_rec'),
-            func.count(Rating.id).label('rating_count'),
+            func.count(func.nullif(Rating.anime_score, 0)).label('rating_count'),
         )
         .group_by(Rating.anime_id)
         .subquery()
@@ -133,11 +133,20 @@ def list_animes(
     total = query.count()
 
     if sort == 'count':
-        query = query.order_by(desc('rating_count'))
+        query = query.order_by(
+            desc('rating_count'), desc('avg_score'),
+            desc('avg_rec'), desc(Anime.id)
+        )
     elif sort == 'avg_rec':
-        query = query.order_by(desc('avg_rec'))
+        query = query.order_by(
+            desc('avg_rec'), desc('rating_count'),
+            desc('avg_score'), desc(Anime.id)
+        )
     else:
-        query = query.order_by(desc('avg_score'))
+        query = query.order_by(
+            desc('avg_score'), desc('rating_count'),
+            desc('avg_rec'), desc(Anime.id)
+        )
 
     offset = (page - 1) * limit
     rows = query.offset(offset).limit(limit).all()
@@ -164,7 +173,7 @@ def list_animes(
         user_rated_ids = {
             row[0]
             for row in db.query(Rating.anime_id)
-            .filter(Rating.user_id == current_user.id)
+            .filter(Rating.user_id == current_user.id, Rating.anime_score > 0)
             .all()
         }
 

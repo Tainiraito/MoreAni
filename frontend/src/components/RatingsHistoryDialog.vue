@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useResponsiveDialog } from '@/composables/useResponsiveDialog'
 import { useApi } from '@/composables/useApi'
 import EmptyState from '@/components/EmptyState.vue'
@@ -92,7 +92,7 @@ import AnimeDetailModal from '@/components/anime/AnimeDetailModal.vue'
 import RatingScores from '@/components/RatingScores.vue'
 import type { Rating } from '@/types'
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 defineEmits<{
   'update:visible': [value: boolean]
   update: []
@@ -102,7 +102,7 @@ const api = useApi()
 const PAGE_SIZE = 20
 
 const items = ref<Rating[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const currentPage = ref(1)
 const totalPages = ref(1)
 
@@ -129,4 +129,14 @@ async function loadPage(page: number) {
     loading.value = false
   }
 }
+
+watch(
+  () => props.visible,
+  (v) => {
+    if (!v) {
+      loading.value = true
+      items.value = []
+    }
+  }
+)
 </script>

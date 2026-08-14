@@ -319,11 +319,11 @@
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <TransitionGroup name="row" tag="tbody">
               <tr
                 v-for="(anime, i) in animes"
                 :key="anime.id"
-                class="border-b border-gray-50 hover:bg-primary-pink/5 cursor-pointer transition-colors"
+                class="border-b border-gray-50 hover:bg-primary-pink/5 cursor-pointer row-item"
                 :class="{
                   'bg-gradient-to-r from-primary-pink/[0.07] to-transparent':
                     isLoggedIn && anime.user_rated === false
@@ -378,7 +378,7 @@
                   <span v-else>-</span>
                 </td>
               </tr>
-            </tbody>
+            </TransitionGroup>
           </table>
           <!-- 底部加载指示 -->
           <div v-if="loadingMore" class="py-4 text-center text-text-secondary text-xs">
@@ -633,6 +633,8 @@ watch(searchKeyword, (val) => {
   hasMore.value = true
   if (val) {
     searchTimer = setTimeout(() => loadAnimes(), 300)
+  } else {
+    loadAnimes()
   }
 })
 

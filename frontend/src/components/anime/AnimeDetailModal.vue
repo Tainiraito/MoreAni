@@ -464,16 +464,13 @@ const savingRating = ref(false)
 const savingEdit = ref(false)
 const showAuthDialog = ref(false)
 const tagsInput = ref('')
-const gradientBg = ref(
-  'linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff'
-)
+const gradientBg = ref('linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff')
 const coverRef = ref<HTMLImageElement | null>(null)
 
 function onCoverError(e: Event) {
   const img = e.target as HTMLImageElement
   img.style.opacity = '0.3'
-  gradientBg.value =
-    'linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff'
+  gradientBg.value = 'linear-gradient(135deg, rgba(247,131,172,0.08) 0%, transparent 40%), #fff'
 }
 
 const { dialogWidth } = useResponsiveDialog('600px')
