@@ -26,9 +26,10 @@
 | 后端 | Python FastAPI | 现有代码基础，LLM 支持最好 |
 | ORM | SQLAlchemy 2.0 | 类型安全，async 支持 |
 | 数据库 | SQLite | 暂不迁移，够用 |
-| 前端 | Vue 3 + TypeScript | 现有代码基础 |
-| UI 库 | Element Plus | 现有，成熟 |
-| 状态管理 | Pinia | Vue 官方推荐 |
+| 前端 | **React 18 + TypeScript** | LLM 友好：一种语言、显式状态、训练数据多 |
+| UI 库 | **shadcn/ui + Tailwind CSS** | 无运行时依赖、可定制、LLM 友好 |
+| 状态管理 | **Zustand** | 轻量、显式、TypeScript 友好 |
+| 路由 | React Router v6 | 成熟、类型安全 |
 | 构建 | Vite | 快，HMR 好 |
 | 部署 | Docker | 现有方案 |
 
@@ -304,33 +305,24 @@ POST   /api/v1/bangumi/import/:bgm_id # 导入
 | SettingsView | 头像 + 密码 | AvatarPicker, PasswordForm |
 | GuestView | 只读内容详情 | ContentDetail (readonly) |
 
-### 4.3 组件规范
+### 4.3 组件规范（React + TypeScript）
 
 **每个组件文件结构**：
-```vue
-<script setup lang="ts">
+```tsx
 // 1. imports
-// 2. props/emits
-// 3. state (ref/reactive)
-// 4. computed
-// 5. methods
-// 6. lifecycle hooks
-</script>
-
-<template>
-  <!-- 单一根元素 -->
-</template>
-
-<style scoped>
-/* 组件私有样式 */
-</style>
+// 2. types/interfaces
+// 3. hooks
+// 4. component
+// 5. named export
 ```
 
 **命名规范**：
-- 组件文件：PascalCase（`ContentCard.vue`）
-- 组合式函数：camelCase（`useContent.ts`）
-- Store：camelCase（`useContentStore`）
-- CSS 类：kebab-case（`content-card`）
+- 组件文件：PascalCase（`ContentCard.tsx`）
+- 页面文件：PascalCase + Page（`ExplorePage.tsx`）
+- Hook 文件：camelCase + use（`useContent.ts`）
+- Store 文件：camelCase + store（`useContentStore.ts`）
+- 工具文件：camelCase（`formatScore.ts`）
+- CSS 类：Tailwind utility classes（无自定义 CSS 文件）
 
 ---
 
