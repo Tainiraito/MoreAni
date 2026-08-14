@@ -1,27 +1,17 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import ElementPlus from 'unplugin-element-plus/vite'
-import { fileURLToPath, URL } from 'node:url'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
-  plugins: [vue(), ElementPlus({})],
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   server: {
-    host: '0.0.0.0',
-    port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      }
+      '/api': 'http://localhost:8000',
     },
-    watch: {
-      usePolling: true,
-      interval: 500
-    }
-  }
+  },
 })

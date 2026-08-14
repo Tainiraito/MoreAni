@@ -7,6 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+node_modules
+dist
+dist-ssr
+*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -17,32 +22,3 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-# OS files
-Thumbs.db
-.DS_Store
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# Node modules
-node_modules/
-
-# Build output
-dist/
-dist-ssr/
-
-# Coverage
-coverage/
-
-# Temporary files
-*.tmp
-*.temp
-
-# Hermes Agent
-.hermes/
-
-# OpenCode
-opencode.json
