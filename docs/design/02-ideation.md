@@ -1,8 +1,8 @@
 # MoreAni v2.0 — I阶段：创意构思
 
-> **文档版本**: v0.1
+> **文档版本**: v0.2
 > **日期**: 2026-08-14
-> **状态**: 🔄 进行中
+> **状态**: ✅ 已确认
 
 ---
 
@@ -17,37 +17,31 @@
 ### 现状
 当前只支持「番剧」，用 `animes` 表存储。但用户需求是「番剧/电影/游戏/软件/网站」都要支持。
 
-### 创意 A：统一内容模型（推荐 ✅）
+### 方案（✅ 已确认）
+
+统一 `content_items` 模型，公共字段 + JSON `metadata` 存各类型特有字段。
 
 ```
-content_items（内容条目）
-├── type: enum('anime', 'movie', 'game', 'software', 'website', 'book')
-├── title, title_alt, cover_url, description
-├── source_type: enum('bangumi', 'manual', 'steam', 'douban')
-├── source_id: string (关联外部平台)
-├── tags: 关联表
+content_items
+├── id, title, title_alt, cover_url, description
+├── content_type: enum('anime', 'movie', 'game', 'software', 'website', 'book')
+├── episodes, status, release_date, platform  ← 公共字段
+├── source_type, source_id, source_url        ← 外部源
+├── share_token, is_public                    ← 分享
+├── metadata: JSON                            ← 各类型特有字段
 ├── created_by → users
 └── created_at, updated_at
 ```
 
-**优点**：
-- 一套代码支持所有类型
-- 按 type 筛选即可
-- 未来扩展新类型只需加 enum 值
-- Bangumi 只是数据源之一，不是唯一
+**metadata 示例**：
+- 番剧: `{ "episodes": 24, "air_status": "finished" }`
+- 游戏: `{ "developer": "miHoYo", "platforms": ["PC", "PS5"], "playtime_hours": 120 }`
+- 软件: `{ "version": "1.0", "license": "MIT", "platforms": ["Windows", "Mac"] }`
 
-**实现成本**：中等（需要改表名和字段映射）
+**优点**：不改表结构即可扩展，前端按 type 渲染不同表单。
+**缺点**：JSON 字段不方便精确查询（本项目查询需求简单，够用）。
 
-### 创意 B：多表独立模型
-
-每种类型一个表（animes, movies, games...），共享评分表。
-
-**优点**：各类型字段可以不同
-**缺点**：大量重复代码，评分系统要写 N 套
-
-### 决策
-
-**选择 A**。统一模型更简洁，符合「内容分享工具」的定位。
+> 决策 D18: 统一内容模型 + JSON metadata 存特有字段
 
 ---
 
@@ -56,38 +50,28 @@ content_items（内容条目）
 ### 现状
 标签用 JSON 字符串存储，没有分类体系。
 
-### 创意 A：Bangumi 标签 + 自定义标签混合（推荐 ✅）
+### 方案（✅ 已确认）
+
+独立标签表 + 关联表，Bangumi 标签和自定义标签混合。
 
 ```
-tags（标签表）
-├── id, name, type: enum('bangumi', 'custom')
+tags
+├── id, name (UNIQUE)
+├── tag_type: enum('bangumi', 'custom')
 └── created_at
 
-content_tags（关联表）
-└── content_id → content_items, tag_id → tags
+content_tags
+├── content_id → content_items (ON DELETE CASCADE)
+├── tag_id → tags (ON DELETE CASCADE)
+└── PRIMARY KEY (content_id, tag_id)
 ```
 
-- 从 Bangumi 导入时，自动抓取标签并存入 tags 表
-- 用户可以手动添加自定义标签
-- Bangumi 标签标记为 `type='bangumi'`，自定义标记为 `type='custom'`
-- 不维护「分类字典」，直接用标签系统
+- Bangumi 导入时自动抓取标签 → `tag_type='bangumi'`
+- 用户可手动添加标签 → `tag_type='custom'`
+- 标签可跨内容类型使用
+- 不维护分类字典，标签系统足够
 
-**优点**：
-- 不需要自己维护分类体系
-- Bangumi 标签天然丰富
-- 用户可以自由打标签
-- 标签可以跨类型使用（一个标签可以同时用于番剧和电影）
-
-### 创意 B：维护本地分类字典
-
-自己建 categories 表，手动维护类型→分类映射。
-
-**优点**：完全可控
-**缺点**：维护成本高，和 Bangumi 对不上
-
-### 决策
-
-**选择 A**。用标签系统代替分类字典，Bangumi 标签 + 自定义标签混合。
+> 决策 D19: 独立标签表 + Bangumi/自定义混合
 
 ---
 
@@ -97,229 +81,144 @@ content_tags（关联表）
 - 内部和 UI 都是 1-10 整数
 - 双维度：anime_score + recommend
 
-### 创意：百分制内部存储 + 10星 UI 显示
+### 方案（✅ 已确认）
+
+百分制（0-100）内部存储，10 星半星 UI 显示。
 
 ```
 ratings 表
-├── score: integer (0-100, 百分制内部存储)
-├── recommend: integer (0-100, 百分制内部存储)
+├── score: integer (0-100, 百分制)
+├── recommend: integer (0-100, 百分制)
 └── review: text
-
-API 层
-├── 返回 score（百分制）给需要精确数据的场景
-└── 返回 score_display（1-10）给 UI 显示
-
-UI 层
-├── el-rate :max="10" 显示 10 星
-└── 显示分数时除以10: `${score/10}分`
 ```
 
-**评分转换**：
-- 用户打 8 星 → 存储 80
-- 显示均分 → `avg/10` 四舍五入到一位小数
-- 未来如果要支持半星 → 存储 85 显示 8.5 星
+**换算**：
+- 用户打 8.5 星 → 存 85
+- 显示均分 → `avg / 10` 四舍五入（如 85 → 8.5）
+- 百分制分数 → 直接显示（85分）
+- 0 分 = 暂不打分（不计入均分）
 
-**优点**：
-- 内部精度高，方便后续换算
-- UI 保持 10 星直觉
-- 0分 = 暂不打分（保持兼容）
+**半星实现**：el-rate `allow-half` 属性，步长0.5。
+
+> 决策 D20: 百分制评分（0-100），UI 10 星半星
 
 ---
 
 ## 5. 领域四：观看状态
 
-### 创意：独立的用户-内容状态表
+### 方案（✅ 已确认）
+
+独立表 `user_content_status`，底层4个状态值，UI 标签按内容类型动态显示。
 
 ```
-user_content_status（用户观看状态）
+user_content_status
 ├── user_id → users
 ├── content_id → content_items
 ├── status: enum('want', 'watching', 'watched', 'dropped')
-├── updated_at
+├── created_at, updated_at
 └── UNIQUE(user_id, content_id)
 ```
 
-**状态定义**：
-| 状态 | 中文 | 图标 | 说明 |
-|------|------|------|------|
-| want | 想看 | 📋 | 收藏/计划观看 |
-| watching | 在看 | ▶️ | 正在观看 |
-| watched | 看完 | ✅ | 已完成 |
-| dropped | 弃坑 | ❌ | 放弃观看 |
+**状态标签按类型显示**：
 
-**UI 设计**：
-- 番剧卡片上显示状态图标
-- 筛选器支持按状态筛选
-- 首页「我的片单」按状态分组
+| 类型 | 想看 | 在看 | 已看 | 弃坑 |
+|------|------|------|------|------|
+| 番剧/电影 | 想看 | 在看 | 已看 | 弃坑 |
+| 游戏 | 想玩 | 在玩 | 已玩 | 弃坑 |
+| 软件/网站 | 收藏 | — | — | — |
+
+- 软件/网站只用 `want` 一个值，显示为「收藏」
+- 底层存的都是 `want/watching/watched/dropped`
+
+> 决策 D21: 观看状态按内容类型动态显示标签，软件/网站只有「收藏」
 
 ---
 
 ## 6. 领域五：用户头像
 
-### 创意：内置头像集 + 随机分配
+### 方案（✅ 已确认）
 
-```
-avatars（头像配置，代码内嵌或配置文件）
-├── 20-30 个预设头像（SVG 或 PNG）
-├── 风格统一（可爱/简约/像素风）
-└── 注册时随机分配，用户可在设置中切换
-```
+内置头像集，前端 `public/avatars/` 目录，用户记录 `avatar_id` 整数编号。
 
-**头像存储**：
-- 放在 `frontend/public/avatars/` 目录
-- 用户记录 `avatar_id: integer`（头像编号）
+- 注册时随机分配
+- 设置页展示头像网格，点击切换
 - 不存图片文件，只存编号
+- 20-30 个预设头像，风格统一
 
-**切换方式**：
-- 设置页展示头像网格
-- 点击选择 → 更新 avatar_id
+> 决策 D22: 内置头像集 + avatar_id 编号
 
 ---
 
 ## 7. 领域六：内容分享类型扩展
 
-### 现状
-只支持 Bangumi 导入。
+### 方案（✅ 已确认）
 
-### 创意：多源导入架构
+MVP 支持两种导入：Bangumi + 手动。未来可扩展 Steam、豆瓣等。
 
 ```
 content_items
-├── source_type: enum('bangumi', 'steam', 'manual')
+├── source_type: enum('bangumi', 'manual')  ← MVP
 ├── source_id: string
-└── source_url: string (原始链接)
-
-导入流程
-├── Bangumi → 自动填充元数据
-├── Steam → 自动填充（未来）
-├── 手动 → 用户自己填
-└── 链接解析 → 自动识别类型（未来）
+└── source_url: string
 ```
 
-**MVP 阶段**：只做 Bangumi + 手动
-**未来扩展**：Steam、豆瓣、IT 邦助等
+- Bangumi：搜索 + 一键导入元数据
+- 手动：用户自己填写所有字段
+
+> 决策 D23: MVP 先做 Bangumi + 手动导入
 
 ---
 
 ## 8. 领域七：安全与隐私
 
-### 8.1 安全防护
+### 方案（✅ 已确认）
 
-| 威胁 | 防护方案 |
-|------|----------|
-| 暴力破解登录 | 登录失败 5 次锁定 15 分钟 |
-| SQL 注入 | SQLAlchemy ORM 天然防护 |
-| XSS 攻击 | 前端 v-text/v-html 安全使用 |
-| CSRF | SameSite cookie + JWT |
-| 频率限制 | API 限流（60次/分钟） |
-| 邀请码枚举 | 注册失败不区分「码错」和「用户已存在」 |
+**A. 安全防护**：
 
-### 8.2 隐私保护
-
-**核心原则**：只有注册用户才能看到内容。
-
-| 场景 | 方案 |
+| 威胁 | 防护 |
 |------|------|
-| 未登录访问 | 只看到登录页面，看不到任何内容 |
-| 未注册用户 | 无法注册（需邀请码） |
-| 内容可见性 | 所有登录用户可见所有内容（内部工具） |
-| API 保护 | 所有 API 需要 JWT token（除 login/register） |
+| 暴力破解登录 | 失败 5 次锁定 15 分钟 |
+| API 频率 | 60 次/分钟（按 IP） |
+| 邀请码枚举 | 注册限流 3 次/小时（按 IP） |
+| SQL 注入 | SQLAlchemy ORM |
+| XSS | React 天然转义 |
+| CSRF | SameSite cookie + JWT |
 
-**实现**：
-- 前端路由守卫：未登录重定向到登录页
-- 后端中间件：所有 /api/* 需要 token（除 /api/auth/login 和 /api/auth/register）
-- 不做「公开/私密」分级（内部工具，要么全看要么全不看）
+**B. 隐私保护**：
+
+| 场景 | 权限 |
+|------|------|
+| 未登录 | 只看到登录页，无任何内容 |
+| 分享链接游客 | 可看内容+评分+评论，不可看用户名/头像 |
+| 已登录用户 | 全站可见（内部工具） |
+
+> 决策 D24: 安全限流 + 游客脱敏 + 未登录不可见
 
 ---
 
 ## 9. 领域八：架构重设计
 
-### 9.1 后端架构
+### 方案（✅ 已确认）
 
-```
-backend/
-├── main.py              # FastAPI 入口
-├── database.py          # 数据库连接
-├── models.py            # SQLAlchemy 模型
-├── schemas.py           # Pydantic Schema
-├── auth.py              # JWT 认证
-├── deps.py              # 依赖注入（get_db, get_current_user）
-├── services/
-│   ├── content.py       # 内容业务逻辑
-│   ├── rating.py        # 评分业务逻辑
-│   ├── user.py          # 用户业务逻辑
-│   └── bangumi.py       # Bangumi API 客户端
-├── routers/
-│   ├── v1/
-│   │   ├── auth.py      # 认证路由
-│   │   ├── content.py   # 内容路由
-│   │   ├── rating.py    # 评分路由
-│   │   └── user.py      # 用户路由
-│   └── __init__.py
-├── middleware/
-│   ├── rate_limit.py    # 限流中间件
-│   └── security.py      # 安全中间件
-└── scripts/
-    ├── manage_codes.py  # 邀请码管理
-    └── seed_avatars.py  # 头像初始化
-```
+**A. 后端**：service 层拆分，路由薄转发，API `/api/v1/`。
 
-### 9.2 前端架构
+**B. 前端页面结构**：
 
-```
-frontend/src/
-├── App.vue
-├── main.ts
-├── router/
-│   └── index.ts         # 路由配置
-├── stores/
-│   ├── auth.ts          # 认证状态
-│   ├── content.ts       # 内容数据
-│   └── app.ts           # 全局状态
-├── views/
-│   ├── HomeView.vue     # 首页（推荐+动态）
-│   ├── ExploreView.vue  # 探索（列表+搜索+筛选）
-│   ├── DetailView.vue   # 内容详情页
-│   ├── ProfileView.vue  # 个人主页
-│   └── SettingsView.vue # 设置页
-├── components/
-│   ├── layout/
-│   │   ├── AppHeader.vue
-│   │   └── AppFooter.vue
-│   ├── content/
-│   │   ├── ContentCard.vue
-│   │   ├── ContentGrid.vue
-│   │   └── ContentDetail.vue
-│   ├── rating/
-│   │   ├── RatingStars.vue
-│   │   ├── RatingForm.vue
-│   │   └── RatingList.vue
-│   ├── auth/
-│   │   ├── LoginDialog.vue
-│   │   └── RegisterDialog.vue
-│   └── common/
-│       ├── AvatarPicker.vue
-│       ├── StatusBadge.vue
-│       └── EmptyState.vue
-├── composables/
-│   ├── useApi.ts
-│   ├── useAuth.ts
-│   └── useContent.ts
-├── types/
-│   └── index.ts
-└── styles/
-    └── main.css
-```
+| 组件 | 形态 | 路由/触发 |
+|------|------|-----------|
+| 首页/探索 | 合并 1 个页面 | `/` |
+| 内容详情 | 弹窗 | 点击卡片弹出 |
+| 登录/注册 | 合并 1 个弹窗 | 未登录自动弹出 |
+| 设置 | 弹窗 | 头部菜单触发 |
+| 用户主页 | 页面 | `/profile/:id` |
 
-### 9.3 关键设计决策
+**C. 分享链接 = 临时权限**：
+- 游客点链接 → 获得临时会话
+- 可浏览全站、搜索查询
+- 不可评分、评论、任何写操作
+- 不是单独页面，是后端权限模式
 
-| 决策 | 方案 | 理由 |
-|------|------|------|
-| 路由 | vue-router，5 个页面 | 功能分离，URL 可分享 |
-| 状态管理 | Pinia（3 个 store） | 类型安全，DevTools 支持 |
-| API 版本 | /api/v1/ | 向后兼容 |
-| 认证 | JWT + httpOnly cookie | 比 localStorage 更安全 |
-| 数据库 | SQLite（暂不迁移） | 够用，简单 |
+> 决策 D25: 页面合并+弹窗化，分享链接为临时权限模式
 
 ---
 

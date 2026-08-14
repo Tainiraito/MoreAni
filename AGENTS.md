@@ -133,6 +133,12 @@ frontend/src/
     └── globals.css       # Tailwind imports + custom styles
 ```
 
+## Git Rules
+
+- **Local commits**: OK to do automatically
+- **Push to remote**: MUST have user confirmation first
+- Never `git push` without explicit user approval
+
 ## Commit Convention
 
 ```
