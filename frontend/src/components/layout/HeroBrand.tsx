@@ -52,6 +52,16 @@ function CoverImage({ src, alt }: {
   )
 }
 
+/** 随机打乱数组 */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 export function HeroBrand() {
   const { openAuth } = useUIStore()
   const { user } = useAuthStore()
@@ -65,21 +75,24 @@ export function HeroBrand() {
   const isFirstLogin = useRef(!sessionStorage.getItem('moreani-scrolled'))
   const cardWidth = 160
   const gap = 20
-  const coverHeight = 210
-  const infoMinHeight = 70
 
-  // 加载推荐内容
+  // 加载番剧内容并随机选取
   useEffect(() => {
-    api.listContent({ sort: 'rating', limit: '20' })
+    api.listContent({ type: 'anime' })
       .then(res => {
         const list = (res.items || []) as ContentItem[]
-        const withCover = list.filter(i => i.cover_url).slice(0, 8)
-        setItems(withCover)
+        // 只选取有封面的番剧
+        const withCover = list.filter(i => i.cover_url)
+        // 随机打乱
+        const shuffled = shuffleArray(withCover)
+        // 至少取 12 个，确保不会出现空白
+        const selected = shuffled.slice(0, Math.max(12, shuffled.length))
+        setItems(selected)
       })
       .catch(() => {})
   }, [])
 
-  // 自动循环滚动 - 使用 CSS animation 实现无缝循环
+  // 自动循环滚动 - 使用 CSS animation
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
@@ -124,15 +137,14 @@ export function HeroBrand() {
       isFirstLogin.current = false
       sessionStorage.setItem('moreani-scrolled', '1')
       setTimeout(() => {
-        // 滚动到内容区域，留出导航栏和间距
         const scrollTarget = window.innerHeight - 120
         window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
       }, 500)
     }
   }, [user])
 
-  // 生成足够的卡片用于无缝循环（至少覆盖 2 倍屏幕宽度）
-  const minSets = 4 // 确保足够多
+  // 生成足够的卡片用于无缝循环（4组）
+  const minSets = 4
   const displayItems = Array(minSets).fill(items).flat()
 
   return (
@@ -209,7 +221,7 @@ export function HeroBrand() {
           </button>
         </div>
 
-        {/* 滚动推荐卡片 — 使用 CSS animation 实现无缝循环 */}
+        {/* 滚动推荐卡片 */}
         {items.length > 0 && (
           <div
             className="w-screen overflow-hidden"
@@ -228,6 +240,8 @@ export function HeroBrand() {
             >
               {displayItems.map((item, index) => {
                 const isHovered = hoveredIndex === index
+                const coverHeight = 210
+                const infoMinHeight = 70
                 return (
                   <div
                     key={index}
