@@ -75,12 +75,13 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
             onClick={handleFavoriteClick}
             className="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
-              background: isFavorited ? 'var(--brand)' : 'rgba(255,255,255,0.9)',
-              color: isFavorited ? 'white' : 'var(--text-muted)',
+              background: 'var(--bg-card)',
+              border: isFavorited ? '2px solid var(--brand)' : '1px solid var(--border-line)',
+              color: isFavorited ? 'var(--brand)' : 'var(--text-muted)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={14} fill={isFavorited ? 'white' : 'none'} />
+            <Heart size={14} fill={isFavorited ? 'var(--brand)' : 'none'} />
           </button>
         )}
 
@@ -158,12 +159,13 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
             onClick={handleFavoriteClick}
             className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
-              background: isFavorited ? 'var(--brand)' : 'rgba(255,255,255,0.9)',
-              color: isFavorited ? 'white' : 'var(--text-muted)',
+              background: 'var(--bg-card)',
+              border: isFavorited ? '2px solid var(--brand)' : '1px solid var(--border-line)',
+              color: isFavorited ? 'var(--brand)' : 'var(--text-muted)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={12} fill={isFavorited ? 'white' : 'none'} />
+            <Heart size={12} fill={isFavorited ? 'var(--brand)' : 'none'} />
           </button>
         )}
 
