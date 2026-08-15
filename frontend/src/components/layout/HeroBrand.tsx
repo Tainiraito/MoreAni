@@ -21,11 +21,12 @@ export function HeroBrand() {
   const { theme, toggleTheme } = useTheme()
   const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [hoveredId, setHoveredId] = useState<number | null>(null)
+  const [scrollProgress, setScrollProgress] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const animFrameRef = useRef<number>(0)
   const scrollPosRef = useRef(0)
-  const lastLoginPromptRef = useRef(0) // 上次提示时的滚动进度
+  const lastPromptProgress = useRef(0)
 
   // 加载推荐内容
   useEffect(() => {
@@ -38,24 +39,29 @@ export function HeroBrand() {
       .catch(() => {})
   }, [])
 
-  // 自动循环滚动
+  // 自动循环滚动 — 使用 transform 实现丝滑动画
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
 
-    const speed = 0.3 // 每帧滚动像素（调慢）
+    let lastTime = performance.now()
+    const speed = 30 // 每秒像素
 
-    const animate = () => {
+    const animate = (currentTime: number) => {
+      const delta = (currentTime - lastTime) / 1000
+      lastTime = currentTime
+
       if (!isPaused) {
-        scrollPosRef.current += speed
+        scrollPosRef.current += speed * delta
         const halfWidth = container.scrollWidth / 2
 
         if (scrollPosRef.current >= halfWidth) {
-          scrollPosRef.current = 0
+          scrollPosRef.current -= halfWidth
         }
 
-        container.scrollLeft = scrollPosRef.current
+        container.style.transform = `translateX(-${scrollPosRef.current}px)`
       }
+
       animFrameRef.current = requestAnimationFrame(animate)
     }
 
@@ -63,35 +69,31 @@ export function HeroBrand() {
     return () => cancelAnimationFrame(animFrameRef.current)
   }, [items, isPaused])
 
-  // 监听页面滚动（未登录限制）
+  // 监听页面滚动 — 处理进度条和登录提示
   useEffect(() => {
-    if (user) return
-
     const handleScroll = () => {
       const scrollY = window.scrollY
-      const maxScroll = window.innerHeight * 0.35 // 只允许滚动 35%
-
-      // 限制滚动
-      if (scrollY > maxScroll) {
-        window.scrollTo(0, maxScroll)
-      }
-
-      // 计算进度
+      const maxScroll = window.innerHeight
       const progress = Math.min(scrollY / maxScroll, 1)
+      setScrollProgress(progress)
 
-      // 滚动满时弹出登录框（每次满都提示，不只是第一次）
-      if (progress >= 1 && lastLoginPromptRef.current < 1) {
-        lastLoginPromptRef.current = 1
-        openAuth()
-      }
-
-      // 滚回时重置标记
-      if (progress < 0.5) {
-        lastLoginPromptRef.current = 0
+      if (!user) {
+        // 未登录：限制滚动在进度条范围内
+        if (scrollY > maxScroll) {
+          window.scrollTo(0, maxScroll)
+        }
+        // 进度条满时弹出登录
+        if (progress >= 1 && lastPromptProgress.current < 1) {
+          lastPromptProgress.current = 1
+          openAuth()
+        }
+        if (progress < 0.8) {
+          lastPromptProgress.current = 0
+        }
       }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: false })
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [user, openAuth])
 
@@ -108,34 +110,34 @@ export function HeroBrand() {
   const displayItems = [...items, ...items]
 
   return (
-    <div className="relative h-screen flex flex-col items-center justify-center overflow-hidden">
+    <div className="relative h-screen overflow-hidden" style={{ background: 'var(--bg-page)' }}>
       {/* 背景装饰 */}
       <div
         className="absolute inset-0 -z-10"
         style={{
           background: theme === 'dark'
-            ? 'radial-gradient(ellipse at center, rgba(251, 113, 167, 0.05) 0%, transparent 70%)'
-            : 'radial-gradient(ellipse at center, rgba(251, 113, 167, 0.03) 0%, transparent 70%)',
+            ? 'radial-gradient(ellipse at center top, rgba(251, 113, 167, 0.05) 0%, transparent 60%)'
+            : 'radial-gradient(ellipse at center top, rgba(251, 113, 167, 0.03) 0%, transparent 60%)',
         }}
       />
 
-      {/* 主内容区 */}
-      <div className="flex flex-col items-center text-center px-6 mb-12">
+      {/* 主内容区 — 视觉重心上移 */}
+      <div className="absolute top-[15%] left-0 right-0 flex flex-col items-center text-center px-6">
         {/* 大 icon */}
-        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-8">
+        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
           <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
         </div>
 
         {/* 标题 */}
         <h1
-          className="text-4xl sm:text-5xl font-bold tracking-tight mb-3"
+          className="text-4xl sm:text-5xl font-bold tracking-tight mb-2"
           style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
         >
           又看一集
         </h1>
 
         {/* 副标题 */}
-        <p className="text-base sm:text-lg mb-10" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-base sm:text-lg mb-8" style={{ color: 'var(--text-muted)' }}>
           记录看过的番，看看朋友的评价
         </p>
 
@@ -168,39 +170,42 @@ export function HeroBrand() {
         )}
       </div>
 
-      {/* 滚动推荐卡片 — 撑满窗口，横向卡片 */}
+      {/* 滚动推荐卡片 — 撑满窗口，transform 动画 */}
       {items.length > 0 && (
         <div
-          ref={scrollContainerRef}
-          className="absolute bottom-16 left-0 right-0 overflow-hidden"
+          className="absolute bottom-8 left-0 right-0 overflow-hidden"
           onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
-          style={{ scrollBehavior: 'auto' }}
+          onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
         >
-          <div className="flex gap-4 px-4" style={{ width: 'max-content' }}>
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 will-change-transform"
+            style={{ width: 'max-content' }}
+          >
             {displayItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
                 className="flex-shrink-0 flex rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
                 style={{
                   background: 'var(--bg-card)',
-                  border: hoveredIndex === index
-                    ? '2px solid var(--brand)'
-                    : '1px solid var(--border-line)',
-                  width: hoveredIndex === index ? '280px' : '260px',
-                  boxShadow: hoveredIndex === index
-                    ? '0 4px 20px rgba(251, 113, 167, 0.15)'
+                  border: '1px solid var(--border-line)',
+                  width: hoveredId === item.id ? '300px' : '260px',
+                  transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
+                  boxShadow: hoveredId === item.id
+                    ? '0 8px 30px rgba(0,0,0,0.15)'
                     : 'none',
+                  zIndex: hoveredId === item.id ? 10 : 1,
                 }}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
+                onMouseEnter={() => setHoveredId(item.id)}
+                onMouseLeave={() => setHoveredId(null)}
               >
                 {/* 封面 */}
-                <div className="w-20 h-28 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
+                <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
                   <img
                     src={secureUrl(item.cover_url)}
                     alt={item.title}
                     className="w-full h-full object-cover"
+                    style={{ aspectRatio: '3/4' }}
                   />
                 </div>
 
@@ -233,42 +238,73 @@ export function HeroBrand() {
         </div>
       )}
 
-      {/* 底部：滚动进度 / 滚动提示 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+      {/* 底部进度条区域 */}
+      <div className="absolute bottom-2 left-0 right-0 flex justify-center">
         {!user ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1.5">
+            {/* 进度条 */}
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{
-                background: 'var(--bg-card)',
-                border: '2px solid var(--border-line)',
-              }}
+              className="w-48 h-1 rounded-full overflow-hidden"
+              style={{ background: 'var(--border-line)' }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10" fill="none" stroke="var(--border-line)" strokeWidth="2" />
-                <circle
-                  cx="12" cy="12" r="10"
-                  fill="none"
-                  stroke="var(--brand)"
-                  strokeWidth="2"
-                  strokeDasharray="0 63"
-                  strokeLinecap="round"
-                  transform="rotate(-90 12 12)"
-                />
-              </svg>
+              <div
+                className="h-full rounded-full transition-all duration-150"
+                style={{
+                  width: `${scrollProgress * 100}%`,
+                  background: 'var(--brand)',
+                }}
+              />
             </div>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
               登录后查看更多
             </span>
           </div>
         ) : (
-          <div className="animate-bounce" style={{ color: 'var(--text-muted)' }}>
+          <div
+            className="animate-bounce cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
+            onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M19 12l-7 7-7-7" />
             </svg>
           </div>
         )}
       </div>
+
+      {/* 进度条满时的遮罩提示（未登录） */}
+      {!user && scrollProgress >= 0.95 && (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{
+            background: 'rgba(0,0,0,0.3)',
+            animation: 'fade-in 300ms ease-out',
+          }}
+          onClick={openAuth}
+        >
+          <div
+            className="px-8 py-4 rounded-xl text-center"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+            }}
+          >
+            <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>
+              登录后解锁完整内容
+            </p>
+            <button
+              onClick={(e) => { e.stopPropagation(); openAuth() }}
+              className="px-6 py-2 text-sm font-semibold rounded-full"
+              style={{
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
+              }}
+            >
+              登录 / 注册
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
