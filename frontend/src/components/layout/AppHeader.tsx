@@ -11,6 +11,7 @@ export function AppHeader() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const avatarRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,6 +33,8 @@ export function AppHeader() {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
+
+  const menuItemStyle = "w-full px-4 py-2.5 text-sm text-left transition-colors"
 
   return (
     <header
@@ -68,6 +71,7 @@ export function AppHeader() {
           {/* 右侧：头像菜单 */}
           <div className="relative" ref={menuRef}>
             <button
+              ref={avatarRef}
               onClick={() => setMenuOpen(!menuOpen)}
               className="w-8 h-8 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
               style={{
@@ -94,15 +98,16 @@ export function AppHeader() {
               )}
             </button>
 
-            {/* 下拉菜单 */}
+            {/* 下拉菜单 — 相对头像居中 */}
             {menuOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-48 rounded-xl overflow-hidden"
+                className="absolute right-0 top-full mt-2 w-44 rounded-xl overflow-hidden"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
                   animation: 'scale-in 150ms ease-out',
+                  transformOrigin: 'top right',
                 }}
               >
                 {/* 用户信息（已登录） */}
@@ -123,22 +128,24 @@ export function AppHeader() {
                 {/* 主题切换 */}
                 <button
                   onClick={() => { toggleTheme(); setMenuOpen(false) }}
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                  className={menuItemStyle}
                   style={{ color: 'var(--text-primary)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span>{theme === 'light' ? '🌙' : '☀️'}</span>
-                  <span>{theme === 'light' ? '深色模式' : '浅色模式'}</span>
+                  {theme === 'light' ? '深色模式' : '浅色模式'}
                 </button>
 
                 {/* 设置（已登录） */}
                 {user && (
                   <button
                     onClick={() => { openSettings(); setMenuOpen(false) }}
-                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    className={menuItemStyle}
                     style={{ color: 'var(--text-primary)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span>⚙️</span>
-                    <span>设置</span>
+                    设置
                   </button>
                 )}
 
@@ -149,20 +156,22 @@ export function AppHeader() {
                 {user ? (
                   <button
                     onClick={() => { logout(); setMenuOpen(false) }}
-                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    className={menuItemStyle}
                     style={{ color: 'var(--accent-coral)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span>🚪</span>
-                    <span>退出登录</span>
+                    退出登录
                   </button>
                 ) : (
                   <button
                     onClick={() => { openAuth(); setMenuOpen(false) }}
-                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    className={menuItemStyle}
                     style={{ color: 'var(--brand)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <span>👤</span>
-                    <span>登录 / 注册</span>
+                    登录 / 注册
                   </button>
                 )}
               </div>
