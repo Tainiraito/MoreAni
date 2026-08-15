@@ -367,3 +367,38 @@ style={{
 3. 对比 Gleamory 的布局风格
 
 **禁止**：仅通过 `curl` 检查 HTML 类名就声称布局正确。
+
+## 导航栏设计规范
+
+### 头像菜单（统一入口）
+
+导航栏右侧只有一个头像按钮，点击展开下拉菜单：
+
+**未登录状态**：
+- 显示：灰色圆形 + 人形图标
+- 菜单：深色/浅色切换 + 登录/注册
+
+**已登录状态**：
+- 显示：品牌渐变背景 + 用户名首字母
+- 菜单：用户信息 + 深色/浅色切换 + 设置 + 退出登录
+
+### 实现要点
+
+```tsx
+// 点击外部关闭菜单
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      setMenuOpen(false)
+    }
+  }
+  if (menuOpen) {
+    document.addEventListener('mousedown', handleClickOutside)
+  }
+  return () => document.removeEventListener('mousedown', handleClickOutside)
+}, [menuOpen])
+```
+
+- 菜单动画：`animation: 'scale-in 150ms ease-out'`
+- 分割线分隔不同功能区
+- 危险操作（退出）用 `accent-coral` 颜色
