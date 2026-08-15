@@ -39,13 +39,13 @@ export function HeroBrand() {
       .catch(() => {})
   }, [])
 
-  // 自动循环滚动 — 使用 transform 实现丝滑动画
+  // 自动循环滚动
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
 
     let lastTime = performance.now()
-    const speed = 30 // 每秒像素
+    const speed = 30
 
     const animate = (currentTime: number) => {
       const delta = (currentTime - lastTime) / 1000
@@ -54,11 +54,9 @@ export function HeroBrand() {
       if (!isPaused) {
         scrollPosRef.current += speed * delta
         const halfWidth = container.scrollWidth / 2
-
         if (scrollPosRef.current >= halfWidth) {
           scrollPosRef.current -= halfWidth
         }
-
         container.style.transform = `translateX(-${scrollPosRef.current}px)`
       }
 
@@ -69,7 +67,7 @@ export function HeroBrand() {
     return () => cancelAnimationFrame(animFrameRef.current)
   }, [items, isPaused])
 
-  // 监听页面滚动 — 处理进度条和登录提示
+  // 监听页面滚动
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY
@@ -78,11 +76,9 @@ export function HeroBrand() {
       setScrollProgress(progress)
 
       if (!user) {
-        // 未登录：限制滚动在进度条范围内
         if (scrollY > maxScroll) {
           window.scrollTo(0, maxScroll)
         }
-        // 进度条满时弹出登录
         if (progress >= 1 && lastPromptProgress.current < 1) {
           lastPromptProgress.current = 1
           openAuth()
@@ -106,7 +102,6 @@ export function HeroBrand() {
     }
   }, [user])
 
-  // 双倍卡片用于无缝循环
   const displayItems = [...items, ...items]
 
   return (
@@ -121,8 +116,8 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 — 视觉重心上移 */}
-      <div className="absolute top-[15%] left-0 right-0 flex flex-col items-center text-center px-6">
+      {/* 主内容区 — 居中布局 */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
           <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
@@ -142,8 +137,8 @@ export function HeroBrand() {
         </p>
 
         {/* 按钮区 */}
-        {!user && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-10">
+          {!user && (
             <button
               onClick={openAuth}
               className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
@@ -154,95 +149,91 @@ export function HeroBrand() {
             >
               登录 / 注册
             </button>
-            <button
-              onClick={toggleTheme}
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:opacity-80"
-              style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-line)',
-                color: 'var(--text-muted)',
-              }}
-              title={theme === 'light' ? '切换到深色模式' : '切换到浅色模式'}
+          )}
+          <button
+            onClick={toggleTheme}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:opacity-80"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+              color: 'var(--text-muted)',
+            }}
+            title={theme === 'light' ? '切换到深色模式' : '切换到浅色模式'}
+          >
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        </div>
+
+        {/* 滚动推荐卡片 — 按钮下方，撑满窗口 */}
+        {items.length > 0 && (
+          <div
+            className="w-screen overflow-hidden"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
+          >
+            <div
+              ref={scrollContainerRef}
+              className="flex gap-4 will-change-transform px-4"
+              style={{ width: 'max-content' }}
             >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
+              {displayItems.map((item, index) => (
+                <div
+                  key={`${item.id}-${index}`}
+                  className="flex-shrink-0 flex rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-line)',
+                    width: hoveredId === item.id ? '300px' : '260px',
+                    transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
+                    boxShadow: hoveredId === item.id
+                      ? '0 8px 30px rgba(0,0,0,0.15)'
+                      : 'none',
+                    zIndex: hoveredId === item.id ? 10 : 1,
+                  }}
+                  onMouseEnter={() => setHoveredId(item.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                >
+                  <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
+                    <img
+                      src={secureUrl(item.cover_url)}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                      style={{ aspectRatio: '3/4' }}
+                    />
+                  </div>
+                  <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                    <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </h3>
+                    {item.title_alt && (
+                      <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
+                        {item.title_alt}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      {item.avg_score && item.avg_score > 0 && (
+                        <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+                          ★ {(item.avg_score / 10).toFixed(1)}
+                        </span>
+                      )}
+                      {item.episodes > 0 && (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {item.episodes}集
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* 滚动推荐卡片 — 撑满窗口，transform 动画 */}
-      {items.length > 0 && (
-        <div
-          className="absolute bottom-8 left-0 right-0 overflow-hidden"
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
-        >
-          <div
-            ref={scrollContainerRef}
-            className="flex gap-4 will-change-transform"
-            style={{ width: 'max-content' }}
-          >
-            {displayItems.map((item, index) => (
-              <div
-                key={`${item.id}-${index}`}
-                className="flex-shrink-0 flex rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-line)',
-                  width: hoveredId === item.id ? '300px' : '260px',
-                  transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
-                  boxShadow: hoveredId === item.id
-                    ? '0 8px 30px rgba(0,0,0,0.15)'
-                    : 'none',
-                  zIndex: hoveredId === item.id ? 10 : 1,
-                }}
-                onMouseEnter={() => setHoveredId(item.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                {/* 封面 */}
-                <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
-                  <img
-                    src={secureUrl(item.cover_url)}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                    style={{ aspectRatio: '3/4' }}
-                  />
-                </div>
-
-                {/* 信息 */}
-                <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                  <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {item.title}
-                  </h3>
-                  {item.title_alt && (
-                    <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
-                      {item.title_alt}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {item.avg_score && item.avg_score > 0 && (
-                      <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
-                        ★ {(item.avg_score / 10).toFixed(1)}
-                      </span>
-                    )}
-                    {item.episodes > 0 && (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {item.episodes}集
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 底部进度条区域 */}
-      <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+      {/* 底部进度条 */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center">
         {!user ? (
           <div className="flex flex-col items-center gap-1.5">
-            {/* 进度条 */}
             <div
               className="w-48 h-1 rounded-full overflow-hidden"
               style={{ background: 'var(--border-line)' }}
@@ -272,7 +263,7 @@ export function HeroBrand() {
         )}
       </div>
 
-      {/* 进度条满时的遮罩提示（未登录） */}
+      {/* 进度条满时的遮罩 */}
       {!user && scrollProgress >= 0.95 && (
         <div
           className="absolute inset-0 flex items-center justify-center"
