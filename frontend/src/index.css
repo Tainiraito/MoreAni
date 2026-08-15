@@ -3,8 +3,7 @@
 
 /* ============================================
    MoreAni 配色规范 — 基于霓虹粉猫耳 icon
-   主色: #FF8CD4 (霓虹粉)
-   辅色: #FF00FF (洋红霓虹)
+   支持浅色/暗色主题切换，默认浅色
    ============================================ */
 
 @theme {
@@ -14,21 +13,13 @@
   --color-brand-deep: #E060B8;
   --color-brand-neon: #FF00FF;
 
-  /* 中性色 */
-  --color-ink: #1a1a1a;
-  --color-slate: #555555;
-  --color-muted: #999999;
-  --color-border: rgba(255, 140, 212, 0.15);
-  --color-paper: #0a0a0a;
-  --color-surface: #141414;
-
   /* 内容类型色 */
   --color-type-anime: #FF8CD4;
-  --color-type-movie: #00D4AA;
-  --color-type-game: #FF8C42;
-  --color-type-software: #FFD93D;
+  --color-type-movie: #00B894;
+  --color-type-game: #E17055;
+  --color-type-software: #D4A017;
   --color-type-website: #4DA6FF;
-  --color-type-book: #FF6B6B;
+  --color-type-book: #E85D5D;
 
   /* 强调色 */
   --color-accent-purple: #C77DFF;
@@ -39,25 +30,32 @@
   --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
 }
 
+/* 浅色主题（默认） */
 :root {
-  /* 页面背景 — 深色主题 */
+  --bg-page: #faf8f5;
+  --bg-card: #ffffff;
+  --bg-card-warm: #f5f2ee;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #999999;
+  --accent-amber: #FF8CD4;
+  --accent-pink: #FF8CD4;
+  --border-line: rgba(0, 0, 0, 0.08);
+  --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --shadow-neon: none;
+}
+
+/* 暗色主题 */
+:root.dark {
   --bg-page: #0a0a0a;
   --bg-card: #141414;
   --bg-card-warm: #1a1a1a;
-
-  /* 文字色 */
   --text-primary: #f0f0f0;
   --text-secondary: #b0b0b0;
   --text-muted: #808080;
-
-  /* 强调色 */
   --accent-amber: #FF8CD4;
   --accent-pink: #FF8CD4;
-
-  /* 边框 */
   --border-line: rgba(255, 140, 212, 0.12);
-
-  /* 阴影 */
   --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.5);
   --shadow-neon: 0 0 10px rgba(255, 140, 212, 0.3), 0 0 30px rgba(255, 140, 212, 0.1);
 }
@@ -82,11 +80,13 @@ body {
   line-height: 1.6;
 }
 
-/* Subtle scrollbar — 深色主题 */
+/* Subtle scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255, 140, 212, 0.2); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 140, 212, 0.4); }
+::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+:root.dark ::-webkit-scrollbar-thumb { background: rgba(255, 140, 212, 0.2); }
+:root.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255, 140, 212, 0.4); }
 
 /* Smooth animations */
 @keyframes slide-in-right {
@@ -104,8 +104,4 @@ body {
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
-}
-@keyframes neon-pulse {
-  0%, 100% { box-shadow: 0 0 5px rgba(255, 140, 212, 0.3); }
-  50% { box-shadow: 0 0 15px rgba(255, 140, 212, 0.5), 0 0 30px rgba(255, 140, 212, 0.2); }
 }

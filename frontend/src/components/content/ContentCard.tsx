@@ -27,7 +27,7 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
 
   return (
     <article
-      className="group cursor-pointer overflow-hidden rounded-lg transition-all duration-200 hover:shadow-neon"
+      className="group cursor-pointer overflow-hidden rounded-lg transition-all duration-200 hover:shadow-md"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-line)',

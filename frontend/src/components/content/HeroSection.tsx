@@ -43,7 +43,6 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-line)',
-        boxShadow: '0 0 20px rgba(255, 140, 212, 0.08)',
       }}
       onClick={() => onSelect(content.id)}
     >
@@ -90,7 +89,6 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
                 className="px-4 py-2 rounded-lg"
                 style={{
                   background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
-                  boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)',
                 }}
               >
                 <span className="font-display text-xl font-bold text-white">{avgScore}</span>
@@ -110,11 +108,9 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
 
           <div className="mt-7">
             <span
-              className="inline-flex items-center px-5 py-2.5 text-white text-sm font-medium rounded-full
-                         transition-all duration-200 group-hover:shadow-neon"
+              className="inline-flex items-center px-5 py-2.5 text-white text-sm font-medium rounded-full transition-all duration-200"
               style={{
                 background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
-                boxShadow: '0 0 10px rgba(255, 140, 212, 0.2)',
               }}
             >
               查看详情 →

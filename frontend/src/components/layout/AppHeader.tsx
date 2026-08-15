@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
+import { useTheme } from '@/hooks/use-theme'
 import { PageContainer } from '@/components/layout/PageContainer'
 
 export function AppHeader() {
   const { user, logout } = useAuthStore()
   const { openAuth, openSettings } = useUIStore()
+  const { theme, toggleTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -39,7 +41,6 @@ export function AppHeader() {
               src="/favicon-32.png"
               alt="MoreAni"
               className="w-6 h-6 rounded-sm"
-              style={{ boxShadow: '0 0 8px rgba(255, 140, 212, 0.3)' }}
             />
             <span
               className="text-xs font-medium uppercase tracking-[0.15em]"
@@ -49,8 +50,18 @@ export function AppHeader() {
             </span>
           </a>
 
-          {/* Right side: functional buttons */}
+          {/* Right side: theme toggle + functional buttons */}
           <div className="flex items-center gap-3">
+            {/* 主题切换 */}
+            <button
+              onClick={toggleTheme}
+              className="w-7 h-7 flex items-center justify-center rounded-md transition-all duration-200 hover:opacity-70"
+              style={{ color: 'var(--text-muted)' }}
+              title={theme === 'light' ? '切换到暗色模式' : '切换到浅色模式'}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
+
             {user ? (
               <>
                 <span
