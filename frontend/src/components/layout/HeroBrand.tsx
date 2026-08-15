@@ -1,9 +1,12 @@
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { useTheme } from '@/hooks/use-theme'
+import { Sun, Moon } from 'lucide-react'
 
 export function HeroBrand() {
   const { openAuth } = useUIStore()
   const { user } = useAuthStore()
+  const { theme, toggleTheme } = useTheme()
 
   return (
     <div className="relative pt-16 pb-12 sm:pt-20 sm:pb-16">
@@ -26,7 +29,7 @@ export function HeroBrand() {
           记录看过的番，看看朋友的评价
         </p>
 
-        {/* 登录后：个人名片卡片 / 未登录：登录注册按钮 */}
+        {/* 登录后：个人名片卡片 / 未登录：登录注册按钮 + 主题切换 */}
         {user ? (
           <div
             className="px-6 py-4 rounded-xl"
@@ -50,16 +53,32 @@ export function HeroBrand() {
             </div>
           </div>
         ) : (
-          <button
-            onClick={openAuth}
-            className="px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-            style={{
-              background: 'var(--btn-primary-bg)',
-              color: 'var(--btn-primary-text)',
-            }}
-          >
-            登录 / 注册
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openAuth}
+              className="px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
+              }}
+            >
+              登录 / 注册
+            </button>
+
+            {/* 主题切换按钮 */}
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:opacity-80"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-line)',
+                color: 'var(--text-muted)',
+              }}
+              title={theme === 'light' ? '切换到深色模式' : '切换到浅色模式'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          </div>
         )}
       </div>
     </div>

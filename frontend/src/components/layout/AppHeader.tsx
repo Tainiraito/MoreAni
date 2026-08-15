@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useTheme } from '@/hooks/use-theme'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { User, Sun, Moon, Settings, LogOut } from 'lucide-react'
 
 export function AppHeader() {
   const { user, logout } = useAuthStore()
@@ -32,7 +33,7 @@ export function AppHeader() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
 
-  const menuItemStyle = "w-full px-4 py-2.5 text-sm text-left transition-colors"
+  const menuItemStyle = "w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2.5"
 
   return (
     <header
@@ -80,10 +81,7 @@ export function AppHeader() {
                   className="w-full h-full flex items-center justify-center"
                   style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <User size={16} />
                 </div>
               )}
             </button>
@@ -133,6 +131,7 @@ export function AppHeader() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
+                  {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
                   {theme === 'light' ? '深色模式' : '浅色模式'}
                 </button>
 
@@ -144,6 +143,7 @@ export function AppHeader() {
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
+                    <Settings size={16} />
                     设置
                   </button>
                 )}
@@ -158,6 +158,7 @@ export function AppHeader() {
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
+                    <LogOut size={16} />
                     退出登录
                   </button>
                 ) : (
@@ -168,6 +169,7 @@ export function AppHeader() {
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
+                    <User size={16} />
                     登录 / 注册
                   </button>
                 )}

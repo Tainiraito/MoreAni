@@ -1,5 +1,6 @@
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { X } from 'lucide-react'
 
 export function SettingsDialog() {
   const { settingsOpen, closeSettings } = useUIStore()
@@ -15,7 +16,7 @@ export function SettingsDialog() {
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border-line)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255, 140, 212, 0.1)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -26,7 +27,7 @@ export function SettingsDialog() {
             className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200 hover:opacity-80"
             style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -39,7 +40,6 @@ export function SettingsDialog() {
               style={{
                 background: 'linear-gradient(135deg, var(--brand-light), var(--brand))',
                 border: '2px solid var(--brand)',
-                boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)',
               }}
             >
               <span className="text-white text-xl font-semibold">
@@ -62,10 +62,7 @@ export function SettingsDialog() {
         </div>
 
         {/* 关于 */}
-        <div
-          className="pt-4"
-          style={{ borderTop: '1px solid var(--border-line)' }}
-        >
+        <div className="pt-4" style={{ borderTop: '1px solid var(--border-line)' }}>
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
             MoreAni v2.0 — 又看一集
           </p>
