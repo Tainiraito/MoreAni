@@ -158,7 +158,7 @@ export function ContentDetailDialog() {
               onClick={handleToggleFavorite}
               className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
               style={{
-                background: isFavorited ? 'var(--brand)' : 'var(--bg-card)',
+                background: isFavorited ? '#FB71A7' : 'var(--bg-card)',
                 border: isFavorited ? 'none' : '1px solid var(--border-line)',
                 color: isFavorited ? 'white' : 'var(--text-muted)',
               }}

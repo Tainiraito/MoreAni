@@ -56,7 +56,7 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
     onToggleFavorite?.(content.id)
   }
 
-  // Grid 模式：用于内容列表
+  // Grid 模式
   if (mode === 'grid') {
     return (
       <article
@@ -69,19 +69,19 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* 收藏按钮 - 右上角 */}
+        {/* 收藏按钮 */}
         {onToggleFavorite && (
           <button
             onClick={handleFavoriteClick}
             className="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
               background: 'var(--bg-card)',
-              border: isFavorited ? '2px solid var(--brand)' : '1px solid var(--border-line)',
-              color: isFavorited ? 'var(--brand)' : 'var(--text-muted)',
+              border: isFavorited ? '2px solid #FB71A7' : '1px solid var(--border-line)',
+              color: isFavorited ? '#FB71A7' : 'var(--text-muted)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={14} fill={isFavorited ? 'var(--brand)' : 'none'} />
+            <Heart size={14} fill={isFavorited ? '#FB71A7' : 'none'} />
           </button>
         )}
 
@@ -99,8 +99,8 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
           <div className="flex items-center justify-center gap-3">
             {avgScore && (
               <div className="flex items-center gap-1">
-                <Star size={12} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
-                <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                <span className="text-xs font-semibold" style={{ color: '#FB71A7' }}>
                   {avgScore}
                 </span>
               </div>
@@ -123,7 +123,7 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
     )
   }
 
-  // Scroll 模式：用于首屏滚动卡片
+  // Scroll 模式
   const coverHeight = 210
   const infoMinHeight = 70
 
@@ -153,19 +153,19 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
           transition: 'box-shadow 0.3s ease',
         }}
       >
-        {/* 收藏按钮 - 右上角 */}
+        {/* 收藏按钮 */}
         {onToggleFavorite && (
           <button
             onClick={handleFavoriteClick}
             className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
               background: 'var(--bg-card)',
-              border: isFavorited ? '2px solid var(--brand)' : '1px solid var(--border-line)',
-              color: isFavorited ? 'var(--brand)' : 'var(--text-muted)',
+              border: isFavorited ? '2px solid #FB71A7' : '1px solid var(--border-line)',
+              color: isFavorited ? '#FB71A7' : 'var(--text-muted)',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={12} fill={isFavorited ? 'var(--brand)' : 'none'} />
+            <Heart size={12} fill={isFavorited ? '#FB71A7' : 'none'} />
           </button>
         )}
 
@@ -192,8 +192,8 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
             <div className="flex items-center justify-center gap-2">
               {avgScore && (
                 <div className="flex items-center gap-0.5">
-                  <Star size={10} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
-                  <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                  <Star size={10} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                  <span className="text-xs font-semibold" style={{ color: '#FB71A7' }}>
                     {avgScore}
                   </span>
                 </div>

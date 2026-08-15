@@ -137,7 +137,7 @@ export function HeroSection({ content, isFavorited = false, onSelect, onToggleFa
                 onClick={handleFavoriteClick}
                 className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
                 style={{
-                  background: isFavorited ? 'var(--brand)' : 'var(--bg-card-warm)',
+                  background: isFavorited ? '#FB71A7' : 'var(--bg-card-warm)',
                   border: isFavorited ? 'none' : '1px solid var(--border-line)',
                   color: isFavorited ? 'white' : 'var(--text-primary)',
                 }}
