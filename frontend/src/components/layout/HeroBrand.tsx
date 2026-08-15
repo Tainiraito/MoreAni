@@ -119,10 +119,8 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 — 整体居中偏上 */}
-      <div
-        className="flex flex-col items-center text-center px-6 pt-[18vh]"
-      >
+      {/* 主内容区 */}
+      <div className="flex flex-col items-center text-center px-6 pt-[18vh]">
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
           <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
@@ -169,7 +167,7 @@ export function HeroBrand() {
           </button>
         </div>
 
-        {/* 滚动推荐卡片 — 跟随按钮下方 */}
+        {/* 滚动推荐卡片 */}
         {items.length > 0 && (
           <div
             className="w-screen overflow-hidden py-12"
@@ -222,21 +220,45 @@ export function HeroBrand() {
                     />
                   </div>
 
-                  {/* 信息 */}
-                  <div className="p-2.5">
-                    <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                  {/* 信息 — 居中展示 */}
+                  <div className="p-3 text-center">
+                    {/* 标题 */}
+                    <h3 className="text-xs font-semibold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
                       {item.title}
                     </h3>
-                    <div className="flex items-center gap-1.5">
-                      {item.avg_score && item.avg_score > 0 && (
-                        <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+
+                    {/* 分数 + 打分人数 — 默认展示 */}
+                    {item.avg_score && item.avg_score > 0 && (
+                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
                           ★ {(item.avg_score / 10).toFixed(1)}
                         </span>
-                      )}
-                      {item.episodes > 0 && (
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {item.episodes}集
+                          {item.rating_count || 0}人
                         </span>
+                      </div>
+                    )}
+
+                    {/* 集数 + 简介 — hover 时展示 */}
+                    <div
+                      className="overflow-hidden transition-all duration-300"
+                      style={{
+                        maxHeight: hoveredIndex === index ? '80px' : '0px',
+                        opacity: hoveredIndex === index ? 1 : 0,
+                      }}
+                    >
+                      {item.episodes > 0 && (
+                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                          {item.episodes}集
+                        </p>
+                      )}
+                      {item.description && (
+                        <p
+                          className="text-xs line-clamp-2"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          {item.description}
+                        </p>
                       )}
                     </div>
                   </div>
