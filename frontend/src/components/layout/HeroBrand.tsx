@@ -237,8 +237,8 @@ export function HeroBrand() {
         </div>
       )}
 
-      {/* 已登录时显示向下箭头 */}
-      {user && (
+      {/* 已登录时显示向下箭头 — 仅在首屏显示 */}
+      {user && scrollProgress < 0.9 && (
         <div className="fixed bottom-6 left-0 right-0 flex justify-center">
           <div
             className="animate-bounce cursor-pointer"
