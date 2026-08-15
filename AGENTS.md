@@ -298,3 +298,14 @@ import { PageContainer, PageMain } from '@/components/layout/PageContainer'
 **原因**：CSS 层叠规则中，`@layer` 外的样式 > `@layer` 内的样式，无论选择器特异性多高。Tailwind v4 的工具类在 `@layer utilities` 内，所以任何 `@layer` 外的通用选择器都能覆盖它们。
 
 **经验教训**：不要在 `index.css` 中用 `*` 选择器设置 `margin`、`padding`、`box-sizing`——Tailwind 的 preflight 已经处理了这些。自定义样式放入 `@layer base` 或使用 Tailwind 的主题变量。
+
+## 布局验证规范
+
+**每次修改布局相关代码后，必须截图验证实际渲染效果**，不能只检查类名是否正确。
+
+验证方法：
+1. 用 headless Chromium 截图：`chrome --headless --screenshot=/tmp/check.png --window-size=1920,1080 http://localhost:5173/`
+2. 用 `vision_analyze` 检查截图：确认内容居中、间距正确、header 对齐
+3. 对比 Gleamory 的布局风格
+
+**禁止**：仅通过 `curl` 检查 HTML 类名就声称布局正确。
