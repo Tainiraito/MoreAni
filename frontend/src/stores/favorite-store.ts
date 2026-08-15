@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '@/lib/api'
+import { useToastStore } from '@/stores/toast-store'
 
 interface FavoriteState {
   favoriteIds: number[]
@@ -28,17 +29,21 @@ export const useFavoriteStore = create<FavoriteState>((set, get) => ({
   toggleFavorite: async (id: number) => {
     const { favoriteIds } = get()
     const isFav = favoriteIds.includes(id)
-    
+    const toast = useToastStore.getState()
+
     try {
       if (isFav) {
         await api.clearStatus(id)  // 保存到数据库
         set({ favoriteIds: favoriteIds.filter(fid => fid !== id) })
+        toast.addToast('success', '已取消收藏')
       } else {
         await api.setStatus({ content_id: id, status: 'want' })  // 保存到数据库
         set({ favoriteIds: [...favoriteIds, id] })
+        toast.addToast('success', '已加入收藏')
       }
     } catch (err) {
       console.error('Toggle favorite failed:', err)
+      toast.addToast('error', '收藏操作失败，请重试')
     }
   },
 

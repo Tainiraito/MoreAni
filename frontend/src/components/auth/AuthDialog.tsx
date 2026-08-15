@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,12 +27,16 @@ export function AuthDialog() {
     try {
       if (mode === 'login') {
         const res = await api.login({ username, password })
+        const userData = res.user as { username: string }
         setUser(res.user as any)
         if (res.token) setToken(res.token)
+        useToastStore.getState().addToast('success', `欢迎回来，${userData.username}！`)
       } else {
         const res = await api.register({ code, username, password })
+        const userData = res.user as { username: string }
         setUser(res.user as any)
         if (res.token) setToken(res.token)
+        useToastStore.getState().addToast('success', `注册成功，欢迎加入，${userData.username}！`)
       }
       closeAuth()
       resetForm()

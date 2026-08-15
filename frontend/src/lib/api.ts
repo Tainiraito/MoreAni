@@ -53,6 +53,7 @@ export const api = {
   getMe: () => request<{ id: number; username: string; avatar_id: number; role: string }>('/auth/me'),
   updateAvatar: (avatar_id: number) =>
     request<{ ok: boolean }>('/auth/me/avatar', { method: 'PUT', body: JSON.stringify({ avatar_id }) }),
+  logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
   // Content
   listContent: (params?: Record<string, string>) => {

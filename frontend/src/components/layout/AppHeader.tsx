@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
+import { useToastStore } from '@/stores/toast-store'
 import { useTheme } from '@/hooks/use-theme'
+import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { User, Sun, Moon, Settings, LogOut } from 'lucide-react'
 
@@ -156,7 +158,12 @@ export function AppHeader() {
 
                 {user ? (
                   <button
-                    onClick={() => { logout(); setMenuOpen(false) }}
+                    onClick={async () => {
+                      setMenuOpen(false)
+                      try { await api.logout() } catch { /* ignore */ }
+                      logout()
+                      useToastStore.getState().addToast('success', '已退出登录')
+                    }}
                     className={menuItemStyle}
                     style={{ color: 'var(--accent-coral)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
