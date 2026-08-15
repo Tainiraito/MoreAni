@@ -11,7 +11,6 @@ export function AppHeader() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const avatarRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -71,12 +70,9 @@ export function AppHeader() {
           {/* 右侧：头像菜单 */}
           <div className="relative" ref={menuRef}>
             <button
-              ref={avatarRef}
               onClick={() => setMenuOpen(!menuOpen)}
               className="w-8 h-8 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
-              style={{
-                border: '2px solid var(--border-line)',
-              }}
+              style={{ border: '2px solid var(--border-line)' }}
             >
               {user ? (
                 <div
@@ -101,27 +97,39 @@ export function AppHeader() {
             {/* 下拉菜单 — 相对头像居中 */}
             {menuOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-44 rounded-xl overflow-hidden"
+                className="absolute top-full mt-2 w-48 rounded-xl overflow-hidden"
                 style={{
+                  right: '50%',
+                  transform: 'translateX(50%)',
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
                   animation: 'scale-in 150ms ease-out',
-                  transformOrigin: 'top right',
+                  transformOrigin: 'top center',
                 }}
               >
-                {/* 用户信息（已登录） */}
+                {/* 用户信息卡片（已登录） */}
                 {user && (
                   <div
                     className="px-4 py-3"
                     style={{ borderBottom: '1px solid var(--border-line)' }}
                   >
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {user.username}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {user.role === 'admin' ? '管理员' : '成员'}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
+                      >
+                        {user.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {user.username}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {user.role === 'admin' ? '管理员' : '成员'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -130,7 +138,7 @@ export function AppHeader() {
                   onClick={() => { toggleTheme(); setMenuOpen(false) }}
                   className={menuItemStyle}
                   style={{ color: 'var(--text-primary)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   {theme === 'light' ? '深色模式' : '浅色模式'}
@@ -142,7 +150,7 @@ export function AppHeader() {
                     onClick={() => { openSettings(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     设置
@@ -158,7 +166,7 @@ export function AppHeader() {
                     onClick={() => { logout(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--accent-coral)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     退出登录
@@ -168,7 +176,7 @@ export function AppHeader() {
                     onClick={() => { openAuth(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--brand)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-warm)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     登录 / 注册
