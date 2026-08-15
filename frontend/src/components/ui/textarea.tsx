@@ -1,14 +1,12 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
-    <input
-      type={type}
-      data-slot="input"
+    <textarea
+      data-slot="textarea"
       className={cn(
-        "h-9 w-full min-w-0 rounded-lg px-3 py-1 text-sm outline-none transition-shadow",
-        "file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+        "flex min-h-16 w-full rounded-lg px-3 py-2 text-sm outline-none transition-shadow resize-none",
         "focus:ring-1 focus:ring-[#FB71A7]/50",
         "disabled:cursor-not-allowed disabled:opacity-50",
         "placeholder:text-[var(--text-muted)]",
@@ -24,4 +22,4 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   )
 }
 
-export { Input }
+export { Textarea }
