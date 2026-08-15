@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 
 export function AuthDialog() {
@@ -95,7 +96,7 @@ export function AuthDialog() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>密码</Label>
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
+            <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
           </div>
           {error && <p className="text-sm text-accent-coral">{error}</p>}
           <Button type="submit" loading={loading} className="w-full">
