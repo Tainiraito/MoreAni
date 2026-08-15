@@ -402,3 +402,32 @@ useEffect(() => {
 - 菜单动画：`animation: 'scale-in 150ms ease-out'`
 - 分割线分隔不同功能区
 - 危险操作（退出）用 `accent-coral` 颜色
+
+## 按钮对比度规范
+
+所有主按钮必须确保文字和背景有足够的对比度：
+
+### CSS 变量
+
+```css
+/* 浅色主题 */
+--btn-primary-bg: linear-gradient(135deg, #E060B8, #C750A0);
+--btn-primary-text: #ffffff;
+
+/* 暗色主题 */
+--btn-primary-bg: linear-gradient(135deg, #FF8CD4, #E060B8);
+--btn-primary-text: #ffffff;
+```
+
+### 使用方式
+
+```tsx
+<button style={{
+  background: 'var(--btn-primary-bg)',
+  color: 'var(--btn-primary-text)',
+}}>
+  按钮文字
+</button>
+```
+
+**关键**：浅色主题使用更深的粉色（#E060B8 → #C750A0），确保白色文字可读。
