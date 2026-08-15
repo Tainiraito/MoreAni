@@ -1,33 +1,33 @@
-# AGENTS.md — MoreAni Project Rules
+# AGENTS.md — MoreAni 项目协作指南
 
-> **For AI agents (Hermes/Claude)**: project-level rules for MoreAni codebase.
+> **适用对象**: AI 助手（Hermes/Claude）— MoreAni 代码库的项目级规则。
 
-## Project Overview
+## 项目概览
 
-- **Name**: MoreAni（又看一集）
-- **Type**: Internal content sharing tool for friends
-- **Stack**: React 18 + TypeScript + Tailwind + shadcn/ui + FastAPI + SQLite
-- **Dev env**: Windows local (WSL2)
-- **Prod env**: NAS (192.168.31.26)
-- **Domain**: moreani.lovelysia.top
+- **名称**: MoreAni（又看一集）
+- **类型**: 朋友间内部内容分享工具
+- **技术栈**: React 19 + TypeScript + Tailwind CSS v4 + FastAPI + SQLite
+- **开发环境**: Windows 本地 (WSL2)
+- **生产环境**: NAS (192.168.31.26)
+- **域名**: moreani.lovelysia.top
 
-## Code Style Principles
+## 代码风格原则
 
-### LLM-Friendly Code
+### LLM 友好代码
 
-| Principle | Rule |
-|-----------|------|
-| Single Responsibility | Each file does ONE thing |
-| Small Files | Max 300 lines Python, 200 lines TSX/TS |
-| Explicit Types | Full type annotations everywhere |
-| Self-Documenting | Clear names + docstrings, no cryptic abbreviations |
-| Consistent Patterns | Same feature = same code structure |
-| Flat Imports | No deep nesting, max 2 levels |
+| 原则 | 规则 |
+|------|------|
+| 单一职责 | 每个文件只做一件事 |
+| 小文件 | Python 最多 300 行，TSX/TS 最多 200 行 |
+| 显式类型 | 所有地方都要有完整类型注解 |
+| 自文档化 | 清晰的命名 + 文档字符串，不使用晦涩缩写 |
+| 一致模式 | 相同功能 = 相同代码结构 |
+| 扁平导入 | 不超过 2 层嵌套 |
 
 ### React + TypeScript
 
 ```tsx
-// DO: Functional component + types + clear naming
+// ✅ 正确：函数组件 + 类型 + 清晰命名
 interface ContentCardProps {
   content: ContentItem
   onSelect: (id: number) => void
@@ -41,43 +41,43 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
   )
 }
 
-// DON'T: No types, barrel exports, default exports
+// ❌ 错误：无类型、桶导出、默认导出
 export default (props) => <div onClick={props.onSelect}>{props.content.title}</div>
 ```
 
 ### Python (FastAPI)
 
 ```python
-# DO: Type hints + docstring
+# ✅ 正确：类型提示 + 文档字符串
 def get_content_by_id(content_id: int, db: Session) -> ContentItem:
-    """Get a single content item by ID."""
+    """获取单个内容项。"""
     return db.query(ContentItem).filter(ContentItem.id == content_id).first()
 
-# DON'T: No types, no docs
+# ❌ 错误：无类型、无文档
 def get_c(cid, db):
     return db.query(ContentItem).filter(ContentItem.id == cid).first()
 ```
 
-## File Structure Rules
+## 文件结构规范
 
-### Backend
+### 后端
 
 ```
 backend/
-├── main.py           # Entry point ONLY, no business logic
-├── database.py       # DB connection ONLY
-├── models.py         # SQLAlchemy models ONLY
-├── schemas.py        # Pydantic schemas ONLY
-├── auth.py           # JWT utilities ONLY
-├── deps.py           # FastAPI dependencies ONLY
-├── services/         # Business logic
+├── main.py           # 入口文件，不含业务逻辑
+├── database.py       # 数据库连接
+├── models.py         # SQLAlchemy 模型
+├── schemas.py        # Pydantic 模式
+├── auth.py           # JWT 工具
+├── deps.py           # FastAPI 依赖注入
+├── services/         # 业务逻辑层
 │   ├── __init__.py
-│   ├── content.py    # Content CRUD + search
-│   ├── rating.py     # Rating CRUD + stats
-│   ├── user.py       # User management
-│   ├── tag.py        # Tag management
-│   └── bangumi.py    # Bangumi API client
-├── routers/          # HTTP layer (thin, delegates to services)
+│   ├── content.py    # 内容 CRUD + 搜索
+│   ├── rating.py     # 评分 CRUD + 统计
+│   ├── user.py       # 用户管理
+│   ├── tag.py        # 标签管理
+│   └── bangumi.py    # Bangumi API 客户端
+├── routers/          # HTTP 路由层（薄层，委托给 services）
 │   └── v1/
 │       ├── auth.py
 │       ├── content.py
@@ -85,30 +85,30 @@ backend/
 │       ├── user.py
 │       ├── tag.py
 │       ├── bangumi.py
-│       └── proxy.py      # Image proxy (bypass CORP/CORS)
-├── middleware/        # Cross-cutting concerns
+│       └── proxy.py      # 图片代理（绕过 CORP/CORS）
+├── middleware/        # 中间件
 │   ├── rate_limit.py
 │   └── security.py
-└── scripts/          # CLI tools
+└── scripts/          # CLI 工具
 ```
 
-### Frontend (React + TypeScript)
+### 前端 (React + TypeScript)
 
 ```
 frontend/src/
-├── main.tsx              # Entry point
-├── App.tsx               # Root component + providers
-├── router.tsx            # React Router config
-├── types/                # TypeScript interfaces
+├── main.tsx              # 入口
+├── App.tsx               # 根组件 + Provider
+├── router.tsx            # React Router 配置
+├── types/                # TypeScript 接口
 │   ├── content.ts
 │   ├── rating.ts
 │   ├── user.ts
 │   └── api.ts
-├── stores/               # Zustand stores
+├── stores/               # Zustand 状态管理
 │   ├── auth-store.ts
 │   ├── content-store.ts
 │   └── ui-store.ts
-├── pages/                # Route pages (one per route)
+├── pages/                # 页面组件（每个路由一个）
 │   ├── HomePage.tsx
 │   ├── ExplorePage.tsx
 │   ├── DetailPage.tsx
@@ -117,119 +117,119 @@ frontend/src/
 │   ├── LoginPage.tsx
 │   ├── RegisterPage.tsx
 │   └── GuestPage.tsx
-├── components/           # Reusable components
+├── components/           # 可复用组件
 │   ├── layout/           # AppHeader, AppFooter
 │   ├── content/          # ContentCard, ContentGrid
 │   ├── rating/           # RatingStars, RatingForm
 │   ├── auth/             # LoginForm, RegisterForm
-│   └── ui/               # shadcn/ui components
-├── hooks/                # Custom hooks
+│   └── ui/               # shadcn/ui 组件
+├── hooks/                # 自定义 Hooks
 │   ├── use-api.ts
 │   ├── use-auth.ts
 │   └── use-content.ts
-├── lib/                  # Utilities
-│   ├── api.ts            # API client (fetch wrapper)
-│   └── utils.ts          # Helper functions
+├── lib/                  # 工具库
+│   ├── api.ts            # API 客户端（fetch 封装）
+│   └── utils.ts          # 辅助函数
 └── styles/
-    └── globals.css       # Tailwind imports + custom styles
+    └── globals.css       # Tailwind 导入 + 自定义样式
 ```
 
-## Git Rules
+## Git 规范
 
-- **Local commits**: OK to do automatically
-- **Push to remote**: MUST have user confirmation first
-- Never `git push` without explicit user approval
+- **本地提交**: 可以自动执行
+- **推送到远程**: 必须先获得用户确认
+- 未经用户明确批准，不得 `git push`
 
-## Commit Convention
-
-```
-feat: add feature X
-fix: resolve bug in Y
-refactor: restructure Z (no behavior change)
-docs: update documentation
-style: formatting, no logic change
-test: add/modify tests
-chore: build, CI, dependencies
-```
-
-Each commit should be:
-- Atomic (one logical change)
-- Descriptive (what changed and why)
-- Tested (if applicable)
-
-## Branch Strategy
+## 提交规范
 
 ```
-main          ← stable releases, PR only
-  └── dev     ← development mainline
+feat: 添加功能 X
+fix: 修复 bug Y
+refactor: 重构 Z（无行为变化）
+docs: 更新文档
+style: 格式调整，无逻辑变化
+test: 添加/修改测试
+chore: 构建、CI、依赖
+```
+
+每次提交应该是：
+- 原子性（一个逻辑变更）
+- 描述性（改了什么，为什么改）
+- 经过测试（如果适用）
+
+## 分支策略
+
+```
+main          ← 稳定版本，仅通过 PR
+  └── dev     ← 开发主线
        ├── feat/xxx
        ├── fix/xxx
        └── refactor/xxx
 ```
 
-## Testing Requirements
+## 测试要求
 
-### Backend
+### 后端
 
-- Unit tests for services: `pytest tests/unit/`
-- API tests for routers: `pytest tests/api/`
-- Run before commit: `pytest tests/ -v`
+- 服务层单元测试: `pytest tests/unit/`
+- 路由层 API 测试: `pytest tests/api/`
+- 提交前运行: `pytest tests/ -v`
 
-### Frontend
+### 前端
 
-- Component tests: Vitest
-- Run before commit: `npm run test`
+- 组件测试: Vitest
+- 提交前运行: `npm run test`
 
-## Database Migration
+## 数据库迁移
 
-When modifying models:
-1. Update `models.py`
-2. Create migration in `migrations/`
-3. Test on dev data
-4. Backup production DB before applying
+修改模型时：
+1. 更新 `models.py`
+2. 在 `migrations/` 中创建迁移
+3. 在开发数据上测试
+4. 应用前备份生产数据库
 
-## API Design Rules
+## API 设计规范
 
-- All APIs under `/api/v1/`
-- RESTful naming: nouns, not verbs
-- Consistent response format
-- Pagination: `?page=1&size=20`
-- Error responses: `{"detail": "message"}`
-- Auth: JWT in httpOnly cookie
-- Image proxy: `/api/v1/proxy/image?url=<encoded_url>` (bypass CORP/CORS for Bangumi CDN)
+- 所有 API 位于 `/api/v1/`
+- RESTful 命名：名词，不是动词
+- 统一响应格式
+- 分页: `?page=1&size=20`
+- 错误响应: `{"detail": "消息内容"}`
+- 认证: JWT 存储在 httpOnly cookie
+- 图片代理: `/api/v1/proxy/image?url=<编码后的URL>`（绕过 Bangumi CDN 的 CORP/CORS 限制）
 
-## Security Rules
+## 安全规范
 
-- Never store secrets in code (use .env)
-- All user input is validated (Pydantic)
-- SQL injection prevented by ORM
-- Rate limiting on all endpoints
-- Share links use cryptographically random tokens
-- Image proxy restricts to allowed domains only (bgm.tv, wikimedia, etc.)
+- 不在代码中存储密钥（使用 .env）
+- 所有用户输入都经过验证（Pydantic）
+- ORM 防止 SQL 注入
+- 所有端点都有速率限制
+- 分享链接使用加密随机 token
+- 图片代理仅允许特定域名（bgm.tv、wikimedia 等）
 
-## Vite Proxy Configuration
+## Vite 代理配置
 
-Frontend dev server proxies `/api/*` to backend. **Critical**: ensure `vite.config.ts` points to correct port:
+前端开发服务器将 `/api/*` 代理到后端。**关键**：确保 `vite.config.ts` 指向正确端口：
 
 ```ts
 // vite.config.ts
 server: {
   proxy: {
-    '/api': 'http://localhost:8080',  // Must match backend port
+    '/api': 'http://localhost:8080',  // 必须与后端端口一致
   },
 },
 ```
 
-## Image URL Handling (CORP/CORS)
+## 图片 URL 处理（CORP/CORS）
 
-Bangumi CDN (`lain.bgm.tv`) sets `Cross-Origin-Resource-Policy` header, blocking direct browser access.
+Bangumi CDN（`lain.bgm.tv`）设置了 `Cross-Origin-Resource-Policy` 头，阻止浏览器直接访问。
 
-**Solution**: Frontend components use `secureUrl()` helper to proxy external images:
+**解决方案**：前端组件使用 `secureUrl()` 辅助函数代理外部图片：
 
 ```tsx
 function secureUrl(url: string): string {
   if (!url) return url
-  // Proxy Bangumi CDN images
+  // 代理 Bangumi CDN 图片
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
@@ -237,43 +237,43 @@ function secureUrl(url: string): string {
 }
 ```
 
-This applies to: `ContentCard`, `HeroSection`, `ContentDetailDialog`.
+适用于：`ContentCard`、`HeroSection`、`ContentDetailDialog`。
 
-## Layout System (Gleamory Style)
+## 布局系统（Gleamory 风格）
 
-All pages must use `PageContainer` or `PageMain` for consistent centering:
+所有页面必须使用 `PageContainer` 或 `PageMain` 实现一致的居中布局：
 
 ```tsx
 import { PageContainer, PageMain } from '@/components/layout/PageContainer'
 
-// For page content (uses <main> element)
+// 页面内容（使用 <main> 元素）
 <PageMain className="py-20 sm:py-24">
-  {/* Content here */}
+  {/* 内容 */}
 </PageMain>
 
-// For other containers (uses <div> element)
+// 其他容器（使用 <div> 元素）
 <PageContainer>
-  {/* Content here */}
+  {/* 内容 */}
 </PageContainer>
 ```
 
-**Width modes**:
-- `standard` (default): `px-6 sm:px-[5.5%]` + `max-w-[90rem]` — for most pages
-- `wide`: `px-4 sm:px-6 lg:px-8` + `max-w-[100rem]` — for wide workspaces
+**宽度模式**：
+- `standard`（默认）: `px-6 sm:px-[5.5%]` + `max-w-[90rem]` — 适用于大多数页面
+- `wide`: `px-4 sm:px-6 lg:px-8` + `max-w-[100rem]` — 适用于宽工作台
 
-**Critical rules**:
-- `AppHeader` must use same width mode as page content
-- Never use custom `max-w-*` or `mx-auto` on page-level containers
-- Background color: `var(--bg-page, #f5f3ef)`
+**关键规则**：
+- `AppHeader` 必须使用与页面内容相同的宽度模式
+- 页面级容器不得使用自定义 `max-w-*` 或 `mx-auto`
+- 背景色: `var(--bg-page, #f5f3ef)`
 
-## What NOT to Do
+## 禁止事项
 
-- ❌ Don't put business logic in routers
-- ❌ Don't put UI logic in stores
-- ❌ Don't use `any` type in TypeScript
-- ❌ Don't create files > 300 lines
-- ❌ Don't skip type annotations
-- ❌ Don't hardcode values (use config/env)
-- ❌ Don't mix concerns (DB + HTTP + Business)
-- ❌ Don't use default exports (prefer named exports)
-- ❌ Don't use class components (functional only)
+- ❌ 路由层不要放业务逻辑
+- ❌ Store 不要放 UI 逻辑
+- ❌ TypeScript 不要使用 `any` 类型
+- ❌ 文件不要超过 300 行
+- ❌ 不要省略类型注解
+- ❌ 不要硬编码值（使用 config/env）
+- ❌ 不要混合关注点（DB + HTTP + 业务）
+- ❌ 不要使用默认导出（优先命名导出）
+- ❌ 不要使用类组件（仅函数组件）
