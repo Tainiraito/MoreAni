@@ -183,88 +183,125 @@ export function HeroBrand() {
               {displayItems.map((item, index) => (
                 <div
                   key={index}
-                  className="flex-shrink-0 cursor-pointer"
+                  className="flex-shrink-0 cursor-pointer relative"
                   style={{
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-line)',
-                    borderRadius: '12px',
                     width: `${cardWidth}px`,
+                    height: '280px',
                     transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
-                    boxShadow: hoveredIndex === index
-                      ? '0 12px 40px rgba(0,0,0,0.2)'
-                      : '0 2px 8px rgba(0,0,0,0.05)',
                     zIndex: hoveredIndex === index ? 20 : 1,
-                    transformOrigin: 'center bottom', // 从底部中心放大
-                    overflow: 'hidden',
-                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                    transformOrigin: 'center bottom',
+                    transition: 'transform 0.3s ease, z-index 0s',
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {/* 封面 — 固定高度 */}
+                  {/* 默认状态：封面 + 信息 */}
                   <div
-                    className="w-full"
-                    style={{ 
-                      background: 'var(--bg-card-warm)',
-                      height: '210px', // 固定高度
-                      borderRadius: '12px 12px 0 0',
-                      overflow: 'hidden',
+                    className="absolute inset-0 rounded-xl overflow-hidden"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-line)',
+                      boxShadow: hoveredIndex === index
+                        ? '0 12px 40px rgba(0,0,0,0.2)'
+                        : '0 2px 8px rgba(0,0,0,0.05)',
+                      transition: 'box-shadow 0.3s ease',
                     }}
                   >
-                    <img
-                      src={secureUrl(item.cover_url)}
-                      alt={item.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = '/placeholder.png'
+                    {/* 封面 */}
+                    <div
+                      className="w-full"
+                      style={{ 
+                        background: 'var(--bg-card-warm)',
+                        height: '210px',
+                        overflow: 'hidden',
                       }}
-                    />
+                    >
+                      <img
+                        src={secureUrl(item.cover_url)}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = '/placeholder.png'
+                        }}
+                      />
+                    </div>
+
+                    {/* 信息 */}
+                    <div className="p-3 text-center">
+                      <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                        {item.title}
+                      </h3>
+                      {item.avg_score && item.avg_score > 0 && (
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                            ★ {(item.avg_score / 10).toFixed(1)}
+                          </span>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {item.rating_count || 0}人
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {/* 信息区 — 固定高度，相对定位 */}
-                  <div className="p-3 text-center relative" style={{ minHeight: '70px' }}>
-                    {/* 标题 */}
-                    <h3 className="text-xs font-semibold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </h3>
-
-                    {/* 分数 + 打分人数 — 默认展示 */}
-                    {item.avg_score && item.avg_score > 0 && (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
-                          ★ {(item.avg_score / 10).toFixed(1)}
-                        </span>
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {item.rating_count || 0}人
-                        </span>
-                      </div>
-                    )}
-
-                    {/* 额外信息 — 覆盖整个信息区 */}
-                    {hoveredIndex === index && (
+                  {/* Hover 覆盖层：覆盖整个卡片 */}
+                  {hoveredIndex === index && (
+                    <div
+                      className="absolute inset-0 rounded-xl overflow-hidden flex flex-col"
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '2px solid var(--brand)',
+                        boxShadow: '0 12px 40px rgba(251, 113, 167, 0.25)',
+                      }}
+                    >
+                      {/* 封面（半透明） */}
                       <div
-                        className="absolute inset-0 p-3 text-center flex flex-col justify-center"
-                        style={{
-                          background: 'var(--bg-card)',
-                        }}
+                        className="w-full relative"
+                        style={{ height: '120px', overflow: 'hidden' }}
                       >
-                        <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                        <img
+                          src={secureUrl(item.cover_url)}
+                          alt={item.title}
+                          className="w-full h-full object-cover opacity-40"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = '/placeholder.png'
+                          }}
+                        />
+                        {/* 分数覆盖在封面上 */}
+                        {item.avg_score && item.avg_score > 0 && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold" style={{ color: 'var(--brand)' }}>
+                                ★ {(item.avg_score / 10).toFixed(1)}
+                              </div>
+                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                {item.rating_count || 0}人评分
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 详细信息 */}
+                      <div className="flex-1 p-3 flex flex-col">
+                        <h3 className="text-sm font-semibold mb-2 line-clamp-1" style={{ color: 'var(--text-primary)' }}>
                           {item.title}
                         </h3>
                         {item.episodes > 0 && (
-                          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
                             {item.episodes}集
                           </p>
                         )}
                         {item.description && (
-                          <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-xs line-clamp-4 flex-1" style={{ color: 'var(--text-secondary)' }}>
                             {item.description}
                           </p>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
