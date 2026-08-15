@@ -70,11 +70,12 @@ export function HeroBrand() {
   const [isPaused, setIsPaused] = useState(false)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const lastPromptProgress = useRef(0)
-  const isFirstLogin = useRef(!sessionStorage.getItem('moreani-scrolled'))
+  const progressRef = useRef(0)
   const cardWidth = 160
   const gap = 20
+  const totalSteps = 10 // 需要滚动10次达到100%
 
   // 加载番剧内容并随机选取
   useEffect(() => {
@@ -92,6 +93,35 @@ export function HeroBrand() {
       .catch(() => {})
   }, [])
 
+  // 监听鼠标滚轮事件（仅未登录时）
+  useEffect(() => {
+    if (user) return
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      
+      // 向下滚动增加进度
+      if (e.deltaY > 0) {
+        progressRef.current = Math.min(1, progressRef.current + (1 / totalSteps))
+      } 
+      // 向上滚动减少进度
+      else if (e.deltaY < 0) {
+        progressRef.current = Math.max(0, progressRef.current - (1 / totalSteps))
+      }
+      
+      setScrollProgress(progressRef.current)
+      
+      // 进度达到100%时显示登录提示
+      if (progressRef.current >= 1 && !showLoginPrompt) {
+        setShowLoginPrompt(true)
+        openAuth()
+      }
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [user, openAuth, showLoginPrompt])
+
   // 自动循环滚动 - 使用 CSS animation
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -105,41 +135,12 @@ export function HeroBrand() {
     container.style.animationDuration = `${duration}s`
   }, [items])
 
-  // 监听页面滚动
+  // 登录后重置进度
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY
-      const maxScroll = window.innerHeight
-      const progress = Math.min(scrollY / maxScroll, 1)
-      setScrollProgress(progress)
-
-      if (!user) {
-        if (scrollY > maxScroll) {
-          window.scrollTo(0, maxScroll)
-        }
-        if (progress >= 1 && lastPromptProgress.current < 1) {
-          lastPromptProgress.current = 1
-          openAuth()
-        }
-        if (progress < 0.8) {
-          lastPromptProgress.current = 0
-        }
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [user, openAuth])
-
-  // 登录后自动滚动出首屏（仅首次登录）
-  useEffect(() => {
-    if (user && isFirstLogin.current) {
-      isFirstLogin.current = false
-      sessionStorage.setItem('moreani-scrolled', '1')
-      setTimeout(() => {
-        const scrollTarget = window.innerHeight - 120
-        window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
-      }, 500)
+    if (user) {
+      progressRef.current = 0
+      setScrollProgress(0)
+      setShowLoginPrompt(false)
     }
   }, [user])
 
@@ -344,27 +345,44 @@ export function HeroBrand() {
         )}
       </div>
 
-      {/* 底部进度条 */}
-      <div className="fixed bottom-3 left-0 right-0 flex justify-center">
-        {!user ? (
-          <div className="flex flex-col items-center gap-1">
+      {/* 底部进度条 — 仅未登录显示 */}
+      {!user && (
+        <div className="fixed bottom-6 left-0 right-0 flex flex-col items-center gap-2">
+          {/* 进度条 */}
+          <div
+            className="w-48 h-1.5 rounded-full overflow-hidden"
+            style={{ background: 'var(--border-line)' }}
+          >
             <div
-              className="w-48 h-1 rounded-full overflow-hidden"
-              style={{ background: 'var(--border-line)' }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-150"
-                style={{
-                  width: `${scrollProgress * 100}%`,
-                  background: 'var(--brand)',
-                }}
-              />
-            </div>
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              登录后查看更多
-            </span>
+              className="h-full rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: `${scrollProgress * 100}%`,
+                background: scrollProgress >= 1 
+                  ? 'var(--brand)' 
+                  : `linear-gradient(90deg, var(--brand) 0%, var(--brand-deep) 100%)`,
+              }}
+            />
           </div>
-        ) : (
+          
+          {/* 提示文字 */}
+          <span 
+            className="text-xs transition-opacity duration-300"
+            style={{ 
+              color: 'var(--text-muted)',
+              opacity: scrollProgress > 0 && scrollProgress < 1 ? 1 : 0.5,
+            }}
+          >
+            {scrollProgress >= 1 
+              ? '释放以查看更多 →' 
+              : `向下滚动探索更多 (${Math.round(scrollProgress * 100)}%)`
+            }
+          </span>
+        </div>
+      )}
+
+      {/* 已登录时显示向下箭头 */}
+      {user && (
+        <div className="fixed bottom-6 left-0 right-0 flex justify-center">
           <div
             className="animate-bounce cursor-pointer"
             style={{ color: 'var(--text-muted)' }}
@@ -374,18 +392,18 @@ export function HeroBrand() {
               <path d="M12 5v14M19 12l-7 7-7-7" />
             </svg>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 进度条满时的遮罩 */}
-      {!user && scrollProgress >= 0.95 && (
+      {showLoginPrompt && !user && (
         <div
           className="fixed inset-0 flex items-center justify-center"
           style={{
             background: 'rgba(0,0,0,0.3)',
             animation: 'fade-in 300ms ease-out',
           }}
-          onClick={openAuth}
+          onClick={() => setShowLoginPrompt(false)}
         >
           <div
             className="px-8 py-4 rounded-xl text-center"
