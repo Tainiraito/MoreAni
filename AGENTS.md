@@ -84,7 +84,8 @@ backend/
 │       ├── rating.py
 │       ├── user.py
 │       ├── tag.py
-│       └── bangumi.py
+│       ├── bangumi.py
+│       └── proxy.py      # Image proxy (bypass CORP/CORS)
 ├── middleware/        # Cross-cutting concerns
 │   ├── rate_limit.py
 │   └── security.py
@@ -195,6 +196,7 @@ When modifying models:
 - Pagination: `?page=1&size=20`
 - Error responses: `{"detail": "message"}`
 - Auth: JWT in httpOnly cookie
+- Image proxy: `/api/v1/proxy/image?url=<encoded_url>` (bypass CORP/CORS for Bangumi CDN)
 
 ## Security Rules
 
@@ -203,6 +205,39 @@ When modifying models:
 - SQL injection prevented by ORM
 - Rate limiting on all endpoints
 - Share links use cryptographically random tokens
+- Image proxy restricts to allowed domains only (bgm.tv, wikimedia, etc.)
+
+## Vite Proxy Configuration
+
+Frontend dev server proxies `/api/*` to backend. **Critical**: ensure `vite.config.ts` points to correct port:
+
+```ts
+// vite.config.ts
+server: {
+  proxy: {
+    '/api': 'http://localhost:8080',  // Must match backend port
+  },
+},
+```
+
+## Image URL Handling (CORP/CORS)
+
+Bangumi CDN (`lain.bgm.tv`) sets `Cross-Origin-Resource-Policy` header, blocking direct browser access.
+
+**Solution**: Frontend components use `secureUrl()` helper to proxy external images:
+
+```tsx
+function secureUrl(url: string): string {
+  if (!url) return url
+  // Proxy Bangumi CDN images
+  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv')) {
+    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
+  }
+  return url.replace(/^http:\/\//, 'https://')
+}
+```
+
+This applies to: `ContentCard`, `HeroSection`, `ContentDetailDialog`.
 
 ## What NOT to Do
 

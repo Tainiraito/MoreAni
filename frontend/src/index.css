@@ -1,13 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme {
+  /* Warm palette */
+  --color-brand: #E83E8C;
+  --color-brand-light: #FFD6EA;
+  --color-brand-deep: #C42E78;
 
-:root {
-  --brand-pink: #E83E8C;
-  --brand-dark: #1A1A2E;
-  --brand-light: #FFF5F9;
+  --color-ink: #1a1a1a;
+  --color-slate: #555555;
+  --color-muted: #999999;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-paper: #f5f3ef;
+  --color-surface: #ffffff;
+
+  /* Accent colors (used sparingly) */
+  --color-accent-purple: #7B61FF;
+  --color-accent-cyan: #00D4AA;
+  --color-accent-orange: #FF8C42;
+  --color-accent-yellow: #FFD93D;
+  --color-accent-blue: #4DA6FF;
+  --color-accent-coral: #E85D5D;
+
+  /* Content type colors (muted tones) */
+  --color-type-anime: #7B61FF;
+  --color-type-movie: #00B894;
+  --color-type-game: #E17055;
+  --color-type-software: #D4A017;
+  --color-type-website: #4DA6FF;
+  --color-type-book: #E85D5D;
+
+  --font-sans: "Noto Sans SC", "Space Grotesk", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
 }
 
 * {
@@ -17,8 +41,35 @@
 }
 
 body {
-  font-family: 'Noto Sans SC', 'Space Grotesk', system-ui, sans-serif;
-  background: #FAFAFA;
-  color: var(--brand-dark);
+  font-family: var(--font-sans);
+  background: var(--color-paper);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+/* Smooth animations */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-out-right {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }

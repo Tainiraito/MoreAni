@@ -65,7 +65,7 @@ MoreAni（又看一集）v2.0 是一款**面向小圈子朋友的内部内容分
 
 | 层 | 选择 |
 |----|------|
-| 前端 | React 18 + TypeScript + Tailwind CSS + shadcn/ui |
+| 前端 | React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui |
 | 状态管理 | Zustand |
 | 路由 | React Router v6 |
 | 构建 | Vite |

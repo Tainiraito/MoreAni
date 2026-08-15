@@ -13,14 +13,12 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="min-h-screen bg-[#FAFAFA]">
+        <div className="min-h-screen" style={{ background: 'var(--bg-page, #f5f3ef)' }}>
           <AppHeader />
-          <main>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/profile/:id" element={<ProfilePage />} />
-            </Routes>
-          </main>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/profile/:id" element={<ProfilePage />} />
+          </Routes>
         </div>
 
         {/* Global Dialogs */}

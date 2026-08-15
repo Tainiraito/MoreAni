@@ -28,6 +28,9 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Archive (legacy files)
+_archive/
+
 # Design docs (local only, not for public repo)
 product-design.md
 

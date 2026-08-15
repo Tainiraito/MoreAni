@@ -4,7 +4,7 @@
 > **日期**: 2026-08-15  
 > **状态**: 📋 设计规范  
 > **风格方向**: 扁平 / 二次元 / 杂志编排  
-> **技术基础**: React 18 + TypeScript + shadcn/ui + Tailwind CSS v4
+> **技术基础**: React 19 + TypeScript + shadcn/ui + Tailwind CSS v4
 
 ---
 
