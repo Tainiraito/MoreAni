@@ -100,6 +100,19 @@ body {
 :root.dark ::-webkit-scrollbar-thumb { background: rgba(251, 113, 167, 0.2); }
 :root.dark ::-webkit-scrollbar-thumb:hover { background: rgba(251, 113, 167, 0.4); }
 
+/* Dark select dropdown */
+select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+/* Dark date picker */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
 /* Smooth animations */
 @keyframes slide-in-right {
   from { transform: translateX(100%); opacity: 0; }

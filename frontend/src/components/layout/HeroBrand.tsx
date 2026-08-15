@@ -122,7 +122,7 @@ export function HeroBrand() {
       <div className="flex flex-col items-center text-center px-6 pt-[18vh]">
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
-          <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
+          <img src={theme === 'dark' ? '/favicon-white.png' : '/favicon.png'} alt="MoreAni" className="w-full h-full object-cover" />
         </div>
 
         {/* 标题 */}

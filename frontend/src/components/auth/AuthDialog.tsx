@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function AuthDialog() {
   const { authOpen, closeAuth } = useUIStore()
@@ -83,10 +84,19 @@ export function AuthDialog() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
-            <Input label="邀请码" value={code} onChange={e => setCode(e.target.value)} placeholder="请输入邀请码" required />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>邀请码</Label>
+              <Input value={code} onChange={e => setCode(e.target.value)} placeholder="请输入邀请码" required />
+            </div>
           )}
-          <Input label="用户名" value={username} onChange={e => setUsername(e.target.value)} placeholder="请输入用户名" required />
-          <Input label="密码" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>用户名</Label>
+            <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="请输入用户名" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>密码</Label>
+            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
+          </div>
           {error && <p className="text-sm text-accent-coral">{error}</p>}
           <Button type="submit" loading={loading} className="w-full">
             {mode === 'login' ? '登录' : '注册'}

@@ -1,5 +1,6 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Heart } from 'lucide-react'
+import { Star, Users, Play, Heart, RefreshCw } from 'lucide-react'
+import { CoverImage } from '@/components/ui/CoverImage'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -14,22 +15,25 @@ const TYPE_COLORS: Record<string, string> = {
   book: 'bg-type-book/10 text-type-book',
 }
 
-function secureUrl(url: string): string {
-  if (!url) return url
-  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
-    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
-  }
-  return url.replace(/^http:\/\//, 'https://')
-}
-
 interface HeroSectionProps {
   content: ContentItem
   isFavorited?: boolean
   onSelect: (id: number) => void
   onToggleFavorite?: () => void
+  onRefresh?: () => void
+  progress?: number
+  autoRefreshMs?: number
 }
 
-export function HeroSection({ content, isFavorited = false, onSelect, onToggleFavorite }: HeroSectionProps) {
+export function HeroSection({
+  content,
+  isFavorited = false,
+  onSelect,
+  onToggleFavorite,
+  onRefresh,
+  progress = 0,
+  autoRefreshMs = 11000,
+}: HeroSectionProps) {
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
@@ -44,34 +48,23 @@ export function HeroSection({ content, isFavorited = false, onSelect, onToggleFa
     onToggleFavorite?.()
   }
 
+  const handleRefreshClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onRefresh?.()
+  }
+
   return (
     <div
       className="relative rounded-xl overflow-hidden cursor-pointer group mb-8"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
       onClick={() => onSelect(content.id)}
     >
-      <div className="flex flex-col md:flex-row">
-        <div className="md:w-2/5 aspect-[3/4] md:aspect-auto md:min-h-[420px] overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
-          {content.cover_url ? (
-            <img
-              src={secureUrl(content.cover_url)}
-              alt={content.title}
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-600 ease-out"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = '/placeholder.png'
-              }}
-            />
-          ) : (
-            <img
-              src="/placeholder.png"
-              alt={content.title}
-              className="w-full h-full object-cover"
-            />
-          )}
+      <div className="flex flex-col md:flex-row md:h-[600px]">
+        <div className="md:w-2/5 aspect-[3/4] md:aspect-auto overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
+          <CoverImage src={content.cover_url} alt={content.title} imgClassName="group-hover:scale-[1.03] transition-transform duration-600 ease-out" />
         </div>
 
-        <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center">
+        <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center overflow-hidden">
           <span className={`inline-block w-fit px-3 py-1 text-xs font-medium rounded-lg mb-5 ${TYPE_COLORS[content.content_type] || 'bg-surface text-slate'}`}>
             {TYPE_LABELS[content.content_type] || content.content_type}
           </span>
@@ -93,7 +86,7 @@ export function HeroSection({ content, isFavorited = false, onSelect, onToggleFa
                 </span>
               </div>
             )}
-            
+
             {(content.rating_count ?? 0) > 0 && (
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                 <Users size={14} />
@@ -130,9 +123,9 @@ export function HeroSection({ content, isFavorited = false, onSelect, onToggleFa
             </p>
           )}
 
-          {/* 收藏按钮 */}
-          {onToggleFavorite && (
-            <div className="mt-7">
+          {/* 收藏 + 换一个 */}
+          <div className="mt-7 flex items-center gap-3">
+            {onToggleFavorite && (
               <button
                 onClick={handleFavoriteClick}
                 className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
@@ -145,10 +138,35 @@ export function HeroSection({ content, isFavorited = false, onSelect, onToggleFa
                 <Heart size={16} fill={isFavorited ? 'white' : 'none'} />
                 {isFavorited ? '已收藏' : '收藏'}
               </button>
-            </div>
-          )}
+            )}
+
+            {onRefresh && (
+              <button
+                onClick={handleRefreshClick}
+                className="relative inline-flex items-center gap-1.5 px-6 py-2.5 text-sm font-semibold rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
+                style={{
+                  background: 'var(--bg-card-warm)',
+                  border: '1px solid var(--border-line)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {/* 进度填充背景 */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    width: `${progress}%`,
+                    background: 'linear-gradient(90deg, rgba(251,113,167,0.15), rgba(180,144,228,0.15))',
+                    transition: progress > 0 ? `width ${autoRefreshMs}ms linear` : 'none',
+                  }}
+                />
+                <RefreshCw size={14} className="relative z-10" />
+                <span className="relative z-10">换一个</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
     </div>
   )
 }

@@ -92,7 +92,7 @@ def clear_status(
 def list_my_status(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[StatusResponse]:
+) -> dict:
     """Get current user's all watch statuses."""
     records = (
         db.query(UserContentStatus, ContentItem)
@@ -102,7 +102,7 @@ def list_my_status(
         .all()
     )
 
-    return [
+    items = [
         StatusResponse(
             id=s.id,
             content_id=s.content_id,
@@ -114,3 +114,4 @@ def list_my_status(
         )
         for s, c in records
     ]
+    return {"items": items}

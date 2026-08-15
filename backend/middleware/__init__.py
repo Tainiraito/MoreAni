@@ -29,7 +29,7 @@ RULES: dict[str, RateLimitRule] = {
     "login": RateLimitRule(max_requests=10, window_seconds=900),      # 10 / 15min
     "register": RateLimitRule(max_requests=5, window_seconds=3600),   # 5 / hour
     "write": RateLimitRule(max_requests=30, window_seconds=60),       # 30 / min
-    "read": RateLimitRule(max_requests=120, window_seconds=60),       # 120 / min
+    "read": RateLimitRule(max_requests=300, window_seconds=60),       # 300 / min
 }
 
 

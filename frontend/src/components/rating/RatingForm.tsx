@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { StarRating } from './StarRating'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 interface RatingFormProps {
   initialScore?: number
@@ -39,14 +40,11 @@ export function RatingForm({ initialScore = 0, initialRecommend = 0, initialRevi
 
       <div>
         <label className="block text-sm font-medium text-ink mb-2">评论（可选）</label>
-        <textarea
+        <Textarea
           value={review}
           onChange={e => setReview(e.target.value)}
           placeholder="写点什么吧..."
-          className="w-full h-24 rounded-lg border border-black/[0.08] bg-white px-4 py-3
-                     text-sm text-ink placeholder:text-muted/50 resize-none
-                     focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/10
-                     transition-all duration-200"
+          className="h-24 resize-none"
         />
       </div>
 
