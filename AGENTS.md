@@ -445,3 +445,28 @@ useEffect(() => {
 **渐变**：`linear-gradient(135deg, #FB71A7, #E85D93)`
 
 **原则**：所有涉及品牌色的地方，必须使用 `var(--brand)` 或 `var(--btn-primary-bg)`，不要硬编码色值。
+
+## 图标库规范
+
+统一使用 **Lucide React** 图标库：
+
+```tsx
+import { Sun, Moon, User, Settings, LogOut, X } from 'lucide-react'
+
+// 使用方式
+<Sun size={16} />
+<Moon size={18} />
+```
+
+**规范**：
+- 所有图标必须来自 lucide-react，不要使用 emoji 或其他图标库
+- 图标尺寸：导航栏 16px，按钮 18px，大图标 24px
+- 图标颜色：使用 `currentColor` 继承父元素颜色
+- 单色线性风格，保持视觉一致性
+
+**常用图标**：
+- `User` — 用户/登录
+- `Sun` / `Moon` — 主题切换
+- `Settings` — 设置
+- `LogOut` — 退出
+- `X` — 关闭
