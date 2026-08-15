@@ -216,21 +216,11 @@ export function ContentDetailDialog() {
 
               {/* 标签 */}
               {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
+                <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
                   {tags.map((tag: string, index: number) => (
-                    <span
-                      key={index}
-                      className="px-2.5 py-1 text-xs rounded-full"
-                      style={{
-                        background: 'var(--bg-card-warm)',
-                        color: 'var(--text-muted)',
-                        border: '1px solid var(--border-line)',
-                      }}
-                    >
-                      {tag}
-                    </span>
+                    <span key={index}>#{tag} </span>
                   ))}
-                </div>
+                </p>
               )}
 
               {/* 制作信息 */}
