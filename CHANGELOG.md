@@ -1,6 +1,41 @@
 # Changelog
 
-## dev (2026-05-07)
+## v2.0.0 (2026-08-16)
+
+### 架构
+- 前端迁移到 React 19 + TypeScript + Vite + Tailwind CSS v4
+- 引入 shadcn/ui 组件库（Select/Popover/Calendar/DatePicker/Dialog/Label/Tabs/Textarea/Badge/Button/Input）
+- 后端迁移到 FastAPI + SQLAlchemy + SQLite，路由/服务分层
+
+### 番剧管理
+- 统一新增/编辑表单（ContentFormDialog），支持 Bangumi 搜索快速导入
+- 编辑模式支持「从 Bangumi 重新获取信息」（多候选词 fallback 搜索）
+- 创建时重复校验：Bangumi 按 source_id、手动按标题查重
+- 逻辑删除（软删除）：deleted_at 标记，保留数据行，列表/详情过滤
+- 编辑弹窗新增删除按钮 + 二次确认（层级关闭）
+
+### 列表功能
+- 无限滚动加载（触底加载下一页，每页 20 条）
+- 关键词模糊搜索（标题/别名/简介/标签）
+- 评分状态筛选（全部/已评分/未评分）
+- 排序：最近编辑/放送日期↑↓/评分最高/最新添加/标题
+- 类型 Tab 选中态粉色底线，未开放类型置灰
+
+### 评分与卡片
+- 支持半星评分（左半边/右半边点击）
+- 评分需点「保存」提交，星星只改本地状态
+- 我的评论卡片样式统一，点击进入编辑态
+- 卡片评分颜色：本人已评分粉色 / 未评分灰色；已评论粉色 / 未评论灰色
+- 评论内容支持换行渲染
+
+### 其他
+- 主题切换共享状态（useSyncExternalStore）
+- 精选推荐区固定高度（600px），Hero 自动切换进度条（按钮背景填充）
+- 弹窗滚动锁优化（overflow hidden + 位置恢复）
+- 详情弹窗、编辑弹窗标签数据源统一（content.tags）
+- 手动添加番剧支持 Bangumi 参考评分（按标题搜索）
+
+
 
 ### 重构
 - 提取 `RatingScores.vue` 评分展示组件
