@@ -1,4 +1,4 @@
-"""Rating router — create/upsert, delete, recent activity, history."""
+"""Rating router — create/upsert, delete, recent activity, history, content ratings."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -86,3 +86,15 @@ def get_my_history(
     """Get current user's rating history."""
     items, total = rating_svc.get_user_ratings(db, user.id, page=page, size=size)
     return RatingHistoryResponse(items=items, total=total)
+
+
+@router.get("/content/{content_id}")
+def get_content_ratings(
+    content_id: int,
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """Get all ratings for a specific content item."""
+    items, total = rating_svc.get_content_ratings(db, content_id, page=page, size=size)
+    return {"items": items, "total": total}

@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Hash, Building, Calendar } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Award, TrendingUp, Building, Calendar, MessageCircle } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -24,6 +24,16 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: str
   book: { label: '书籍', icon: BookOpen, color: 'var(--type-book)' },
 }
 
+interface Review {
+  id: number
+  username: string
+  avatar_id: number
+  score: number
+  recommend: number
+  review: string
+  created_at: string
+}
+
 export function ContentDetailDialog() {
   const { detailOpen, detailContentId, closeDetail } = useUIStore()
   const { user } = useAuthStore()
@@ -32,14 +42,19 @@ export function ContentDetailDialog() {
   const [loading, setLoading] = useState(false)
   const [score, setScore] = useState(0)
   const [hoverScore, setHoverScore] = useState(0)
+  const [reviews, setReviews] = useState<Review[]>([])
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
-      api.getContent(detailContentId)
-        .then(c => {
-          setContent(c as ContentItem)
-          setScore((c as ContentItem).my_rating?.score || 0)
+      Promise.all([
+        api.getContent(detailContentId) as Promise<ContentItem>,
+        api.getContentRatings(detailContentId, { size: '10' }),
+      ])
+        .then(([c, ratingsRes]) => {
+          setContent(c)
+          setScore(c.my_rating?.score || 0)
+          setReviews((ratingsRes.items || []) as Review[])
         })
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
@@ -55,6 +70,9 @@ export function ContentDetailDialog() {
       await api.upsertRating({ content_id: content.id, score: newScore * 10 })
       const updated = await api.getContent(content.id) as ContentItem
       setContent(updated)
+      // Reload reviews
+      const ratingsRes = await api.getContentRatings(content.id, { size: '10' })
+      setReviews((ratingsRes.items || []) as Review[])
       toast.addToast('success', '评分成功')
     } catch {
       toast.addToast('error', '评分失败')
@@ -201,14 +219,15 @@ export function ContentDetailDialog() {
                 {/* Bangumi 评分 */}
                 {bangumiScore && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                    <Hash size={14} />
+                    <Award size={14} />
                     <span className="text-sm">BGM {bangumiScore}</span>
                   </div>
                 )}
 
                 {/* 排名 */}
-                {bangumiRank && (
+                {bangumiRank && bangumiRank > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <TrendingUp size={14} />
                     <span className="text-sm">#{bangumiRank}</span>
                   </div>
                 )}
@@ -267,7 +286,7 @@ export function ContentDetailDialog() {
               {/* 我的评分 */}
               {user && (
                 <div
-                  className="p-4 rounded-xl"
+                  className="p-4 rounded-xl mb-6"
                   style={{
                     background: 'var(--bg-card-warm)',
                     border: '1px solid var(--border-line)',
@@ -302,6 +321,56 @@ export function ContentDetailDialog() {
                         {hoverScore || score}
                       </span>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* 站内评论 */}
+              {reviews.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                    <MessageCircle size={16} />
+                    站内评论
+                  </h3>
+                  <div className="space-y-3">
+                    {reviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="p-3 rounded-lg"
+                        style={{
+                          background: 'var(--bg-card-warm)',
+                          border: '1px solid var(--border-line)',
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
+                              style={{
+                                background: 'var(--brand)',
+                                color: 'white',
+                              }}
+                            >
+                              {review.username.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {review.username}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Star size={12} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
+                            <span className="text-xs" style={{ color: 'var(--brand)' }}>
+                              {(review.score / 10).toFixed(1)}
+                            </span>
+                          </div>
+                        </div>
+                        {review.review && (
+                          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            {review.review}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

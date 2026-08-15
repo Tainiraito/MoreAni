@@ -159,3 +159,38 @@ def get_user_ratings(
         })
 
     return items, total
+
+
+def get_content_ratings(
+    db: Session,
+    content_id: int,
+    *,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[dict], int]:
+    """Get all ratings for a specific content item."""
+    query = (
+        db.query(Rating, User)
+        .join(User, Rating.user_id == User.id)
+        .filter(Rating.content_id == content_id, Rating.score > 0)
+        .order_by(Rating.created_at.desc())
+    )
+
+    total = query.count()
+    rows = query.offset((page - 1) * size).limit(size).all()
+
+    items = []
+    for rating, user in rows:
+        items.append({
+            "id": rating.id,
+            "content_id": content_id,
+            "user_id": rating.user_id,
+            "username": user.username,
+            "avatar_id": user.avatar_id,
+            "score": rating.score,
+            "recommend": rating.recommend,
+            "review": rating.review,
+            "created_at": rating.created_at,
+        })
+
+    return items, total
