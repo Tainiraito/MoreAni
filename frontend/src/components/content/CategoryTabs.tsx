@@ -18,8 +18,8 @@ interface CategoryTabsProps {
 export function CategoryTabs({ active, onChange }: CategoryTabsProps) {
   return (
     <div
-      className="mt-6 flex gap-6 overflow-x-auto border-b"
-      style={{ borderColor: 'rgba(44,42,48,0.11)' }}
+      className="mt-6 flex gap-6 overflow-x-auto"
+      style={{ borderBottom: '1px solid var(--border-line)' }}
     >
       {tabs.map(tab => (
         <button
@@ -27,11 +27,9 @@ export function CategoryTabs({ active, onChange }: CategoryTabsProps) {
           onClick={() => onChange(tab.key)}
           className="relative min-h-[3.25rem] whitespace-nowrap pb-3 text-sm font-medium transition-colors duration-150"
           style={{
-            color: active === tab.key
-              ? 'var(--accent-amber, #c4956a)'
-              : 'var(--text-secondary, #4a4550)',
+            color: active === tab.key ? 'var(--brand)' : 'var(--text-muted)',
             borderBottom: active === tab.key
-              ? '2px solid var(--accent-amber, #c4956a)'
+              ? '2px solid var(--brand)'
               : '2px solid transparent',
           }}
         >

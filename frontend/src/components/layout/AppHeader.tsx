@@ -9,17 +9,27 @@ export function AppHeader() {
   return (
     <header
       className="fixed top-0 right-0 left-0 z-50 flex h-11 items-center sm:h-12"
-      style={{ background: 'var(--bg-card, #fff)', borderBottom: '0.5px solid rgba(44,42,48,0.07)' }}
+      style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-line)' }}
     >
       <PageContainer>
         <div className="flex items-center justify-between">
-          {/* Logo — Gleamory style: text only, uppercase tracking */}
+          {/* Logo — icon + 文字 */}
           <a
             href="/"
-            className="text-xs font-medium uppercase tracking-[0.2em] transition-opacity duration-300 hover:opacity-70"
-            style={{ color: 'var(--text-muted, #8a8590)', fontFamily: 'var(--font-display, serif)' }}
+            className="flex items-center gap-2 transition-opacity duration-300 hover:opacity-80"
           >
-            又看一集
+            <img
+              src="/favicon-32.png"
+              alt="MoreAni"
+              className="w-6 h-6 rounded-sm"
+              style={{ boxShadow: '0 0 8px rgba(255, 140, 212, 0.3)' }}
+            />
+            <span
+              className="text-xs font-medium uppercase tracking-[0.15em]"
+              style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+            >
+              又看一集
+            </span>
           </a>
 
           {/* Right side: functional buttons */}
@@ -28,21 +38,21 @@ export function AppHeader() {
               <>
                 <span
                   className="hidden text-xs sm:inline"
-                  style={{ color: 'var(--text-muted, #8a8590)' }}
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   {user.username}
                 </span>
                 <button
                   onClick={openSettings}
                   className="text-xs transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--text-muted, #8a8590)' }}
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   设置
                 </button>
                 <button
                   onClick={logout}
                   className="text-xs transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--text-muted, #8a8590)' }}
+                  style={{ color: 'var(--text-muted)' }}
                 >
                   退出
                 </button>
@@ -51,7 +61,7 @@ export function AppHeader() {
               <button
                 onClick={openAuth}
                 className="text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: 'var(--accent-amber, #c4956a)' }}
+                style={{ color: 'var(--accent-pink)' }}
               >
                 登录
               </button>

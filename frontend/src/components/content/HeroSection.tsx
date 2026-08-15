@@ -9,7 +9,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  anime: 'bg-accent-purple/10 text-accent-purple',
+  anime: 'bg-type-anime/10 text-type-anime',
   movie: 'bg-type-movie/10 text-type-movie',
   game: 'bg-type-game/10 text-type-game',
   software: 'bg-type-software/10 text-type-software',
@@ -39,12 +39,17 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
 
   return (
     <div
-      className="relative rounded-xl overflow-hidden cursor-pointer group mb-8 bg-surface border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+      className="relative rounded-xl overflow-hidden cursor-pointer group mb-8"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-line)',
+        boxShadow: '0 0 20px rgba(255, 140, 212, 0.08)',
+      }}
       onClick={() => onSelect(content.id)}
     >
       <div className="flex flex-col md:flex-row">
         {/* Cover */}
-        <div className="md:w-2/5 aspect-[3/4] md:aspect-auto md:min-h-[420px] overflow-hidden bg-paper relative rounded-t-xl md:rounded-l-xl md:rounded-tr-none">
+        <div className="md:w-2/5 aspect-[3/4] md:aspect-auto md:min-h-[420px] overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
           {content.cover_url ? (
             <img
               src={secureUrl(content.cover_url)}
@@ -67,39 +72,51 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
 
         {/* Info */}
         <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center">
-          <span className={`inline-block w-fit px-3 py-1 text-xs font-medium rounded-lg mb-5 ${TYPE_COLORS[content.content_type] || 'bg-paper text-slate'}`}>
+          <span className={`inline-block w-fit px-3 py-1 text-xs font-medium rounded-lg mb-5 ${TYPE_COLORS[content.content_type] || 'bg-surface text-slate'}`}>
             {TYPE_LABELS[content.content_type] || content.content_type}
           </span>
 
-          <h1 className="text-3xl md:text-[2.5rem] font-bold text-ink tracking-tight leading-tight">
+          <h1 className="text-3xl md:text-[2.5rem] font-bold tracking-tight leading-tight" style={{ color: 'var(--text-primary)' }}>
             {content.title}
           </h1>
 
           {content.title_alt && (
-            <p className="mt-2 text-sm text-muted">{content.title_alt}</p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>{content.title_alt}</p>
           )}
 
           {avgScore && (
             <div className="mt-5 flex items-center gap-3">
-              <div className="bg-ink text-brand px-4 py-2 rounded-lg">
-                <span className="font-display text-xl font-bold">{avgScore}</span>
+              <div
+                className="px-4 py-2 rounded-lg"
+                style={{
+                  background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
+                  boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)',
+                }}
+              >
+                <span className="font-display text-xl font-bold text-white">{avgScore}</span>
                 <span className="text-xs text-white/60 ml-1">/ 10</span>
               </div>
-              <span className="text-sm text-muted">
+              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 {content.rating_count || 0} 人评分
               </span>
             </div>
           )}
 
           {content.description && (
-            <p className="mt-5 text-sm text-slate line-clamp-3 leading-relaxed">
+            <p className="mt-5 text-sm leading-relaxed line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
               {content.description}
             </p>
           )}
 
           <div className="mt-7">
-            <span className="inline-flex items-center px-5 py-2.5 bg-brand text-white text-sm font-medium rounded-full
-                           shadow-sm group-hover:shadow-md group-hover:bg-brand-deep transition-all duration-200">
+            <span
+              className="inline-flex items-center px-5 py-2.5 text-white text-sm font-medium rounded-full
+                         transition-all duration-200 group-hover:shadow-neon"
+              style={{
+                background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
+                boxShadow: '0 0 10px rgba(255, 140, 212, 0.2)',
+              }}
+            >
               查看详情 →
             </span>
           </div>

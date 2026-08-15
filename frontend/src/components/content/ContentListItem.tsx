@@ -22,25 +22,25 @@ export function ContentListItem({ content, onSelect }: ContentListItemProps) {
 
   return (
     <li
-      className="group border-b transition-colors duration-150 last:border-b-0 hover:bg-[rgba(196,149,106,0.05)]"
-      style={{ borderColor: 'rgba(44,42,48,0.1)' }}
+      className="group transition-colors duration-150"
+      style={{ borderBottom: '1px solid var(--border-line)' }}
     >
       <button
         type="button"
         onClick={() => onSelect(content.id)}
-        className="grid w-full min-h-[4.75rem] grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-1 py-4 text-left sm:grid-cols-[9.5rem_minmax(0,1fr)_9rem] sm:items-center sm:gap-x-5 sm:px-2 sm:py-[1.125rem]"
+        className="grid w-full min-h-[4.75rem] grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-1 py-4 text-left sm:grid-cols-[9.5rem_minmax(0,1fr)_9rem] sm:items-center sm:gap-x-5 sm:px-2 sm:py-[1.125rem] hover:opacity-80 transition-opacity"
       >
         {/* Name + tags */}
         <div className="min-w-0">
           <h3
-            className="text-lg font-semibold leading-tight transition-colors group-hover:text-[var(--accent-amber,#c4956a)] sm:text-xl"
-            style={{ color: 'var(--text-primary, #0c0a12)', fontFamily: 'var(--font-display, serif)' }}
+            className="text-lg font-semibold leading-tight sm:text-xl group-hover:text-brand transition-colors"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
           >
             {content.title}
           </h3>
           <p
             className="mt-1 truncate text-xs tracking-[0.04em]"
-            style={{ color: 'var(--text-muted, #8a8590)' }}
+            style={{ color: 'var(--text-muted)' }}
           >
             {TYPE_LABELS[content.content_type] || content.content_type}
             {content.title_alt ? ` · ${content.title_alt}` : ''}
@@ -50,7 +50,7 @@ export function ContentListItem({ content, onSelect }: ContentListItemProps) {
         {/* Description */}
         <p
           className="col-span-2 min-w-0 text-[0.78rem] leading-relaxed sm:col-span-1 sm:line-clamp-2"
-          style={{ color: 'var(--text-secondary, #4a4550)' }}
+          style={{ color: 'var(--text-secondary)' }}
         >
           {content.description || '暂无描述'}
         </p>
@@ -60,7 +60,7 @@ export function ContentListItem({ content, onSelect }: ContentListItemProps) {
           {meta.length > 0 && (
             <span
               className="whitespace-nowrap text-xs leading-[1.125rem] tracking-[0.04em]"
-              style={{ color: 'var(--text-muted, #8a8590)' }}
+              style={{ color: 'var(--text-muted)' }}
             >
               {meta.join(' · ')}
             </span>

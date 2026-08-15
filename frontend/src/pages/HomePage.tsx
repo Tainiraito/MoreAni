@@ -49,11 +49,11 @@ export function HomePage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-32">
-          <p className="text-sm" style={{ color: 'var(--text-muted, #8a8590)' }}>加载中...</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
         </div>
       ) : items.length === 0 ? (
         <div className="flex items-center justify-center py-32">
-          <p className="text-lg" style={{ color: 'var(--text-muted, #8a8590)' }}>
+          <p className="text-lg" style={{ color: 'var(--text-muted)' }}>
             暂无内容
           </p>
         </div>
@@ -65,7 +65,7 @@ export function HomePage() {
               {(activeType === 'all') && (
                 <h2
                   className="mb-4 text-xl font-semibold"
-                  style={{ color: 'var(--text-primary, #0c0a12)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   番剧
                 </h2>
@@ -84,14 +84,13 @@ export function HomePage() {
               {(activeType === 'all') && animeItems.length > 0 && (
                 <h2
                   className="mb-4 text-xl font-semibold"
-                  style={{ color: 'var(--text-primary, #0c0a12)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   其他内容
                 </h2>
               )}
               <ol
-                className="border-y"
-                style={{ borderColor: 'rgba(44,42,48,0.1)' }}
+                style={{ borderTop: '1px solid var(--border-line)' }}
               >
                 {otherItems.map(item => (
                   <ContentListItem key={item.id} content={item} onSelect={openDetail} />
@@ -105,18 +104,18 @@ export function HomePage() {
       {/* Login prompt */}
       <div
         className="mt-12 text-center py-8"
-        style={{ borderTop: '0.5px solid rgba(44,42,48,0.07)' }}
+        style={{ borderTop: '1px solid var(--border-line)' }}
       >
-        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted, #8a8590)' }}>
+        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
           登录后可以评分、评论和管理观看状态
         </p>
         <button
           onClick={openAuth}
-          className="px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200"
+          className="px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200 hover:shadow-neon"
           style={{
-            background: 'var(--accent-amber, #c4956a)',
-            color: '#fffaf2',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
+            color: '#fff',
+            boxShadow: '0 0 10px rgba(255, 140, 212, 0.2)',
           }}
         >
           立即登录

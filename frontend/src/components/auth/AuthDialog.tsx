@@ -46,25 +46,37 @@ export function AuthDialog() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px]"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
          onClick={closeAuth}>
-      <div className="bg-white rounded-2xl w-[420px] max-w-[90vw] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.12)]"
-           onClick={e => e.stopPropagation()}
-           style={{ animation: 'scale-in 200ms ease-out' }}>
+      <div
+        className="rounded-2xl w-[420px] max-w-[90vw] p-8"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-line)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255, 140, 212, 0.1)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Tabs */}
-        <div className="flex border border-black/[0.06] rounded-xl overflow-hidden mb-7">
+        <div className="flex rounded-xl overflow-hidden mb-7" style={{ border: '1px solid var(--border-line)' }}>
           <button
             className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 ${
-              mode === 'login' ? 'bg-brand text-white' : 'bg-white text-muted hover:text-ink hover:bg-paper/50'
+              mode === 'login'
+                ? 'bg-brand text-white'
+                : 'hover:opacity-80'
             }`}
+            style={mode !== 'login' ? { color: 'var(--text-muted)', background: 'var(--bg-card-warm)' } : {}}
             onClick={() => { setMode('login'); resetForm() }}
           >
             登录
           </button>
           <button
-            className={`flex-1 py-2.5 text-sm font-medium border-l border-black/[0.06] transition-all duration-200 ${
-              mode === 'register' ? 'bg-brand text-white' : 'bg-white text-muted hover:text-ink hover:bg-paper/50'
+            className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 ${
+              mode === 'register'
+                ? 'bg-brand text-white'
+                : 'hover:opacity-80'
             }`}
+            style={mode !== 'register' ? { color: 'var(--text-muted)', background: 'var(--bg-card-warm)', borderLeft: '1px solid var(--border-line)' } : { borderLeft: '1px solid var(--border-line)' }}
             onClick={() => { setMode('register'); resetForm() }}
           >
             注册

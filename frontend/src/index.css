@@ -1,59 +1,65 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
-@theme {
-  /* Warm palette */
-  --color-brand: #E83E8C;
-  --color-brand-light: #FFD6EA;
-  --color-brand-deep: #C42E78;
+/* ============================================
+   MoreAni 配色规范 — 基于霓虹粉猫耳 icon
+   主色: #FF8CD4 (霓虹粉)
+   辅色: #FF00FF (洋红霓虹)
+   ============================================ */
 
+@theme {
+  /* 品牌色系 — 霓虹粉 */
+  --color-brand: #FF8CD4;
+  --color-brand-light: #FFBDEA;
+  --color-brand-deep: #E060B8;
+  --color-brand-neon: #FF00FF;
+
+  /* 中性色 */
   --color-ink: #1a1a1a;
   --color-slate: #555555;
   --color-muted: #999999;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-paper: #f5f3ef;
-  --color-surface: #ffffff;
+  --color-border: rgba(255, 140, 212, 0.15);
+  --color-paper: #0a0a0a;
+  --color-surface: #141414;
 
-  /* Accent colors (used sparingly) */
-  --color-accent-purple: #7B61FF;
-  --color-accent-cyan: #00D4AA;
-  --color-accent-orange: #FF8C42;
-  --color-accent-yellow: #FFD93D;
-  --color-accent-blue: #4DA6FF;
-  --color-accent-coral: #E85D5D;
-
-  /* Content type colors (muted tones) */
-  --color-type-anime: #7B61FF;
-  --color-type-movie: #00B894;
-  --color-type-game: #E17055;
-  --color-type-software: #D4A017;
+  /* 内容类型色 */
+  --color-type-anime: #FF8CD4;
+  --color-type-movie: #00D4AA;
+  --color-type-game: #FF8C42;
+  --color-type-software: #FFD93D;
   --color-type-website: #4DA6FF;
-  --color-type-book: #E85D5D;
+  --color-type-book: #FF6B6B;
 
+  /* 强调色 */
+  --color-accent-purple: #C77DFF;
+  --color-accent-coral: #FF6B6B;
+
+  /* 字体 */
   --font-sans: "Noto Sans SC", "Space Grotesk", system-ui, sans-serif;
   --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
 }
 
 :root {
-  /* Page background */
-  --bg-page: #f5f3ef;
-  --bg-card: #ffffff;
-  --bg-card-warm: #f3ede4;
+  /* 页面背景 — 深色主题 */
+  --bg-page: #0a0a0a;
+  --bg-card: #141414;
+  --bg-card-warm: #1a1a1a;
 
-  /* Text colors */
-  --text-primary: #0c0a12;
-  --text-secondary: #4a4550;
-  --text-muted: #8a8590;
+  /* 文字色 */
+  --text-primary: #f0f0f0;
+  --text-secondary: #b0b0b0;
+  --text-muted: #808080;
 
-  /* Accent colors */
-  --accent-amber: #c4956a;
-  --accent-pink: #c4956a;
+  /* 强调色 */
+  --accent-amber: #FF8CD4;
+  --accent-pink: #FF8CD4;
 
-  /* Border */
-  --border-line: rgba(44, 42, 48, 0.07);
+  /* 边框 */
+  --border-line: rgba(255, 140, 212, 0.12);
 
-  /* Shadows */
-  --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.12);
+  /* 阴影 */
+  --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --shadow-neon: 0 0 10px rgba(255, 140, 212, 0.3), 0 0 30px rgba(255, 140, 212, 0.1);
 }
 
 @layer base {
@@ -76,11 +82,11 @@ body {
   line-height: 1.6;
 }
 
-/* Subtle scrollbar */
+/* Subtle scrollbar — 深色主题 */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255, 140, 212, 0.2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 140, 212, 0.4); }
 
 /* Smooth animations */
 @keyframes slide-in-right {
@@ -98,4 +104,8 @@ body {
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
+}
+@keyframes neon-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 140, 212, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 140, 212, 0.5), 0 0 30px rgba(255, 140, 212, 0.2); }
 }

@@ -27,12 +27,15 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
 
   return (
     <article
-      className="group cursor-pointer overflow-hidden rounded-lg border transition-all duration-200 hover:shadow-md"
-      style={{ borderColor: 'rgba(44,42,48,0.06)', background: 'var(--bg-card, #fff)' }}
+      className="group cursor-pointer overflow-hidden rounded-lg transition-all duration-200 hover:shadow-neon"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-line)',
+      }}
       onClick={() => onSelect(content.id)}
     >
       {/* Cover */}
-      <div className="relative aspect-[3/4] overflow-hidden rounded-t-lg bg-[var(--bg-card-warm, #f3ede4)]">
+      <div className="relative aspect-[3/4] overflow-hidden" style={{ background: 'var(--bg-card-warm)' }}>
         {content.cover_url ? (
           <img
             src={secureUrl(content.cover_url)}
@@ -60,14 +63,14 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
 
         <h3
           className="mt-2 line-clamp-1 text-base font-semibold"
-          style={{ color: 'var(--text-primary, #0c0a12)' }}
+          style={{ color: 'var(--text-primary)' }}
         >
           {content.title}
         </h3>
 
-        <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted, #8a8590)' }}>
+        <div className="mt-1 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
           {avgScore && (
-            <span className="font-medium" style={{ color: 'var(--accent-amber, #c4956a)' }}>
+            <span className="font-medium" style={{ color: 'var(--brand)' }}>
               ★ {avgScore}
             </span>
           )}
