@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import { PageContainer } from '@/components/layout/PageContainer'
@@ -5,11 +6,27 @@ import { PageContainer } from '@/components/layout/PageContainer'
 export function AppHeader() {
   const { user, logout } = useAuthStore()
   const { openAuth, openSettings } = useUIStore()
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 80)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   return (
     <header
-      className="fixed top-0 right-0 left-0 z-50 flex h-11 items-center sm:h-12"
-      style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-line)' }}
+      className="fixed top-0 right-0 left-0 z-50 flex h-11 items-center sm:h-12 transition-all duration-300"
+      style={{
+        background: scrolled ? 'var(--bg-card)' : 'transparent',
+        borderBottom: scrolled ? '1px solid var(--border-line)' : '1px solid transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
+        opacity: scrolled ? 1 : 0,
+        transform: scrolled ? 'translateY(0)' : 'translateY(-100%)',
+        pointerEvents: scrolled ? 'auto' : 'none',
+      }}
     >
       <PageContainer>
         <div className="flex items-center justify-between">

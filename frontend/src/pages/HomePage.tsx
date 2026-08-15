@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
+import { HeroBrand } from '@/components/layout/HeroBrand'
 import { CategoryTabs } from '@/components/content/CategoryTabs'
 import { ContentCard } from '@/components/content/ContentCard'
 import { ContentListItem } from '@/components/content/ContentListItem'
@@ -13,7 +14,7 @@ export function HomePage() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
   const [loading, setLoading] = useState(true)
-  const { openDetail, openAuth } = useUIStore()
+  const { openDetail } = useUIStore()
 
   useEffect(() => {
     setLoading(true)
@@ -38,88 +39,71 @@ export function HomePage() {
   const otherItems = items.filter(i => i.content_type !== 'anime')
 
   return (
-    <PageMain className="py-20 sm:py-24">
-      {/* Hero — only for anime */}
-      {hero && hero.content_type === 'anime' && (
-        <HeroSection content={hero} onSelect={openDetail} />
-      )}
+    <PageMain>
+      {/* Hero 品牌区域 — 页面顶部大 icon + 标题 */}
+      <HeroBrand />
 
-      {/* Category Tabs */}
-      <CategoryTabs active={activeType} onChange={setActiveType} />
+      {/* 内容区域 */}
+      <div className="pb-20 sm:pb-24">
+        {/* Hero — 只有番剧才显示 */}
+        {hero && hero.content_type === 'anime' && (
+          <HeroSection content={hero} onSelect={openDetail} />
+        )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-32">
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex items-center justify-center py-32">
-          <p className="text-lg" style={{ color: 'var(--text-muted)' }}>
-            暂无内容
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Anime section — cover card grid */}
-          {animeItems.length > 0 && (
-            <section className="mt-8">
-              {(activeType === 'all') && (
-                <h2
-                  className="mb-4 text-xl font-semibold"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  番剧
-                </h2>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                {animeItems.map(item => (
-                  <ContentCard key={item.id} content={item} onSelect={openDetail} />
-                ))}
-              </div>
-            </section>
-          )}
+        {/* 分类标签 */}
+        <CategoryTabs active={activeType} onChange={setActiveType} />
 
-          {/* Other types — Gleamory-style list */}
-          {otherItems.length > 0 && (
-            <section className="mt-10">
-              {(activeType === 'all') && animeItems.length > 0 && (
-                <h2
-                  className="mb-4 text-xl font-semibold"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  其他内容
-                </h2>
-              )}
-              <ol
-                style={{ borderTop: '1px solid var(--border-line)' }}
-              >
-                {otherItems.map(item => (
-                  <ContentListItem key={item.id} content={item} onSelect={openDetail} />
-                ))}
-              </ol>
-            </section>
-          )}
-        </>
-      )}
+        {loading ? (
+          <div className="flex items-center justify-center py-32">
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex items-center justify-center py-32">
+            <p className="text-lg" style={{ color: 'var(--text-muted)' }}>
+              暂无内容
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* 番剧区域 — 卡片网格 */}
+            {animeItems.length > 0 && (
+              <section className="mt-8">
+                {(activeType === 'all') && (
+                  <h2
+                    className="mb-4 text-xl font-semibold"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    番剧
+                  </h2>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                  {animeItems.map(item => (
+                    <ContentCard key={item.id} content={item} onSelect={openDetail} />
+                  ))}
+                </div>
+              </section>
+            )}
 
-      {/* Login prompt */}
-      <div
-        className="mt-12 text-center py-8"
-        style={{ borderTop: '1px solid var(--border-line)' }}
-      >
-        <p className="mb-3 text-sm" style={{ color: 'var(--text-muted)' }}>
-          登录后可以评分、评论和管理观看状态
-        </p>
-        <button
-          onClick={openAuth}
-          className="px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200 hover:shadow-neon"
-          style={{
-            background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
-            color: '#fff',
-            boxShadow: '0 0 10px rgba(255, 140, 212, 0.2)',
-          }}
-        >
-          立即登录
-        </button>
+            {/* 其他类型 — 列表 */}
+            {otherItems.length > 0 && (
+              <section className="mt-10">
+                {(activeType === 'all') && animeItems.length > 0 && (
+                  <h2
+                    className="mb-4 text-xl font-semibold"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    其他内容
+                  </h2>
+                )}
+                <ol style={{ borderTop: '1px solid var(--border-line)' }}>
+                  {otherItems.map(item => (
+                    <ContentListItem key={item.id} content={item} onSelect={openDetail} />
+                  ))}
+                </ol>
+              </section>
+            )}
+          </>
+        )}
       </div>
     </PageMain>
   )
