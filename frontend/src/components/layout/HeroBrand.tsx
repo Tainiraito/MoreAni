@@ -124,8 +124,8 @@ export function HeroBrand() {
       isFirstLogin.current = false
       sessionStorage.setItem('moreani-scrolled', '1')
       setTimeout(() => {
-        // 滚动到内容区域，留出导航栏空间
-        const scrollTarget = window.innerHeight - 48
+        // 滚动到内容区域，留出导航栏和间距
+        const scrollTarget = window.innerHeight - 120
         window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
       }, 500)
     }
@@ -172,7 +172,7 @@ export function HeroBrand() {
           {user ? (
             <button
               onClick={() => {
-                const scrollTarget = window.innerHeight - 48
+                const scrollTarget = window.innerHeight - 120
                 window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
               }}
               className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
