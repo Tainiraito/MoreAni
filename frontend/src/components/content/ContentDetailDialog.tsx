@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -45,24 +45,34 @@ export function ContentDetailDialog() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
+  const [isFavorited, setIsFavorited] = useState(false)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
-      setBangumiScore(null) // 重置 Bangumi 评分
+      setBangumiScore(null)
+      setScore(0)
+      setIsFavorited(false)
+      
       Promise.all([
         api.getContent(detailContentId) as Promise<ContentItem>,
         api.getContentRatings(detailContentId, { size: '10' }),
+        user ? api.getMyStatuses() : Promise.resolve({ items: [] }),
       ])
-        .then(([c, ratingsRes]) => {
+        .then(([c, ratingsRes, statusRes]) => {
           setContent(c)
           setScore(c.my_rating?.score || 0)
           setReviews((ratingsRes.items || []) as Review[])
+          
+          // 检查收藏状态
+          const statuses = (statusRes.items || []) as { content_id: number; status: string }[]
+          const found = statuses.find(s => s.content_id === c.id)
+          setIsFavorited(found?.status === 'want')
         })
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId])
+  }, [detailOpen, detailContentId, user])
 
   if (!detailOpen) return null
 
@@ -73,7 +83,6 @@ export function ContentDetailDialog() {
       await api.upsertRating({ content_id: content.id, score: newScore * 10 })
       const updated = await api.getContent(content.id) as ContentItem
       setContent(updated)
-      // Reload reviews
       const ratingsRes = await api.getContentRatings(content.id, { size: '10' })
       setReviews((ratingsRes.items || []) as Review[])
       toast.addToast('success', '评分成功')
@@ -82,7 +91,23 @@ export function ContentDetailDialog() {
     }
   }
 
-  // 查询 Bangumi 评分
+  const handleToggleFavorite = async () => {
+    if (!content || !user) return
+    try {
+      if (isFavorited) {
+        await api.clearStatus(content.id)
+        setIsFavorited(false)
+        toast.addToast('success', '已取消收藏')
+      } else {
+        await api.setStatus({ content_id: content.id, status: 'want' })
+        setIsFavorited(true)
+        toast.addToast('success', '已收藏')
+      }
+    } catch {
+      toast.addToast('error', '操作失败')
+    }
+  }
+
   const handleFetchBangumiScore = async () => {
     if (!content?.source_id || content.source_type !== 'bangumi') return
     setBangumiLoading(true)
@@ -100,7 +125,6 @@ export function ContentDetailDialog() {
   const TypeIcon = typeConfig?.icon || Star
   const avgScore = content?.avg_score ? (content.avg_score / 10).toFixed(1) : null
 
-  // Parse metadata (不包含 bangumi 评分了)
   const metadata = content?.metadata 
     ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) 
     : {}
@@ -115,10 +139,8 @@ export function ContentDetailDialog() {
       onClick={closeDetail}
       style={{ animation: 'fade-in 200ms ease-out' }}
     >
-      {/* 背景遮罩 */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
-      {/* 弹窗 */}
       <div
         className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl"
         style={{
@@ -129,18 +151,33 @@ export function ContentDetailDialog() {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* 关闭按钮 */}
-        <button
-          onClick={closeDetail}
-          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-line)',
-            color: 'var(--text-muted)',
-          }}
-        >
-          <X size={16} />
-        </button>
+        {/* 顶部按钮区 - 收藏 + 关闭 */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          {user && (
+            <button
+              onClick={handleToggleFavorite}
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+              style={{
+                background: isFavorited ? 'var(--brand)' : 'var(--bg-card)',
+                border: isFavorited ? 'none' : '1px solid var(--border-line)',
+                color: isFavorited ? 'white' : 'var(--text-muted)',
+              }}
+            >
+              <Heart size={14} fill={isFavorited ? 'white' : 'none'} />
+            </button>
+          )}
+          <button
+            onClick={closeDetail}
+            className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -151,7 +188,6 @@ export function ContentDetailDialog() {
           </div>
         ) : content ? (
           <div className="overflow-y-auto max-h-[85vh]">
-            {/* 封面区域 */}
             <div className="relative" style={{ height: '280px', background: 'var(--bg-card-warm)' }}>
               {content.cover_url ? (
                 <img
@@ -164,7 +200,6 @@ export function ContentDetailDialog() {
                   <TypeIcon size={64} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
                 </div>
               )}
-              {/* 渐变遮罩 */}
               <div
                 className="absolute inset-0"
                 style={{
@@ -173,9 +208,7 @@ export function ContentDetailDialog() {
               />
             </div>
 
-            {/* 内容区域 */}
             <div className="px-6 pb-6 -mt-16 relative">
-              {/* 类型标签 */}
               {typeConfig && (
                 <div
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-3"
@@ -189,7 +222,6 @@ export function ContentDetailDialog() {
                 </div>
               )}
 
-              {/* 标题 */}
               <h2
                 className="text-2xl font-bold mb-1"
                 style={{ color: 'var(--text-primary)' }}
@@ -203,9 +235,7 @@ export function ContentDetailDialog() {
                 </p>
               )}
 
-              {/* 评分和统计 */}
               <div className="flex flex-wrap items-center gap-4 mb-4">
-                {/* 我们的评分 */}
                 {avgScore && (
                   <div className="flex items-center gap-1.5">
                     <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
@@ -215,7 +245,6 @@ export function ContentDetailDialog() {
                   </div>
                 )}
                 
-                {/* 评分人数 */}
                 {(content.rating_count ?? 0) > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Users size={14} />
@@ -223,7 +252,6 @@ export function ContentDetailDialog() {
                   </div>
                 )}
 
-                {/* 集数 */}
                 {content.episodes > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Play size={14} />
@@ -231,7 +259,6 @@ export function ContentDetailDialog() {
                   </div>
                 )}
 
-                {/* Bangumi 链接 */}
                 {content.source_url && (
                   <a
                     href={content.source_url}
@@ -247,7 +274,6 @@ export function ContentDetailDialog() {
                 )}
               </div>
 
-              {/* 标签 */}
               {tags.length > 0 && (
                 <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
                   {tags.map((tag: string, index: number) => (
@@ -256,7 +282,6 @@ export function ContentDetailDialog() {
                 </p>
               )}
 
-              {/* 制作信息 */}
               {(director || studio || airDate) && (
                 <div
                   className="p-3 rounded-lg mb-4 flex flex-wrap gap-4 text-xs"
@@ -287,7 +312,6 @@ export function ContentDetailDialog() {
                 </div>
               )}
 
-              {/* 简介 */}
               {content.description && (
                 <p
                   className="text-sm leading-relaxed mb-6"
@@ -297,7 +321,6 @@ export function ContentDetailDialog() {
                 </p>
               )}
 
-              {/* 我的评分 + Bangumi 参考 */}
               {user && (
                 <div
                   className="p-4 rounded-xl mb-6"
@@ -311,7 +334,6 @@ export function ContentDetailDialog() {
                       我的评分
                     </h3>
                     
-                    {/* Bangumi 参考评分按钮 */}
                     {content.source_type === 'bangumi' && content.source_id && (
                       <button
                         onClick={handleFetchBangumiScore}
@@ -366,7 +388,6 @@ export function ContentDetailDialog() {
                 </div>
               )}
 
-              {/* 站内评论 */}
               {reviews.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>

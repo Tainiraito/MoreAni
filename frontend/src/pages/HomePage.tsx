@@ -34,15 +34,12 @@ export function HomePage() {
         const animeList = (contentRes.items || []) as ContentItem[]
         const statuses = (statusRes.items || []) as { content_id: number; status: string }[]
         
-        // 构建收藏集合
         const favIds = new Set(statuses.filter(s => s.status === 'want').map(s => s.content_id))
         setFavoriteIds(favIds)
         
-        // 只保留有封面的番剧
         const withCover = animeList.filter(i => i.cover_url)
         setAllAnime(withCover)
         
-        // 随机选取一个
         if (withCover.length > 0) {
           const randomIndex = Math.floor(Math.random() * withCover.length)
           const selected = withCover[randomIndex]
@@ -91,13 +88,12 @@ export function HomePage() {
     }
   }, [allAnime, hero, favoriteIds])
 
-  // 切换收藏
-  const handleToggleFavorite = useCallback(async () => {
+  // 切换精选的收藏
+  const handleToggleHeroFavorite = useCallback(async () => {
     if (!hero) return
     
     try {
       if (heroFavorited) {
-        // 取消收藏
         await api.clearStatus(hero.id)
         setFavoriteIds(prev => {
           const next = new Set(prev)
@@ -106,7 +102,6 @@ export function HomePage() {
         })
         setHeroFavorited(false)
       } else {
-        // 收藏
         await api.setStatus({ content_id: hero.id, status: 'want' })
         setFavoriteIds(prev => new Set(prev).add(hero.id))
         setHeroFavorited(true)
@@ -115,6 +110,27 @@ export function HomePage() {
       console.error('Toggle favorite failed:', err)
     }
   }, [hero, heroFavorited])
+
+  // 切换卡片的收藏
+  const handleToggleCardFavorite = useCallback(async (id: number) => {
+    const isFav = favoriteIds.has(id)
+    
+    try {
+      if (isFav) {
+        await api.clearStatus(id)
+        setFavoriteIds(prev => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      } else {
+        await api.setStatus({ content_id: id, status: 'want' })
+        setFavoriteIds(prev => new Set(prev).add(id))
+      }
+    } catch (err) {
+      console.error('Toggle favorite failed:', err)
+    }
+  }, [favoriteIds])
 
   // 未登录只显示首屏
   if (!user) {
@@ -135,7 +151,7 @@ export function HomePage() {
               content={hero}
               isFavorited={heroFavorited}
               onSelect={openDetail}
-              onToggleFavorite={handleToggleFavorite}
+              onToggleFavorite={handleToggleHeroFavorite}
             />
             <button
               onClick={handleRefreshHero}
@@ -182,7 +198,9 @@ export function HomePage() {
                       key={item.id}
                       content={item}
                       mode="grid"
+                      isFavorited={favoriteIds.has(item.id)}
                       onSelect={openDetail}
+                      onToggleFavorite={handleToggleCardFavorite}
                     />
                   ))}
                 </div>

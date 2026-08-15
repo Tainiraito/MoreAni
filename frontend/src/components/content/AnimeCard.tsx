@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Star, Users, Play } from 'lucide-react'
+import { Star, Users, Play, Heart } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -40,26 +40,50 @@ type CardMode = 'grid' | 'scroll'
 interface AnimeCardProps {
   content: ContentItem
   mode?: CardMode
+  isFavorited?: boolean
   onSelect?: (id: number) => void
+  onToggleFavorite?: (id: number) => void
 }
 
-export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) {
+export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelect, onToggleFavorite }: AnimeCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
 
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggleFavorite?.(content.id)
+  }
+
   // Grid 模式：用于内容列表
   if (mode === 'grid') {
     return (
       <article
-        className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:shadow-lg"
+        className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:shadow-lg relative"
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border-line)',
         }}
         onClick={() => onSelect?.(content.id)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
+        {/* 收藏按钮 - 右上角 */}
+        {onToggleFavorite && (
+          <button
+            onClick={handleFavoriteClick}
+            className="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+            style={{
+              background: isFavorited ? 'var(--brand)' : 'rgba(255,255,255,0.9)',
+              color: isFavorited ? 'white' : 'var(--text-muted)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Heart size={14} fill={isFavorited ? 'white' : 'none'} />
+          </button>
+        )}
+
         {/* 封面 */}
         <div className="aspect-[3/4] overflow-hidden" style={{ background: 'var(--bg-card-warm)' }}>
           <CoverImage src={content.cover_url} alt={content.title} />
@@ -104,7 +128,7 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
 
   return (
     <div
-      className="flex-shrink-0 cursor-pointer"
+      className="flex-shrink-0 cursor-pointer relative"
       style={{
         width: '160px',
         height: `${coverHeight + infoMinHeight}px`,
@@ -128,6 +152,21 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
           transition: 'box-shadow 0.3s ease',
         }}
       >
+        {/* 收藏按钮 - 右上角 */}
+        {onToggleFavorite && (
+          <button
+            onClick={handleFavoriteClick}
+            className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+            style={{
+              background: isFavorited ? 'var(--brand)' : 'rgba(255,255,255,0.9)',
+              color: isFavorited ? 'white' : 'var(--text-muted)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            <Heart size={12} fill={isFavorited ? 'white' : 'none'} />
+          </button>
+        )}
+
         {/* 封面 */}
         <div className="w-full overflow-hidden" style={{ height: `${coverHeight}px` }}>
           <CoverImage src={content.cover_url} alt={content.title} />
@@ -139,7 +178,7 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
           style={{
             background: 'var(--bg-card)',
             borderTop: '1px solid var(--border-line)',
-            height: isHovered ? '180px' : `${infoMinHeight}px`,
+            height: isHovered ? '120px' : `${infoMinHeight}px`,
             transition: 'height 0.3s ease',
           }}
         >
@@ -174,13 +213,13 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
             <div
               className="overflow-hidden transition-all duration-300"
               style={{
-                maxHeight: isHovered ? '120px' : '0px',
+                maxHeight: isHovered ? '60px' : '0px',
                 opacity: isHovered ? 1 : 0,
-                marginTop: isHovered ? '8px' : '0px',
+                marginTop: isHovered ? '6px' : '0px',
               }}
             >
               {content.description && (
-                <p className="text-xs line-clamp-6 text-center" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
                   {content.description}
                 </p>
               )}
