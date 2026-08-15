@@ -222,8 +222,8 @@ export function HeroBrand() {
                     />
                   </div>
 
-                  {/* 信息区 — 固定高度 */}
-                  <div className="p-3 text-center" style={{ minHeight: '70px' }}>
+                  {/* 信息区 — 固定高度，相对定位 */}
+                  <div className="p-3 text-center relative" style={{ minHeight: '70px' }}>
                     {/* 标题 */}
                     <h3 className="text-xs font-semibold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
                       {item.title}
@@ -240,27 +240,29 @@ export function HeroBrand() {
                         </span>
                       </div>
                     )}
-                  </div>
 
-                  {/* 额外信息 — 绝对定位，不影响卡片高度 */}
-                  <div
-                    className="absolute left-0 right-0 bottom-0 px-3 pb-3 text-center"
-                    style={{
-                      background: 'linear-gradient(transparent, var(--bg-card) 30%)',
-                      opacity: hoveredIndex === index ? 1 : 0,
-                      transition: 'opacity 0.3s ease',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {item.episodes > 0 && (
-                      <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                        {item.episodes}集
-                      </p>
-                    )}
-                    {item.description && (
-                      <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-                        {item.description}
-                      </p>
+                    {/* 额外信息 — 覆盖整个信息区 */}
+                    {hoveredIndex === index && (
+                      <div
+                        className="absolute inset-0 p-3 text-center flex flex-col justify-center"
+                        style={{
+                          background: 'var(--bg-card)',
+                        }}
+                      >
+                        <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                          {item.title}
+                        </h3>
+                        {item.episodes > 0 && (
+                          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                            {item.episodes}集
+                          </p>
+                        )}
+                        {item.description && (
+                          <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
