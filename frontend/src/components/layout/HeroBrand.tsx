@@ -25,7 +25,6 @@ export function HeroBrand() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [isOnHero, setIsOnHero] = useState(true) // 是否在首屏
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(0)
   const hasTriggeredRef = useRef(false)
@@ -43,17 +42,6 @@ export function HeroBrand() {
         setItems(selected)
       })
       .catch(() => {})
-  }, [])
-
-  // 监听页面滚动（通用，用于判断是否在首屏）
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY
-      setIsOnHero(scrollY < window.innerHeight * 0.8)
-    }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   // 监听鼠标滚轮事件（仅未登录时）
@@ -249,20 +237,6 @@ export function HeroBrand() {
         </div>
       )}
 
-      {/* 已登录时显示向下箭头 — 仅在首屏显示 */}
-      {user && isOnHero && (
-        <div className="fixed bottom-6 left-0 right-0 flex justify-center">
-          <div
-            className="animate-bounce cursor-pointer"
-            style={{ color: 'var(--text-muted)' }}
-            onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M19 12l-7 7-7-7" />
-            </svg>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
