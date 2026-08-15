@@ -126,15 +126,12 @@ export function HeroBrand() {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [user, openAuth, authOpen])
 
-  // 登录框关闭时重置进度
+  // 登录框关闭时立即重置进度
   useEffect(() => {
     if (!authOpen && hasTriggeredRef.current) {
-      // 延迟重置，避免立即触发
-      setTimeout(() => {
-        progressRef.current = 0
-        setScrollProgress(0)
-        hasTriggeredRef.current = false
-      }, 500)
+      progressRef.current = 0
+      setScrollProgress(0)
+      hasTriggeredRef.current = false
     }
   }, [authOpen])
 
