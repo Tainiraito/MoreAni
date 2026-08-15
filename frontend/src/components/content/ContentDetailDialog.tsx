@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Hash, Building, Calendar } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -64,6 +64,17 @@ export function ContentDetailDialog() {
   const typeConfig = content?.content_type ? TYPE_CONFIG[content.content_type] : null
   const TypeIcon = typeConfig?.icon || Star
   const avgScore = content?.avg_score ? (content.avg_score / 10).toFixed(1) : null
+
+  // Parse metadata
+  const metadata = content?.metadata 
+    ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) 
+    : {}
+  const tags = metadata.tags || []
+  const bangumiScore = metadata.bangumi_score
+  const bangumiRank = metadata.bangumi_rank
+  const director = metadata.director
+  const studio = metadata.studio
+  const airDate = metadata.air_date || content?.release_date
 
   return (
     <div
@@ -159,8 +170,9 @@ export function ContentDetailDialog() {
                 </p>
               )}
 
-              {/* 评分和信息 */}
-              <div className="flex items-center gap-4 mb-4">
+              {/* 评分和统计 */}
+              <div className="flex flex-wrap items-center gap-4 mb-4">
+                {/* 我们的评分 */}
                 {avgScore && (
                   <div className="flex items-center gap-1.5">
                     <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
@@ -169,19 +181,88 @@ export function ContentDetailDialog() {
                     </span>
                   </div>
                 )}
+                
+                {/* 评分人数 */}
                 {(content.rating_count ?? 0) > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Users size={14} />
                     <span className="text-sm">{content.rating_count}</span>
                   </div>
                 )}
+
+                {/* 集数 */}
                 {content.episodes > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Play size={14} />
                     <span className="text-sm">{content.episodes}集</span>
                   </div>
                 )}
+
+                {/* Bangumi 评分 */}
+                {bangumiScore && (
+                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <Hash size={14} />
+                    <span className="text-sm">BGM {bangumiScore}</span>
+                  </div>
+                )}
+
+                {/* 排名 */}
+                {bangumiRank && (
+                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-sm">#{bangumiRank}</span>
+                  </div>
+                )}
               </div>
+
+              {/* 标签 */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {tags.map((tag: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-2.5 py-1 text-xs rounded-full"
+                      style={{
+                        background: 'var(--bg-card-warm)',
+                        color: 'var(--text-muted)',
+                        border: '1px solid var(--border-line)',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* 制作信息 */}
+              {(director || studio || airDate) && (
+                <div
+                  className="p-3 rounded-lg mb-4 flex flex-wrap gap-4 text-xs"
+                  style={{
+                    background: 'var(--bg-card-warm)',
+                    border: '1px solid var(--border-line)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {director && (
+                    <div className="flex items-center gap-1">
+                      <Users size={12} />
+                      <span>导演: {director}</span>
+                    </div>
+                  )}
+                  {studio && (
+                    <div className="flex items-center gap-1">
+                      <Building size={12} />
+                      <span>制作: {studio}</span>
+                    </div>
+                  )}
+                  {airDate && (
+                    <div className="flex items-center gap-1">
+                      <Calendar size={12} />
+                      <span>放送: {airDate}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 简介 */}
               {content.description && (
