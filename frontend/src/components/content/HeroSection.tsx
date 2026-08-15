@@ -1,9 +1,5 @@
 import type { ContentItem } from '@/types'
 
-const TYPE_EMOJI: Record<string, string> = {
-  anime: '📺', movie: '🎬', game: '🎮', software: '💻', website: '🌐', book: '📚',
-}
-
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
 }
@@ -50,17 +46,16 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
               className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-600 ease-out"
               onError={(e) => {
                 const target = e.target as HTMLImageElement
-                target.style.display = 'none'
-                const fallback = target.nextElementSibling as HTMLElement
-                if (fallback) fallback.style.display = 'flex'
+                target.src = '/placeholder.png'
               }}
             />
-          ) : null}
-          <div
-            className={`absolute inset-0 w-full h-full items-center justify-center text-8xl opacity-30 ${content.cover_url ? 'hidden' : 'flex'}`}
-          >
-            {TYPE_EMOJI[content.content_type] || '📄'}
-          </div>
+          ) : (
+            <img
+              src="/placeholder.png"
+              alt={content.title}
+              className="w-full h-full object-cover"
+            />
+          )}
         </div>
 
         <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center">

@@ -215,6 +215,10 @@ export function HeroBrand() {
                       src={secureUrl(item.cover_url)}
                       alt={item.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = '/placeholder.png'
+                      }}
                     />
                   </div>
 

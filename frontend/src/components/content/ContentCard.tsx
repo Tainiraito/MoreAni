@@ -1,14 +1,9 @@
 import { TypeBadge } from '@/components/ui/badge'
 import type { ContentItem } from '@/types'
 
-const TYPE_EMOJI: Record<string, string> = {
-  anime: '📺', movie: '🎬', game: '🎮', software: '💻', website: '🌐', book: '📚',
-}
-
 /** Force HTTPS for external image URLs (lain.bgm.tv returns 301 for HTTP) */
 function secureUrl(url: string): string {
   if (!url) return url
-  // Proxy external images to bypass CORP/CORS restrictions
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
@@ -44,17 +39,16 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
             loading="lazy"
             onError={(e) => {
               const target = e.target as HTMLImageElement
-              target.style.display = 'none'
-              const fallback = target.nextElementSibling as HTMLElement
-              if (fallback) fallback.style.display = 'flex'
+              target.src = '/placeholder.png'
             }}
           />
-        ) : null}
-        <div
-          className={`absolute inset-0 items-center justify-center text-5xl ${content.cover_url ? 'hidden' : 'flex'}`}
-        >
-          {TYPE_EMOJI[content.content_type] || '📄'}
-        </div>
+        ) : (
+          <img
+            src="/placeholder.png"
+            alt={content.title}
+            className="h-full w-full object-cover"
+          />
+        )}
       </div>
 
       {/* Info */}
