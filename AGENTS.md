@@ -276,3 +276,25 @@ import { PageContainer, PageMain } from '@/components/layout/PageContainer'
 - ❌ 不要混合关注点（DB + HTTP + 业务）
 - ❌ 不要使用默认导出（优先命名导出）
 - ❌ 不要使用类组件（仅函数组件）
+
+## CSS 层叠陷阱（Tailwind v4）
+
+**关键规则**：`@layer` 外的 CSS 优先级**永远高于** `@layer` 内的。
+
+```css
+/* ❌ 这会覆盖 Tailwind 的 .px-6、.mx-auto 等工具类！ */
+* {
+  padding: 0;  /* 在 @layer 外 → 优先级高于 @layer utilities */
+}
+
+/* ✅ 正确：放入 @layer base */
+@layer base {
+  * {
+    border-color: var(--border-line);
+  }
+}
+```
+
+**原因**：CSS 层叠规则中，`@layer` 外的样式 > `@layer` 内的样式，无论选择器特异性多高。Tailwind v4 的工具类在 `@layer utilities` 内，所以任何 `@layer` 外的通用选择器都能覆盖它们。
+
+**经验教训**：不要在 `index.css` 中用 `*` 选择器设置 `margin`、`padding`、`box-sizing`——Tailwind 的 preflight 已经处理了这些。自定义样式放入 `@layer base` 或使用 Tailwind 的主题变量。
