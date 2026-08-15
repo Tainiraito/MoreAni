@@ -27,6 +27,8 @@ export function HeroBrand() {
   const animFrameRef = useRef<number>(0)
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
+  const cardWidth = 260
+  const gap = 16
 
   // 加载推荐内容
   useEffect(() => {
@@ -45,7 +47,7 @@ export function HeroBrand() {
     if (!container || items.length === 0) return
 
     let lastTime = performance.now()
-    const speed = 30
+    const speed = 25
 
     const animate = (currentTime: number) => {
       const delta = (currentTime - lastTime) / 1000
@@ -53,10 +55,13 @@ export function HeroBrand() {
 
       if (!isPaused) {
         scrollPosRef.current += speed * delta
-        const halfWidth = container.scrollWidth / 2
-        if (scrollPosRef.current >= halfWidth) {
-          scrollPosRef.current -= halfWidth
+        const singleSetWidth = items.length * (cardWidth + gap)
+        
+        // 无缝循环：当滚动完一组时，重置到起始位置
+        if (scrollPosRef.current >= singleSetWidth) {
+          scrollPosRef.current -= singleSetWidth
         }
+        
         container.style.transform = `translateX(-${scrollPosRef.current}px)`
       }
 
@@ -102,7 +107,8 @@ export function HeroBrand() {
     }
   }, [user])
 
-  const displayItems = [...items, ...items]
+  // 生成足够多的卡片用于无缝循环（3组）
+  const displayItems = [...items, ...items, ...items]
 
   return (
     <div className="relative" style={{ height: '100vh', background: 'var(--bg-page)' }}>
@@ -116,10 +122,10 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 — 靠上定位（约 35% 位置） */}
+      {/* 主内容区 — 靠上定位 */}
       <div
         className="absolute left-0 right-0 flex flex-col items-center text-center px-6"
-        style={{ top: '20%' }}
+        style={{ top: '18%' }}
       >
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
@@ -140,7 +146,7 @@ export function HeroBrand() {
         </p>
 
         {/* 按钮区 */}
-        <div className="flex items-center gap-3 mb-10">
+        <div className="flex items-center gap-3">
           {!user && (
             <button
               onClick={openAuth}
@@ -168,45 +174,63 @@ export function HeroBrand() {
         </div>
       </div>
 
-      {/* 滚动推荐卡片 — 撑满窗口底部，带 padding 防止放大截断 */}
+      {/* 滚动推荐卡片 — 按钮下方，撑满窗口 */}
       {items.length > 0 && (
         <div
-          className="absolute bottom-0 left-0 right-0"
-          style={{ padding: '20px 0' }}
+          className="absolute left-0 right-0 overflow-hidden"
+          style={{ top: '55%', bottom: '48px' }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
         >
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 will-change-transform px-4"
-            style={{ width: 'max-content' }}
+            className="flex will-change-transform"
+            style={{ 
+              gap: `${gap}px`,
+              width: 'max-content',
+              paddingLeft: '0px', // 从最左边开始
+            }}
           >
             {displayItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
-                className="flex-shrink-0 flex rounded-xl transition-all duration-300 cursor-pointer"
+                className="flex-shrink-0 flex transition-all duration-300 cursor-pointer"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
-                  width: hoveredId === item.id ? '300px' : '260px',
-                  transform: hoveredId === item.id ? 'scale(1.08)' : 'scale(1)',
+                  borderRadius: '12px',
+                  width: `${hoveredId === item.id ? cardWidth + 40 : cardWidth}px`,
+                  transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
                   boxShadow: hoveredId === item.id
-                    ? '0 12px 40px rgba(0,0,0,0.2)'
+                    ? '0 8px 30px rgba(0,0,0,0.15)'
                     : 'none',
                   zIndex: hoveredId === item.id ? 10 : 1,
                   transformOrigin: 'center center',
+                  overflow: 'hidden',
                 }}
                 onMouseEnter={() => setHoveredId(item.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
-                <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
+                {/* 封面 — 左侧圆角 */}
+                <div
+                  className="w-20 flex-shrink-0"
+                  style={{ 
+                    background: 'var(--bg-card-warm)',
+                    borderRadius: '12px 0 0 12px',
+                  }}
+                >
                   <img
                     src={secureUrl(item.cover_url)}
                     alt={item.title}
                     className="w-full h-full object-cover"
-                    style={{ aspectRatio: '3/4' }}
+                    style={{ 
+                      aspectRatio: '3/4',
+                      borderRadius: '12px 0 0 12px',
+                    }}
                   />
                 </div>
+
+                {/* 信息 */}
                 <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
                   <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
                     {item.title}
@@ -236,9 +260,9 @@ export function HeroBrand() {
       )}
 
       {/* 底部进度条 */}
-      <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+      <div className="absolute bottom-3 left-0 right-0 flex justify-center">
         {!user ? (
-          <div className="flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1">
             <div
               className="w-48 h-1 rounded-full overflow-hidden"
               style={{ background: 'var(--border-line)' }}

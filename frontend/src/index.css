@@ -79,6 +79,7 @@
 
 html {
   background-color: var(--bg-page);
+  overflow-x: hidden; /* 防止卡片滚动导致水平滚动条 */
 }
 
 body {
