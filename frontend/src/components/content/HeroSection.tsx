@@ -1,4 +1,5 @@
 import type { ContentItem } from '@/types'
+import { Star, Users, Play, Hash } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -30,6 +31,14 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
+
+  // Parse metadata if available
+  const metadata = content.metadata ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) : {}
+  const tags = metadata.tags || []
+  const bangumiScore = metadata.bangumi_score
+  const bangumiRank = metadata.bangumi_rank
+  const director = metadata.director
+  const studio = metadata.studio
 
   return (
     <div
@@ -71,18 +80,74 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
             <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>{content.title_alt}</p>
           )}
 
-          {avgScore && (
-            <div className="mt-5 flex items-center gap-3">
-              <div
-                className="px-4 py-2 rounded-lg"
-                style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
-              >
-                <span className="font-display text-xl font-bold text-white">{avgScore}</span>
-                <span className="text-xs text-white/60 ml-1">/ 10</span>
+          {/* 评分和统计 */}
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            {/* 我们的评分 */}
+            {avgScore && (
+              <div className="flex items-center gap-1.5">
+                <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
+                <span className="text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                  {avgScore}
+                </span>
               </div>
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                {content.rating_count || 0} 人评分
-              </span>
+            )}
+            
+            {/* 评分人数 */}
+            {(content.rating_count ?? 0) > 0 && (
+              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <Users size={14} />
+                <span className="text-sm">{content.rating_count}</span>
+              </div>
+            )}
+
+            {/* 集数 */}
+            {content.episodes > 0 && (
+              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <Play size={14} />
+                <span className="text-sm">{content.episodes}集</span>
+              </div>
+            )}
+
+            {/* Bangumi 评分 */}
+            {bangumiScore && (
+              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <Hash size={14} />
+                <span className="text-sm">BGM {bangumiScore}</span>
+              </div>
+            )}
+
+            {/* 排名 */}
+            {bangumiRank && (
+              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <span className="text-sm">#{bangumiRank}</span>
+              </div>
+            )}
+          </div>
+
+          {/* 标签 */}
+          {tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {tags.map((tag: string, index: number) => (
+                <span
+                  key={index}
+                  className="px-2 py-0.5 text-xs rounded-full"
+                  style={{
+                    background: 'var(--bg-card-warm)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-line)',
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 制作信息 */}
+          {(director || studio) && (
+            <div className="mt-4 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              {director && <span>导演: {director}</span>}
+              {studio && <span>制作: {studio}</span>}
             </div>
           )}
 
