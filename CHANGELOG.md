@@ -34,6 +34,7 @@
 - 弹窗滚动锁优化（overflow hidden + 位置恢复）
 - 详情弹窗、编辑弹窗标签数据源统一（content.tags）
 - 手动添加番剧支持 Bangumi 参考评分（按标题搜索）
+- 邀请码支持多次使用（max_uses/use_count），单次/多次邀请码共存
 
 
 
