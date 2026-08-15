@@ -1,3 +1,5 @@
+import { useToastStore } from '@/stores/toast-store'
+
 const API_BASE = '/api/v1'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -6,10 +8,34 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   })
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Request failed' }))
-    throw new Error(err.detail || `HTTP ${res.status}`)
+    let errorMessage = '请求失败'
+
+    try {
+      const err = await res.json()
+      errorMessage = err.detail || `HTTP ${res.status}`
+    } catch {
+      errorMessage = `HTTP ${res.status}`
+    }
+
+    // Show toast for specific errors
+    const toast = useToastStore.getState()
+    if (res.status === 429) {
+      toast.addToast('warning', errorMessage, 5000)
+    } else if (res.status === 401) {
+      toast.addToast('error', '请先登录', 3000)
+    } else if (res.status === 403) {
+      toast.addToast('error', '没有权限', 3000)
+    } else if (res.status === 500) {
+      toast.addToast('error', '服务器错误，请稍后再试', 5000)
+    } else if (res.status >= 400) {
+      toast.addToast('error', errorMessage, 3000)
+    }
+
+    throw new Error(errorMessage)
   }
+
   return res.json()
 }
 

@@ -1,8 +1,8 @@
 """Rate limiting middleware for MoreAni v2.
 
 In-memory sliding-window rate limiter.
-Limits: login 5/15min per IP, register 3/hr per IP,
-writes 20/min per user, reads 60/min per IP.
+Limits: login 10/15min per IP, register 5/hr per IP,
+writes 30/min per user, reads 120/min per IP.
 """
 
 import time
@@ -24,12 +24,12 @@ class RateLimitRule:
         self.window_seconds = window_seconds
 
 
-# Default rules
+# Default rules (relaxed for development)
 RULES: dict[str, RateLimitRule] = {
-    "login": RateLimitRule(max_requests=5, window_seconds=900),       # 5 / 15min
-    "register": RateLimitRule(max_requests=3, window_seconds=3600),   # 3 / hour
-    "write": RateLimitRule(max_requests=20, window_seconds=60),       # 20 / min
-    "read": RateLimitRule(max_requests=60, window_seconds=60),        # 60 / min
+    "login": RateLimitRule(max_requests=10, window_seconds=900),      # 10 / 15min
+    "register": RateLimitRule(max_requests=5, window_seconds=3600),   # 5 / hour
+    "write": RateLimitRule(max_requests=30, window_seconds=60),       # 30 / min
+    "read": RateLimitRule(max_requests=120, window_seconds=60),       # 120 / min
 }
 
 
@@ -94,12 +94,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         allowed, remaining = self._check_rate(key, rule)
         if not allowed:
+            retry_after = rule.window_seconds
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Too many requests. Please try again later."},
+                content={
+                    "detail": f"请求太频繁，请 {retry_after // 60} 分钟后再试。",
+                    "retry_after": retry_after,
+                },
                 headers={
                     "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(time.time()) + rule.window_seconds),
+                    "X-RateLimit-Reset": str(int(time.time()) + retry_after),
+                    "Retry-After": str(retry_after),
                 },
             )
 

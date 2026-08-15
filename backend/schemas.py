@@ -126,7 +126,7 @@ class ContentItemResponse(BaseModel):
     id: int
     title: str
     title_alt: str = ""
-    cover_url: str = ""
+    cover_url: str | None = None
     description: str = ""
     content_type: str
     episodes: int = 0

@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
 import { AuthDialog } from '@/components/auth/AuthDialog'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 
@@ -68,6 +69,7 @@ export default function App() {
           <ContentDetailDialog />
           <AuthDialog />
           <SettingsDialog />
+          <ToastContainer />
         </AuthValidator>
       </BrowserRouter>
     </QueryClientProvider>
