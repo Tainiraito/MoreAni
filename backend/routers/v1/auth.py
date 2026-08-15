@@ -1,8 +1,6 @@
 """Auth router — login, register, me, avatar, password."""
 
-import random
-
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from auth import create_access_token, get_password_hash, verify_password
@@ -16,12 +14,17 @@ from schemas import (
     RegisterRequest,
     UserResponse,
 )
-from services.user import create_user, get_user_by_id, get_user_by_username, update_avatar, update_password
+from services.user import (
+    create_user,
+    get_user_by_username,
+    update_avatar,
+    update_password,
+)
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix='/auth', tags=['auth'])
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post('/login', response_model=AuthResponse)
 def login(
     body: LoginRequest,
     response: Response,
@@ -35,22 +38,22 @@ def login(
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
+            detail='用户名或密码错误',
         )
 
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({'sub': user.id})
     response.set_cookie(
-        key="access_token",
+        key='access_token',
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite='lax',
         max_age=7 * 24 * 3600,  # 7 days
-        path="/",
+        path='/',
     )
     return AuthResponse(user=UserResponse.model_validate(user))
 
 
-@router.post("/register", response_model=AuthResponse)
+@router.post('/register', response_model=AuthResponse)
 def register(
     body: RegisterRequest,
     response: Response,
@@ -65,19 +68,19 @@ def register(
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邀请码无效",
+            detail='邀请码无效',
         )
     if invite.use_count >= invite.max_uses:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="邀请码已用完",
+            detail='邀请码已用完',
         )
 
     # Check username uniqueness
     if get_user_by_username(db, body.username):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="用户名已存在",
+            detail='用户名已存在',
         )
 
     # Create user
@@ -91,25 +94,25 @@ def register(
     db.commit()
 
     # Auto-login
-    token = create_access_token({"sub": user.id})
+    token = create_access_token({'sub': user.id})
     response.set_cookie(
-        key="access_token",
+        key='access_token',
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite='lax',
         max_age=7 * 24 * 3600,
-        path="/",
+        path='/',
     )
     return AuthResponse(user=UserResponse.model_validate(user))
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get('/me', response_model=UserResponse)
 def get_me(user: User = Depends(get_current_user)) -> UserResponse:
     """Get current authenticated user info."""
     return UserResponse.model_validate(user)
 
 
-@router.put("/me/avatar", response_model=UserResponse)
+@router.put('/me/avatar', response_model=UserResponse)
 def update_my_avatar(
     body: AvatarUpdateRequest,
     user: User = Depends(get_current_user),
@@ -120,7 +123,7 @@ def update_my_avatar(
     return UserResponse.model_validate(updated)
 
 
-@router.put("/me/password")
+@router.put('/me/password')
 def change_password(
     body: PasswordChangeRequest,
     user: User = Depends(get_current_user),
@@ -130,15 +133,15 @@ def change_password(
     if not verify_password(body.old_password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="原密码错误",
+            detail='原密码错误',
         )
     new_hash = get_password_hash(body.new_password)
     update_password(db, user, new_hash)
-    return {"detail": "密码修改成功"}
+    return {'detail': '密码修改成功'}
 
 
-@router.post("/logout")
+@router.post('/logout')
 def logout(response: Response) -> dict:
     """Clear access token cookie."""
-    response.delete_cookie(key="access_token", path="/")
-    return {"detail": "已退出登录"}
+    response.delete_cookie(key='access_token', path='/')
+    return {'detail': '已退出登录'}

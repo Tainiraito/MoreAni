@@ -8,13 +8,13 @@ from models import ContentItem, User, UserContentStatus
 from schemas import StatusResponse, StatusSetRequest
 from services import content as content_svc
 
-router = APIRouter(prefix="/status", tags=["status"])
+router = APIRouter(prefix='/status', tags=['status'])
 
 # Software/website types only support 'want' status
-WANT_ONLY_TYPES = {"software", "website"}
+WANT_ONLY_TYPES = {'software', 'website'}
 
 
-@router.post("", response_model=StatusResponse)
+@router.post('', response_model=StatusResponse)
 def set_status(
     body: StatusSetRequest,
     user: User = Depends(get_current_user),
@@ -26,13 +26,13 @@ def set_status(
     """
     content = content_svc.get_content_by_id(db, body.content_id)
     if not content:
-        raise HTTPException(status_code=404, detail="Content not found")
+        raise HTTPException(status_code=404, detail='Content not found')
 
     # Validate: software/website only support 'want'
-    if content.content_type in WANT_ONLY_TYPES and body.status != "want":
+    if content.content_type in WANT_ONLY_TYPES and body.status != 'want':
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="软件/网站类型仅支持收藏",
+            detail='软件/网站类型仅支持收藏',
         )
 
     # Upsert status
@@ -68,7 +68,7 @@ def set_status(
     )
 
 
-@router.delete("/{content_id}", status_code=204)
+@router.delete('/{content_id}', status_code=204)
 def clear_status(
     content_id: int,
     user: User = Depends(get_current_user),
@@ -88,7 +88,7 @@ def clear_status(
         db.commit()
 
 
-@router.get("")
+@router.get('')
 def list_my_status(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -114,4 +114,4 @@ def list_my_status(
         )
         for s, c in records
     ]
-    return {"items": items}
+    return {'items': items}

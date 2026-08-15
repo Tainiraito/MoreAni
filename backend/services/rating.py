@@ -31,7 +31,7 @@ def upsert_rating(
     content_id: int,
     score: int,
     recommend: int = 0,
-    review: str = "",
+    review: str = '',
 ) -> Rating:
     """Create or update a rating (upsert on unique constraint).
 
@@ -76,9 +76,9 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
     """
     stats = (
         db.query(
-            func.avg(Rating.score).label("avg_score"),
-            func.avg(Rating.recommend).label("avg_recommend"),
-            func.count(Rating.id).label("rating_count"),
+            func.avg(Rating.score).label('avg_score'),
+            func.avg(Rating.recommend).label('avg_recommend'),
+            func.count(Rating.id).label('rating_count'),
         )
         .filter(Rating.content_id == content_id, Rating.score > 0)
         .first()
@@ -89,9 +89,9 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
     rating_count = stats[2] or 0
 
     return {
-        "avg_score": avg_score,
-        "avg_recommend": avg_recommend,
-        "rating_count": rating_count,
+        'avg_score': avg_score,
+        'avg_recommend': avg_recommend,
+        'rating_count': rating_count,
     }
 
 
@@ -119,19 +119,21 @@ def get_recent_activity(
 
     items = []
     for rating, user, content in rows:
-        items.append({
-            "rating_id": rating.id,
-            "content_id": content.id,
-            "content_title": content.title,
-            "content_cover": content.cover_url,
-            "content_type": content.content_type,
-            "score": rating.score,
-            "recommend": rating.recommend,
-            "review": rating.review,
-            "username": "匿名用户" if guest_mode else user.username,
-            "avatar_id": 0 if guest_mode else user.avatar_id,
-            "created_at": rating.created_at,
-        })
+        items.append(
+            {
+                'rating_id': rating.id,
+                'content_id': content.id,
+                'content_title': content.title,
+                'content_cover': content.cover_url,
+                'content_type': content.content_type,
+                'score': rating.score,
+                'recommend': rating.recommend,
+                'review': rating.review,
+                'username': '匿名用户' if guest_mode else user.username,
+                'avatar_id': 0 if guest_mode else user.avatar_id,
+                'created_at': rating.created_at,
+            }
+        )
 
     return items, total
 
@@ -156,19 +158,21 @@ def get_user_ratings(
 
     items = []
     for rating, content in rows:
-        items.append({
-            "id": rating.id,
-            "content_id": content.id,
-            "user_id": user_id,
-            "score": rating.score,
-            "recommend": rating.recommend,
-            "review": rating.review,
-            "created_at": rating.created_at,
-            "updated_at": rating.updated_at,
-            "content_title": content.title,
-            "content_cover": content.cover_url,
-            "content_type": content.content_type,
-        })
+        items.append(
+            {
+                'id': rating.id,
+                'content_id': content.id,
+                'user_id': user_id,
+                'score': rating.score,
+                'recommend': rating.recommend,
+                'review': rating.review,
+                'created_at': rating.created_at,
+                'updated_at': rating.updated_at,
+                'content_title': content.title,
+                'content_cover': content.cover_url,
+                'content_type': content.content_type,
+            }
+        )
 
     return items, total
 
@@ -193,16 +197,18 @@ def get_content_ratings(
 
     items = []
     for rating, user in rows:
-        items.append({
-            "id": rating.id,
-            "content_id": content_id,
-            "user_id": rating.user_id,
-            "username": user.username,
-            "avatar_id": user.avatar_id,
-            "score": rating.score,
-            "recommend": rating.recommend,
-            "review": rating.review,
-            "created_at": rating.created_at,
-        })
+        items.append(
+            {
+                'id': rating.id,
+                'content_id': content_id,
+                'user_id': rating.user_id,
+                'username': user.username,
+                'avatar_id': user.avatar_id,
+                'score': rating.score,
+                'recommend': rating.recommend,
+                'review': rating.review,
+                'created_at': rating.created_at,
+            }
+        )
 
     return items, total

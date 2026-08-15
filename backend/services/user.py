@@ -22,13 +22,14 @@ def create_user(
     username: str,
     password_hash: str,
     avatar_id: int | None = None,
-    role: str = "user",
+    role: str = 'user',
 ) -> User:
     """Create a new user.
 
     If avatar_id is None, randomly assigns one (0-29).
     """
     import random
+
     if avatar_id is None:
         avatar_id = random.randint(0, 29)
 
@@ -63,9 +64,7 @@ def update_password(db: Session, user: User, new_hash: str) -> User:
 def get_user_stats(db: Session, user_id: int) -> dict:
     """Get user stats: rating_count, content_count."""
     rating_count = (
-        db.query(func.count(Rating.id))
-        .filter(Rating.user_id == user_id)
-        .scalar()
+        db.query(func.count(Rating.id)).filter(Rating.user_id == user_id).scalar()
     ) or 0
 
     content_count = (
@@ -75,6 +74,6 @@ def get_user_stats(db: Session, user_id: int) -> dict:
     ) or 0
 
     return {
-        "rating_count": rating_count,
-        "content_count": content_count,
+        'rating_count': rating_count,
+        'content_count': content_count,
     }

@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # =============================================================================
 # Tag schemas (defined early — referenced by ContentItemResponse)
 # =============================================================================
+
 
 class TagResponse(BaseModel):
     """Tag response."""
@@ -17,7 +17,7 @@ class TagResponse(BaseModel):
     name: str
     tag_type: str  # bangumi / custom
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 class TagCreate(BaseModel):
@@ -29,6 +29,7 @@ class TagCreate(BaseModel):
 # =============================================================================
 # Auth schemas
 # =============================================================================
+
 
 class LoginRequest(BaseModel):
     """Login request body."""
@@ -51,10 +52,10 @@ class UserResponse(BaseModel):
     id: int
     username: str
     avatar_id: int = 0
-    role: str = "user"
+    role: str = 'user'
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 class AuthResponse(BaseModel):
@@ -80,21 +81,22 @@ class PasswordChangeRequest(BaseModel):
 # Content schemas
 # =============================================================================
 
+
 class ContentItemCreate(BaseModel):
     """Create content request body."""
 
     title: str = Field(min_length=1, max_length=200)
-    title_alt: str = ""
-    cover_url: str = ""
-    description: str = ""
-    content_type: Literal["anime", "movie", "game", "software", "website", "book"]
+    title_alt: str = ''
+    cover_url: str = ''
+    description: str = ''
+    content_type: Literal['anime', 'movie', 'game', 'software', 'website', 'book']
     episodes: int = 0
-    status: str = ""
-    release_date: str = ""
-    platform: str = ""
-    source_type: str = "manual"
-    source_id: str = ""
-    source_url: str = ""
+    status: str = ''
+    release_date: str = ''
+    platform: str = ''
+    source_type: str = 'manual'
+    source_id: str = ''
+    source_url: str = ''
     metadata: dict = {}
     is_public: bool = True
     tags: list[str] = []
@@ -107,7 +109,9 @@ class ContentItemUpdate(BaseModel):
     title_alt: str | None = None
     cover_url: str | None = None
     description: str | None = None
-    content_type: Literal["anime", "movie", "game", "software", "website", "book"] | None = None
+    content_type: (
+        Literal['anime', 'movie', 'game', 'software', 'website', 'book'] | None
+    ) = None
     episodes: int | None = None
     status: str | None = None
     release_date: str | None = None
@@ -125,29 +129,31 @@ class ContentItemResponse(BaseModel):
 
     id: int
     title: str
-    title_alt: str = ""
+    title_alt: str = ''
     cover_url: str | None = None
-    description: str = ""
+    description: str = ''
     content_type: str
     episodes: int = 0
-    status: str = ""
-    release_date: str = ""
-    platform: str = ""
-    source_type: str = "manual"
-    source_id: str = ""
-    source_url: str = ""
-    metadata: dict = Field(default={}, validation_alias="content_metadata")
+    status: str = ''
+    release_date: str = ''
+    platform: str = ''
+    source_type: str = 'manual'
+    source_id: str = ''
+    source_url: str = ''
+    metadata: dict = Field(default={}, validation_alias='content_metadata')
 
-    @field_validator("metadata", mode="before")
+    @field_validator('metadata', mode='before')
     @classmethod
     def parse_metadata(cls, v):
         if isinstance(v, str):
             import json
+
             try:
                 return json.loads(v)
             except (json.JSONDecodeError, TypeError):
                 return {}
         return v or {}
+
     is_public: bool = True
     created_by: int | None = None
     created_at: datetime
@@ -161,7 +167,7 @@ class ContentItemResponse(BaseModel):
     my_score: float | None = None
     my_has_review: bool = False
 
-    model_config = {"from_attributes": True, "populate_by_name": True}
+    model_config = {'from_attributes': True, 'populate_by_name': True}
 
 
 class ContentListResponse(BaseModel):
@@ -189,12 +195,13 @@ class ShareLinkResponse(BaseModel):
     view_count: int = 0
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 # =============================================================================
 # Rating schemas
 # =============================================================================
+
 
 class RatingCreate(BaseModel):
     """Create/update rating request body."""
@@ -202,7 +209,7 @@ class RatingCreate(BaseModel):
     content_id: int
     score: int = Field(ge=0, le=100)
     recommend: int = Field(ge=0, le=100, default=0)
-    review: str = ""
+    review: str = ''
 
 
 class RatingResponse(BaseModel):
@@ -211,10 +218,10 @@ class RatingResponse(BaseModel):
     id: int
     content_id: int
     user_id: int
-    username: str = ""
+    username: str = ''
     score: int
     recommend: int
-    review: str = ""
+    review: str = ''
     created_at: datetime
     updated_at: datetime
     # Computed (for activity feed)
@@ -222,7 +229,7 @@ class RatingResponse(BaseModel):
     content_cover: str | None = None
     content_type: str | None = None
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 class RatingHistoryResponse(BaseModel):
@@ -236,11 +243,12 @@ class RatingHistoryResponse(BaseModel):
 # User status schemas
 # =============================================================================
 
+
 class StatusSetRequest(BaseModel):
     """Set watch status request body."""
 
     content_id: int
-    status: Literal["want", "watching", "watched", "dropped"]
+    status: Literal['want', 'watching', 'watched', 'dropped']
 
 
 class StatusResponse(BaseModel):
@@ -255,12 +263,13 @@ class StatusResponse(BaseModel):
     content_cover: str | None = None
     content_type: str | None = None
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 # =============================================================================
 # User profile schemas
 # =============================================================================
+
 
 class UserPublicProfile(BaseModel):
     """Public user profile (for /user/:id)."""
@@ -268,17 +277,18 @@ class UserPublicProfile(BaseModel):
     id: int
     username: str
     avatar_id: int = 0
-    role: str = "user"
+    role: str = 'user'
     created_at: datetime
     rating_count: int = 0
     content_count: int = 0
 
-    model_config = {"from_attributes": True}
+    model_config = {'from_attributes': True}
 
 
 # =============================================================================
 # Bangumi schemas
 # =============================================================================
+
 
 class BangumiSearchRequest(BaseModel):
     """Bangumi search request body."""
@@ -291,15 +301,15 @@ class BangumiSearchItem(BaseModel):
     """Single Bangumi search result."""
 
     bgm_id: int
-    name: str = ""
-    name_cn: str = ""
-    cover_url: str = ""
+    name: str = ''
+    name_cn: str = ''
+    cover_url: str = ''
     rating: float = 0.0
     tags: list[str] = []
     eps: int = 0
-    air_date: str = ""
-    platform: str = ""
-    summary: str = ""
+    air_date: str = ''
+    platform: str = ''
+    summary: str = ''
 
 
 class BangumiSearchResponse(BaseModel):
@@ -319,6 +329,7 @@ class BangumiImportResponse(BaseModel):
 # =============================================================================
 # Pagination
 # =============================================================================
+
 
 class PaginatedResponse(BaseModel):
     """Generic paginated response."""

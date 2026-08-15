@@ -30,25 +30,25 @@ def get_current_user(
     if not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            detail='Not authenticated',
         )
     payload = verify_token(access_token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail='Invalid or expired token',
         )
-    user_id_str = payload.get("sub")
+    user_id_str = payload.get('sub')
     if user_id_str is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
+            detail='Invalid token payload',
         )
     user = db.query(User).filter(User.id == int(user_id_str)).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail='User not found',
         )
     return user
 
@@ -63,7 +63,7 @@ def get_current_user_optional(
     payload = verify_token(access_token)
     if payload is None:
         return None
-    user_id_str = payload.get("sub")
+    user_id_str = payload.get('sub')
     if user_id_str is None:
         return None
     user = db.query(User).filter(User.id == int(user_id_str)).first()
@@ -81,7 +81,7 @@ def require_role(*roles: str) -> Callable:
         if user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions",
+                detail='Insufficient permissions',
             )
         return user
 

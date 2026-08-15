@@ -14,7 +14,7 @@ def create_tag(
     db: Session,
     *,
     name: str,
-    tag_type: str = "custom",
+    tag_type: str = 'custom',
 ) -> Tag:
     """Create a new tag.
 
@@ -31,11 +31,11 @@ def create_tag(
     return tag
 
 
-def search_tags(db: Session, q: str = "", limit: int = 20) -> list[Tag]:
+def search_tags(db: Session, q: str = '', limit: int = 20) -> list[Tag]:
     """Search tags by name (fuzzy match)."""
     query = db.query(Tag)
     if q:
-        query = query.filter(Tag.name.ilike(f"%{q}%"))
+        query = query.filter(Tag.name.ilike(f'%{q}%'))
     return query.order_by(Tag.name).limit(limit).all()
 
 

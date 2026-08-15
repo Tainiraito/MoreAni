@@ -7,7 +7,8 @@ writes 30/min per user, reads 120/min per IP.
 
 import time
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,7 +18,7 @@ from starlette.responses import JSONResponse
 class RateLimitRule:
     """A single rate limit rule."""
 
-    __slots__ = ("max_requests", "window_seconds")
+    __slots__ = ('max_requests', 'window_seconds')
 
     def __init__(self, max_requests: int, window_seconds: int) -> None:
         self.max_requests = max_requests
@@ -26,10 +27,10 @@ class RateLimitRule:
 
 # Default rules (relaxed for development)
 RULES: dict[str, RateLimitRule] = {
-    "login": RateLimitRule(max_requests=10, window_seconds=900),      # 10 / 15min
-    "register": RateLimitRule(max_requests=5, window_seconds=3600),   # 5 / hour
-    "write": RateLimitRule(max_requests=30, window_seconds=60),       # 30 / min
-    "read": RateLimitRule(max_requests=300, window_seconds=60),       # 300 / min
+    'login': RateLimitRule(max_requests=10, window_seconds=900),  # 10 / 15min
+    'register': RateLimitRule(max_requests=5, window_seconds=3600),  # 5 / hour
+    'write': RateLimitRule(max_requests=30, window_seconds=60),  # 30 / min
+    'read': RateLimitRule(max_requests=300, window_seconds=60),  # 300 / min
 }
 
 
@@ -43,10 +44,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _client_ip(self, request: Request) -> str:
         """Extract client IP from request."""
-        forwarded = request.headers.get("x-forwarded-for")
+        forwarded = request.headers.get('x-forwarded-for')
         if forwarded:
-            return forwarded.split(",")[0].strip()
-        return request.client.host if request.client else "unknown"
+            return forwarded.split(',')[0].strip()
+        return request.client.host if request.client else 'unknown'
 
     def _prune(self, key: str, now: float, window: int) -> None:
         """Remove expired timestamps from the hit list."""
@@ -72,13 +73,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method
 
-        if path.endswith("/auth/login") and method == "POST":
-            return "login", RULES["login"]
-        if path.endswith("/auth/register") and method == "POST":
-            return "register", RULES["register"]
-        if method in ("POST", "PUT", "DELETE"):
-            return "write", RULES["write"]
-        return "read", RULES["read"]
+        if path.endswith('/auth/login') and method == 'POST':
+            return 'login', RULES['login']
+        if path.endswith('/auth/register') and method == 'POST':
+            return 'register', RULES['register']
+        if method in ('POST', 'PUT', 'DELETE'):
+            return 'write', RULES['write']
+        return 'read', RULES['read']
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Apply rate limiting to each request."""
@@ -86,11 +87,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         rule_name, rule = self._select_rule(request)
 
         # Use IP for login/register/read, user_id for writes
-        if rule_name == "write":
-            # We don't have the user_id here yet; use IP as fallback
-            key = f"write:{ip}"
-        else:
-            key = f"{rule_name}:{ip}"
+        key = f'write:{ip}' if rule_name == 'write' else f'{rule_name}:{ip}'
 
         allowed, remaining = self._check_rate(key, rule)
         if not allowed:
@@ -98,16 +95,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=429,
                 content={
-                    "detail": f"请求太频繁，请 {retry_after // 60} 分钟后再试。",
-                    "retry_after": retry_after,
+                    'detail': f'请求太频繁，请 {retry_after // 60} 分钟后再试。',
+                    'retry_after': retry_after,
                 },
                 headers={
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(time.time()) + retry_after),
-                    "Retry-After": str(retry_after),
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': str(int(time.time()) + retry_after),
+                    'Retry-After': str(retry_after),
                 },
             )
 
         response = await call_next(request)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers['X-RateLimit-Remaining'] = str(remaining)
         return response

@@ -1,6 +1,7 @@
 """Content service — CRUD, listing, search, random for MoreAni v2."""
 
 import json
+from datetime import UTC
 from typing import Literal
 
 from sqlalchemy import func
@@ -25,7 +26,15 @@ def list_content(
     status: str | None = None,
     tag: str | None = None,
     q: str | None = None,
-    sort: Literal["newest", "oldest", "rating", "title", "updated_desc", "air_date_desc", "air_date_asc"] = "updated_desc",
+    sort: Literal[
+        'newest',
+        'oldest',
+        'rating',
+        'title',
+        'updated_desc',
+        'air_date_desc',
+        'air_date_asc',
+    ] = 'updated_desc',
     rated: str | None = None,
     user_id: int | None = None,
     page: int = 1,
@@ -48,7 +57,7 @@ def list_content(
         query = query.join(ContentTag).join(Tag).filter(Tag.name == tag)
 
     if q:
-        like_pattern = f"%{q}%"
+        like_pattern = f'%{q}%'
         # Search across title, title_alt, description, AND tags
         tag_sub = (
             db.query(ContentTag.content_id)
@@ -70,25 +79,25 @@ def list_content(
             .filter(Rating.user_id == user_id, Rating.score > 0)
             .subquery()
         )
-        if rated == "rated":
+        if rated == 'rated':
             query = query.filter(ContentItem.id.in_(db.query(rated_sub.c.content_id)))
-        elif rated == "unrated":
+        elif rated == 'unrated':
             query = query.filter(~ContentItem.id.in_(db.query(rated_sub.c.content_id)))
 
     # Count before pagination
     total = query.count()
 
     # Sorting
-    if sort == "oldest":
+    if sort == 'oldest':
         query = query.order_by(ContentItem.created_at.asc())
-    elif sort == "title":
+    elif sort == 'title':
         query = query.order_by(ContentItem.title.asc())
-    elif sort == "rating":
+    elif sort == 'rating':
         # Subquery for average score (score > 0 only)
         avg_sub = (
             db.query(
                 Rating.content_id,
-                func.avg(Rating.score).label("avg_score"),
+                func.avg(Rating.score).label('avg_score'),
             )
             .filter(Rating.score > 0)
             .group_by(Rating.content_id)
@@ -96,9 +105,9 @@ def list_content(
         )
         query = query.outerjoin(avg_sub, ContentItem.id == avg_sub.c.content_id)
         query = query.order_by(func.coalesce(avg_sub.c.avg_score, 0).desc())
-    elif sort == "air_date_desc":
+    elif sort == 'air_date_desc':
         query = query.order_by(ContentItem.release_date.desc())
-    elif sort == "air_date_asc":
+    elif sort == 'air_date_asc':
         query = query.order_by(ContentItem.release_date.asc())
     else:
         # updated_desc (default) — most recently updated first
@@ -112,17 +121,17 @@ def create_content(
     db: Session,
     *,
     title: str,
-    title_alt: str = "",
-    cover_url: str = "",
-    description: str = "",
+    title_alt: str = '',
+    cover_url: str = '',
+    description: str = '',
     content_type: str,
     episodes: int = 0,
-    status: str = "",
-    release_date: str = "",
-    platform: str = "",
-    source_type: str = "manual",
-    source_id: str = "",
-    source_url: str = "",
+    status: str = '',
+    release_date: str = '',
+    platform: str = '',
+    source_type: str = 'manual',
+    source_id: str = '',
+    source_url: str = '',
     content_metadata: dict | None = None,
     is_public: bool = True,
     created_by: int | None = None,
@@ -141,7 +150,7 @@ def create_content(
             .first()
         )
         if existing:
-            raise ValueError(f"该内容已存在：{existing.title}")
+            raise ValueError(f'该内容已存在：{existing.title}')
     else:
         existing = (
             db.query(ContentItem)
@@ -153,7 +162,7 @@ def create_content(
             .first()
         )
         if existing:
-            raise ValueError(f"同名内容已存在：{existing.title}")
+            raise ValueError(f'同名内容已存在：{existing.title}')
 
     content = ContentItem(
         title=title,
@@ -168,7 +177,7 @@ def create_content(
         source_type=source_type,
         source_id=source_id,
         source_url=source_url,
-        content_metadata=json.dumps(content_metadata) if content_metadata else "{}",
+        content_metadata=json.dumps(content_metadata) if content_metadata else '{}',
         is_public=is_public,
         created_by=created_by,
     )
@@ -194,12 +203,12 @@ def update_content(
     Accepts any combination of updatable fields.
     """
     for key, value in fields.items():
-        if key == "content_metadata" and isinstance(value, dict):
+        if key == 'content_metadata' and isinstance(value, dict):
             value = json.dumps(value)
-        if key == "tags":
+        if key == 'tags':
             _attach_tags(db, content, value)
             continue
-        if value is not None and key != "id":
+        if value is not None and key != 'id':
             setattr(content, key, value)
     db.commit()
     db.refresh(content)
@@ -208,8 +217,9 @@ def update_content(
 
 def delete_content(db: Session, content: ContentItem) -> None:
     """Soft-delete a content item (sets deleted_at, keeps DB rows)."""
-    from datetime import datetime, timezone
-    content.deleted_at = datetime.now(timezone.utc)
+    from datetime import datetime
+
+    content.deleted_at = datetime.now(UTC)
     db.commit()
 
 
@@ -226,7 +236,9 @@ def get_random_content(db: Session) -> ContentItem | None:
     )
 
 
-def check_source_duplicate(db: Session, source_type: str, source_id: str) -> ContentItem | None:
+def check_source_duplicate(
+    db: Session, source_type: str, source_id: str
+) -> ContentItem | None:
     """Check if content with this source already exists."""
     return (
         db.query(ContentItem)
@@ -250,7 +262,7 @@ def _attach_tags(db: Session, content: ContentItem, tag_names: list[str]) -> Non
             continue
         tag = db.query(Tag).filter(Tag.name == name).first()
         if not tag:
-            tag = Tag(name=name, tag_type="custom")
+            tag = Tag(name=name, tag_type='custom')
             db.add(tag)
             db.flush()
         db.add(ContentTag(content_id=content.id, tag_id=tag.id))

@@ -8,25 +8,25 @@ from datetime import UTC, datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-logger = logging.getLogger("uvicorn")
+logger = logging.getLogger('uvicorn')
 
 # --- Config ---
-_secret = os.getenv("SECRET_KEY")
+_secret = os.getenv('SECRET_KEY')
 if _secret:
     SECRET_KEY = _secret
 else:
     SECRET_KEY = secrets.token_hex(32)
     logger.warning(
-        "SECRET_KEY not set — using random key. "
-        "All tokens will be invalidated on restart. "
-        "Set SECRET_KEY env var for production."
+        'SECRET_KEY not set — using random key. '
+        'All tokens will be invalidated on restart. '
+        'Set SECRET_KEY env var for production.'
     )
 
-ALGORITHM = "HS256"
+ALGORITHM = 'HS256'
 TOKEN_EXPIRE_DAYS = 7
 
 # --- Password hashing ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 
 def get_password_hash(password: str) -> str:
@@ -49,10 +49,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     """
     to_encode = data.copy()
     expire = datetime.now(UTC) + (expires_delta or timedelta(days=TOKEN_EXPIRE_DAYS))
-    to_encode.update({"exp": expire})
+    to_encode.update({'exp': expire})
     # Ensure sub is string for jose compatibility
-    if "sub" in to_encode:
-        to_encode["sub"] = str(to_encode["sub"])
+    if 'sub' in to_encode:
+        to_encode['sub'] = str(to_encode['sub'])
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 

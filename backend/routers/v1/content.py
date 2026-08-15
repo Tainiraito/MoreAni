@@ -2,7 +2,7 @@
 
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_current_user_optional, get_db
@@ -19,39 +19,51 @@ from schemas import (
 from services import content as content_svc
 from services import rating as rating_svc
 
-router = APIRouter(prefix="/content", tags=["content"])
+router = APIRouter(prefix='/content', tags=['content'])
 
 
-def _to_response(item: ContentItem, db: Session, user_id: int | None = None) -> ContentItemResponse:
+def _to_response(
+    item: ContentItem, db: Session, user_id: int | None = None
+) -> ContentItemResponse:
     """Convert a ContentItem ORM to response schema with computed fields."""
     resp = ContentItemResponse.model_validate(item)
     stats = rating_svc.get_rating_stats(db, item.id)
-    resp.avg_score = stats["avg_score"]
-    resp.avg_recommend = stats["avg_recommend"]
-    resp.rating_count = stats["rating_count"]
+    resp.avg_score = stats['avg_score']
+    resp.avg_recommend = stats['avg_recommend']
+    resp.rating_count = stats['rating_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
     # User-specific fields
     if user_id:
         from models import Rating
-        my_rating = db.query(Rating).filter(
-            Rating.content_id == item.id,
-            Rating.user_id == user_id,
-        ).first()
+
+        my_rating = (
+            db.query(Rating)
+            .filter(
+                Rating.content_id == item.id,
+                Rating.user_id == user_id,
+            )
+            .first()
+        )
         if my_rating and my_rating.score > 0:
             resp.my_score = my_rating.score / 10.0
             resp.my_has_review = bool(my_rating.review and my_rating.review.strip())
     return resp
 
 
-@router.get("", response_model=ContentListResponse)
+@router.get('', response_model=ContentListResponse)
 def list_content(
     db: Session = Depends(get_db),
-    type: str | None = Query(None, description="Content type filter"),
-    status: str | None = Query(None, alias="status", description="Watch status filter"),
-    tag: str | None = Query(None, description="Tag filter"),
-    q: str | None = Query(None, description="Search keyword"),
-    sort: str = Query("updated_desc", description="Sort: updated_desc/newest/oldest/rating/title/air_date_desc/air_date_asc"),
-    rated: str | None = Query(None, description="rated/unrated filter"),
+    type: str | None = Query(None, description='Content type filter'),
+    status: str | None = Query(None, alias='status', description='Watch status filter'),
+    tag: str | None = Query(None, description='Tag filter'),
+    q: str | None = Query(None, description='Search keyword'),
+    sort: str = Query(
+        'updated_desc',
+        description=(
+            'Sort: updated_desc/newest/oldest/rating/title/air_date_desc/air_date_asc'
+        ),
+    ),
+    rated: str | None = Query(None, description='rated/unrated filter'),
     user: User | None = Depends(get_current_user_optional),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -77,16 +89,16 @@ def list_content(
     )
 
 
-@router.get("/random", response_model=ContentItemResponse)
+@router.get('/random', response_model=ContentItemResponse)
 def random_content(db: Session = Depends(get_db)) -> ContentItemResponse:
     """Get a random public content item."""
     item = content_svc.get_random_content(db)
     if not item:
-        raise HTTPException(status_code=404, detail="No content available")
+        raise HTTPException(status_code=404, detail='No content available')
     return _to_response(item, db)
 
 
-@router.get("/{content_id}", response_model=ContentItemResponse)
+@router.get('/{content_id}', response_model=ContentItemResponse)
 def get_content(
     content_id: int,
     db: Session = Depends(get_db),
@@ -94,11 +106,11 @@ def get_content(
     """Get content detail by ID."""
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Content not found")
+        raise HTTPException(status_code=404, detail='Content not found')
     return _to_response(item, db)
 
 
-@router.post("", response_model=ContentItemResponse, status_code=201)
+@router.post('', response_model=ContentItemResponse, status_code=201)
 def create_content(
     body: ContentItemCreate,
     user: User = Depends(get_current_user),
@@ -126,11 +138,11 @@ def create_content(
             tag_names=body.tags,
         )
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return _to_response(item, db)
 
 
-@router.put("/{content_id}", response_model=ContentItemResponse)
+@router.put('/{content_id}', response_model=ContentItemResponse)
 def update_content(
     content_id: int,
     body: ContentItemUpdate,
@@ -143,16 +155,18 @@ def update_content(
     """
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Content not found")
-    if item.created_by != user.id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="No permission to edit this content")
+        raise HTTPException(status_code=404, detail='Content not found')
+    if item.created_by != user.id and user.role != 'admin':
+        raise HTTPException(
+            status_code=403, detail='No permission to edit this content'
+        )
 
     update_data = body.model_dump(exclude_unset=True)
     updated = content_svc.update_content(db, item, **update_data)
     return _to_response(updated, db)
 
 
-@router.delete("/{content_id}", status_code=204)
+@router.delete('/{content_id}', status_code=204)
 def delete_content(
     content_id: int,
     user: User = Depends(get_current_user),
@@ -164,14 +178,16 @@ def delete_content(
     """
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Content not found")
-    if item.created_by != user.id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="No permission to delete this content")
+        raise HTTPException(status_code=404, detail='Content not found')
+    if item.created_by != user.id and user.role != 'admin':
+        raise HTTPException(
+            status_code=403, detail='No permission to delete this content'
+        )
 
     content_svc.delete_content(db, item)
 
 
-@router.post("/{content_id}/share", response_model=ShareLinkResponse)
+@router.post('/{content_id}/share', response_model=ShareLinkResponse)
 def create_share_link(
     content_id: int,
     body: ShareLinkCreate,
@@ -184,7 +200,7 @@ def create_share_link(
     """
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Content not found")
+        raise HTTPException(status_code=404, detail='Content not found')
 
     token = secrets.token_urlsafe(24)[:32]
     link = ShareLink(
@@ -199,7 +215,7 @@ def create_share_link(
     return ShareLinkResponse(
         id=link.id,
         token=link.token,
-        url=f"/guest/{link.token}",
+        url=f'/guest/{link.token}',
         expires_at=link.expires_at,
         view_count=link.view_count,
         created_at=link.created_at,
