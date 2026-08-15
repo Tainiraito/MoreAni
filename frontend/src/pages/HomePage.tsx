@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
 import { CategoryTabs } from '@/components/content/CategoryTabs'
-import { ContentCard } from '@/components/content/ContentCard'
+import { AnimeCard } from '@/components/content/AnimeCard'
 import { ContentListItem } from '@/components/content/ContentListItem'
 import { HeroSection } from '@/components/content/HeroSection'
 import { RefreshCw } from 'lucide-react'
@@ -13,12 +13,12 @@ import type { ContentItem, ContentType } from '@/types'
 
 export function HomePage() {
   const { user } = useAuthStore()
+  const { openDetail } = useUIStore()
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
-  const { openDetail } = useUIStore()
 
   // 加载所有番剧（用于精选推荐）
   useEffect(() => {
@@ -29,7 +29,6 @@ export function HomePage() {
         const list = (res.items || []) as ContentItem[]
         const withCover = list.filter(i => i.cover_url)
         setAllAnime(withCover)
-        // 随机选取一个作为精选
         if (withCover.length > 0) {
           const randomIndex = Math.floor(Math.random() * withCover.length)
           setHero(withCover[randomIndex])
@@ -115,7 +114,7 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {/* 番剧区域 — 卡片网格 */}
+            {/* 番剧区域 — 使用统一的 AnimeCard */}
             {animeItems.length > 0 && (
               <section className="mt-8">
                 {(activeType === 'all') && (
@@ -128,7 +127,12 @@ export function HomePage() {
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                   {animeItems.map(item => (
-                    <ContentCard key={item.id} content={item} onSelect={openDetail} />
+                    <AnimeCard
+                      key={item.id}
+                      content={item}
+                      mode="grid"
+                      onSelect={openDetail}
+                    />
                   ))}
                 </div>
               </section>

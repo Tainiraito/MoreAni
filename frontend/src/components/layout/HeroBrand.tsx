@@ -2,55 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTheme } from '@/hooks/use-theme'
-import { Sun, Moon, Users } from 'lucide-react'
+import { Sun, Moon } from 'lucide-react'
 import { api } from '@/lib/api'
+import { AnimeCard } from '@/components/content/AnimeCard'
 import type { ContentItem } from '@/types'
-
-/** Force HTTPS for external image URLs */
-function secureUrl(url: string): string {
-  if (!url) return ''
-  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
-    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
-  }
-  return url.replace(/^http:\/\//, 'https://')
-}
-
-/** 带占位的图片组件 */
-function CoverImage({ src, alt }: {
-  src: string
-  alt: string
-}) {
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
-
-  const imageSrc = (!error && src) ? secureUrl(src) : '/placeholder.png'
-  const showPlaceholder = !loaded || error
-
-  return (
-    <div className="relative w-full h-full" style={{ background: 'var(--bg-card-warm)' }}>
-      {/* 占位图 */}
-      {showPlaceholder && (
-        <img
-          src="/placeholder.png"
-          alt={alt}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      )}
-      {/* 真实图片 */}
-      {src && !error && (
-        <img
-          src={imageSrc}
-          alt={alt}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-        />
-      )}
-    </div>
-  )
-}
 
 /** 随机打乱数组 */
 function shuffleArray<T>(array: T[]): T[] {
@@ -66,16 +21,15 @@ export function HeroBrand() {
   const { openAuth, authOpen } = useUIStore()
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
+  const { openDetail } = useUIStore()
   const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(0)
   const hasTriggeredRef = useRef(false)
   const cardWidth = 160
   const gap = 20
-  const totalSteps = 10
 
   // 加载番剧内容并随机选取
   useEffect(() => {
@@ -95,19 +49,14 @@ export function HeroBrand() {
     if (user) return
 
     const handleWheel = (e: WheelEvent) => {
-      // 如果登录框打开，不处理
       if (authOpen) return
       
       e.preventDefault()
       
-      // 向下滚动增加进度
       if (e.deltaY > 0) {
-        progressRef.current = Math.min(1, progressRef.current + (1 / totalSteps))
-      } 
-      // 向上滚动减少进度
-      else if (e.deltaY < 0) {
-        progressRef.current = Math.max(0, progressRef.current - (1 / totalSteps))
-        // 向上滚动时重置触发标记
+        progressRef.current = Math.min(1, progressRef.current + (1 / 10))
+      } else if (e.deltaY < 0) {
+        progressRef.current = Math.max(0, progressRef.current - (1 / 10))
         if (progressRef.current < 0.8) {
           hasTriggeredRef.current = false
         }
@@ -115,7 +64,6 @@ export function HeroBrand() {
       
       setScrollProgress(progressRef.current)
       
-      // 进度达到100%时显示登录提示（只触发一次）
       if (progressRef.current >= 1 && !hasTriggeredRef.current) {
         hasTriggeredRef.current = true
         openAuth()
@@ -144,7 +92,7 @@ export function HeroBrand() {
     }
   }, [user])
 
-  // 自动循环滚动 - 使用 CSS animation
+  // 自动循环滚动
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
@@ -155,8 +103,7 @@ export function HeroBrand() {
   }, [items])
 
   // 生成足够的卡片用于无缝循环（4组）
-  const minSets = 4
-  const displayItems = Array(minSets).fill(items).flat()
+  const displayItems = Array(4).fill(items).flat()
 
   return (
     <div className="relative min-h-screen" style={{ background: 'var(--bg-page)' }}>
@@ -238,7 +185,7 @@ export function HeroBrand() {
             className="w-screen overflow-hidden"
             style={{ padding: '48px 0 80px' }}
             onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
+            onMouseLeave={() => setIsPaused(false)}
           >
             <div
               ref={scrollContainerRef}
@@ -249,107 +196,14 @@ export function HeroBrand() {
                 animationPlayState: isPaused ? 'paused' : 'running',
               }}
             >
-              {displayItems.map((item, index) => {
-                const isHovered = hoveredIndex === index
-                const coverHeight = 210
-                const infoMinHeight = 70
-                return (
-                  <div
-                    key={index}
-                    className="flex-shrink-0 cursor-pointer"
-                    style={{
-                      width: `${cardWidth}px`,
-                      height: `${coverHeight + infoMinHeight}px`,
-                      transform: isHovered ? 'scale(1.08)' : 'scale(1)',
-                      zIndex: isHovered ? 20 : 1,
-                      transformOrigin: 'center bottom',
-                      transition: 'transform 0.3s ease',
-                    }}
-                    onMouseEnter={() => setHoveredIndex(index)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                  >
-                    {/* 卡片容器 */}
-                    <div
-                      className="relative w-full h-full rounded-xl overflow-hidden"
-                      style={{
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-line)',
-                        boxShadow: isHovered
-                          ? '0 12px 40px rgba(0,0,0,0.2)'
-                          : '0 2px 8px rgba(0,0,0,0.05)',
-                        transition: 'box-shadow 0.3s ease',
-                      }}
-                    >
-                      {/* 封面 */}
-                      <div
-                        className="w-full overflow-hidden"
-                        style={{ height: `${coverHeight}px` }}
-                      >
-                        <CoverImage
-                          src={item.cover_url}
-                          alt={item.title}
-                        />
-                      </div>
-
-                      {/* 信息区 */}
-                      <div
-                        className="absolute left-0 right-0 bottom-0 overflow-hidden"
-                        style={{
-                          background: 'var(--bg-card)',
-                          borderTop: '1px solid var(--border-line)',
-                          height: isHovered ? '180px' : `${infoMinHeight}px`,
-                          transition: 'height 0.3s ease',
-                        }}
-                      >
-                        <div className="p-3 text-center">
-                          <h3 className="text-xs font-semibold truncate mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                            {item.title}
-                          </h3>
-
-                          <div className="flex items-center justify-center gap-3">
-                            {item.avg_score && item.avg_score > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs" style={{ color: 'var(--brand)' }}>★</span>
-                                <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                                  {(item.avg_score / 10).toFixed(1)}
-                                </span>
-                              </div>
-                            )}
-                            {(item.rating_count ?? 0) > 0 && (
-                              <div className="flex items-center gap-1">
-                                <Users size={10} style={{ color: 'var(--text-muted)' }} />
-                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                  {item.rating_count}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div
-                            className="overflow-hidden transition-all duration-300"
-                            style={{
-                              maxHeight: isHovered ? '100px' : '0px',
-                              opacity: isHovered ? 1 : 0,
-                              marginTop: isHovered ? '8px' : '0px',
-                            }}
-                          >
-                            {item.episodes > 0 && (
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                                {item.episodes}集
-                              </p>
-                            )}
-                            {item.description && (
-                              <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
-                                {item.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {displayItems.map((item, index) => (
+                <AnimeCard
+                  key={index}
+                  content={item}
+                  mode="scroll"
+                  onSelect={openDetail}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -358,7 +212,6 @@ export function HeroBrand() {
       {/* 底部进度条 — 仅未登录显示 */}
       {!user && (
         <div className="fixed bottom-6 left-0 right-0 flex flex-col items-center gap-2">
-          {/* 进度条 */}
           <div className="w-48 h-1.5 rounded-full bg-gray-200 overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300 ease-out"
@@ -368,8 +221,6 @@ export function HeroBrand() {
               }}
             />
           </div>
-          
-          {/* 提示文字 */}
           <span 
             className="text-xs transition-opacity duration-300"
             style={{ 
