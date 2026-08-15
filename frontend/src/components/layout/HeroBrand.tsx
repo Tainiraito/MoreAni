@@ -189,7 +189,7 @@ export function HeroBrand() {
                     border: '1px solid var(--border-line)',
                     borderRadius: '12px',
                     width: `${cardWidth}px`,
-                    height: hoveredIndex === index ? 'auto' : undefined,
+                    minHeight: '280px', // 固定最小高度
                     transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
                     boxShadow: hoveredIndex === index
                       ? '0 12px 40px rgba(0,0,0,0.2)'
@@ -197,7 +197,7 @@ export function HeroBrand() {
                     zIndex: hoveredIndex === index ? 10 : 1,
                     transformOrigin: 'center center',
                     overflow: 'hidden',
-                    position: 'relative',
+                    willChange: 'transform', // 创建独立合成层
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
