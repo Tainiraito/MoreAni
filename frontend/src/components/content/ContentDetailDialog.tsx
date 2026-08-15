@@ -172,13 +172,14 @@ export function ContentDetailDialog() {
                 {(content.rating_count ?? 0) > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Users size={14} />
-                    <span className="text-sm">{content.rating_count}人评分</span>
+                    <span className="text-sm">{content.rating_count}</span>
                   </div>
                 )}
                 {content.episodes > 0 && (
-                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {content.episodes}集
-                  </span>
+                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <Play size={14} />
+                    <span className="text-sm">{content.episodes}集</span>
+                  </div>
                 )}
               </div>
 
