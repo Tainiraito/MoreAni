@@ -5,6 +5,7 @@ import { HomePage } from '@/pages/HomePage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
+import { ContentFormDialog } from '@/components/content/ContentFormDialog'
 import { AuthDialog } from '@/components/auth/AuthDialog'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { ToastContainer } from '@/components/ui/toast'
@@ -12,6 +13,8 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useUIStore } from '@/stores/ui-store'
 import { api } from '@/lib/api'
+
+import { useRefreshStore } from '@/stores/refresh-store'
 
 const queryClient = new QueryClient()
 
@@ -31,7 +34,6 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
             role: userData.role as 'user' | 'admin',
             created_at: new Date().toISOString(),
           })
-          // 加载收藏状态
           loadFavorites()
         })
         .catch(() => {
@@ -55,14 +57,23 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
 }
 
 function GlobalDialogs() {
-  const { detailContentId } = useUIStore()
-  const { isFavorited, toggleFavorite } = useFavoriteStore()
-  
+  const { detailContentId, addAnimeOpen, editContentId, closeAddAnime, closeEditContent } = useUIStore()
+  const { isFavorited, toggleFavorite, loadFavorites } = useFavoriteStore()
+
+  const handleRefresh = () => {
+    loadFavorites()
+    useRefreshStore.getState().triggerRefresh()
+  }
+
   return (
-    <ContentDetailDialog
-      isFavorited={detailContentId ? isFavorited(detailContentId) : false}
-      onToggleFavorite={toggleFavorite}
-    />
+    <>
+      <ContentDetailDialog
+        isFavorited={detailContentId ? isFavorited(detailContentId) : false}
+        onToggleFavorite={toggleFavorite}
+      />
+      <ContentFormDialog open={addAnimeOpen} onClose={closeAddAnime} onSaved={handleRefresh} />
+      <ContentFormDialog contentId={editContentId} open={!!editContentId} onClose={closeEditContent} onSaved={handleRefresh} />
+    </>
   )
 }
 

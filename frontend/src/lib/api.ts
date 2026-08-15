@@ -101,14 +101,13 @@ export const api = {
   // Bangumi
   searchBangumi: (q: string) => request<{ items: unknown[] }>(`/bangumi/search?q=${encodeURIComponent(q)}`),
   importBangumi: (bgm_id: number) =>
-    request<{ id: number }>('/bangumi/import', { method: 'POST', body: JSON.stringify({ bgm_id }) }),
+    request<{ id: number }>(`/bangumi/import/${bgm_id}`, { method: 'POST' }),
+  getBangumiDetail: (bgm_id: number) =>
+    request<Record<string, unknown>>(`/bangumi/detail/${bgm_id}`),
   getBangumiScore: (bgm_id: number) =>
     request<{ score: number }>(`/bangumi/score/${bgm_id}`),
 
   // User
   getUser: (id: number) => request<unknown>(`/user/${id}`),
   getUserRatings: (id: number) => request<{ items: unknown[] }>(`/user/${id}/ratings`),
-
-  // Guest
-  getGuestToken: (token: string) => request<{ token: string }>(`/guest/${token}`),
 }

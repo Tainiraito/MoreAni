@@ -27,6 +27,9 @@ export interface ContentItem {
   rating_count?: number
   my_rating?: Rating | null
   my_status?: WatchStatus | null
+  my_score?: number | null
+  my_has_review?: boolean
+  tags?: Tag[]
 }
 
 export interface Rating {

@@ -3,17 +3,10 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { secureUrl } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
-
-/** Force HTTPS for external image URLs */
-function secureUrl(url: string): string {
-  if (!url) return ''
-  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
-    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
-  }
-  return url.replace(/^http:\/\//, 'https://')
-}
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
   anime: { label: '番剧', icon: Play, color: 'var(--type-anime)' },
@@ -26,6 +19,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: str
 
 interface Review {
   id: number
+  content_id: number
+  user_id: number
   username: string
   avatar_id: number
   score: number
@@ -40,51 +35,118 @@ interface ContentDetailDialogProps {
 }
 
 export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
-  const { detailOpen, detailContentId, closeDetail } = useUIStore()
+  const { detailOpen, detailContentId, closeDetail, openEditContent } = useUIStore()
   const { user } = useAuthStore()
   const toast = useToastStore.getState()
   const [content, setContent] = useState<ContentItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [score, setScore] = useState(0)
   const [hoverScore, setHoverScore] = useState(0)
-  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviewText, setReviewText] = useState('')
+  const [myRatingId, setMyRatingId] = useState<number | null>(null)
+  const [allReviews, setAllReviews] = useState<Review[]>([])
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
       setBangumiScore(null)
       setScore(0)
-      
+      setReviewText('')
+      setMyRatingId(null)
+      setEditing(false)
+
       Promise.all([
         api.getContent(detailContentId) as Promise<ContentItem>,
-        api.getContentRatings(detailContentId, { size: '10' }),
+        api.getContentRatings(detailContentId, { size: '50' }),
       ])
         .then(([c, ratingsRes]) => {
           setContent(c)
-          setScore(c.my_rating?.score || 0)
-          setReviews((ratingsRes.items || []) as Review[])
+          const ratings = (ratingsRes.items || []) as Review[]
+          setAllReviews(ratings)
+
+          // Extract current user's existing rating from the list
+          if (user) {
+            const mine = ratings.find((r: Review) => r.username === user.username)
+            if (mine) {
+              setScore(mine.score / 10) // API returns 0-100, UI shows 1-10
+              setReviewText(mine.review || '')
+              setMyRatingId(mine.id)
+            }
+          }
         })
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId])
+  }, [detailOpen, detailContentId, user?.username])
+
+  // Lock body scroll when dialog is open
+  useEffect(() => {
+    if (detailOpen) {
+      const scrollY = window.scrollY
+      document.documentElement.style.overflow = 'hidden'
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.documentElement.style.overflow = ''
+        document.body.style.overflow = ''
+        requestAnimationFrame(() => window.scrollTo(0, scrollY))
+      }
+    }
+  }, [detailOpen])
 
   if (!detailOpen) return null
 
-  const handleRate = async (newScore: number) => {
-    if (!content || !user) return
+  // Star click — only update local state, don't save
+  const handleStarClick = (newScore: number) => {
     setScore(newScore)
+  }
+
+  // Save button — actually submit to API
+  const handleSave = async () => {
+    if (!content || !user || score <= 0) return
     try {
-      await api.upsertRating({ content_id: content.id, score: newScore * 10 })
-      const updated = await api.getContent(content.id) as ContentItem
+      await api.upsertRating({
+        content_id: content.id,
+        score: score * 10,
+        review: reviewText,
+      })
+      const [updated, ratingsRes] = await Promise.all([
+        api.getContent(content.id) as Promise<ContentItem>,
+        api.getContentRatings(content.id, { size: '50' }),
+      ])
       setContent(updated)
-      const ratingsRes = await api.getContentRatings(content.id, { size: '10' })
-      setReviews((ratingsRes.items || []) as Review[])
-      toast.addToast('success', '评分成功')
+      const ratings = (ratingsRes.items || []) as Review[]
+      setAllReviews(ratings)
+      const mine = ratings.find((r: Review) => r.username === user.username)
+      if (mine) setMyRatingId(mine.id)
+      setEditing(false)
+      toast.addToast('success', '评分已保存')
     } catch {
       toast.addToast('error', '评分失败')
+    }
+  }
+
+  const handleDeleteRating = async () => {
+    if (!myRatingId) return
+    try {
+      await api.deleteRating(myRatingId)
+      setScore(0)
+      setReviewText('')
+      setMyRatingId(null)
+      // Refresh content and ratings
+      if (content) {
+        const [updated, ratingsRes] = await Promise.all([
+          api.getContent(content.id) as Promise<ContentItem>,
+          api.getContentRatings(content.id, { size: '50' }),
+        ])
+        setContent(updated)
+        setAllReviews((ratingsRes.items || []) as Review[])
+      }
+      toast.addToast('success', '评分已删除')
+    } catch {
+      toast.addToast('error', '删除失败')
     }
   }
 
@@ -94,10 +156,21 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   }
 
   const handleFetchBangumiScore = async () => {
-    if (!content?.source_id || content.source_type !== 'bangumi') return
+    if (!content) return
     setBangumiLoading(true)
     try {
-      const res = await api.getBangumiScore(parseInt(content.source_id))
+      let bgmId = content.source_id ? parseInt(content.source_id) : null
+      // If no source_id, search Bangumi by title
+      if (!bgmId) {
+        const searchRes = await api.searchBangumi(content.title)
+        const items = (searchRes.items || []) as { bgm_id: number }[]
+        if (items.length > 0) bgmId = items[0].bgm_id
+      }
+      if (!bgmId) {
+        toast.addToast('error', '未在 Bangumi 找到匹配条目')
+        return
+      }
+      const res = await api.getBangumiScore(bgmId)
       setBangumiScore(res.score)
     } catch {
       toast.addToast('error', '查询失败')
@@ -110,10 +183,13 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   const TypeIcon = typeConfig?.icon || Star
   const avgScore = content?.avg_score ? (content.avg_score / 10).toFixed(1) : null
 
-  const metadata = content?.metadata 
-    ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) 
+  const metadata = content?.metadata
+    ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata)
     : {}
-  const tags = metadata.tags || []
+  // Prefer content.tags (Tag table) over metadata.tags (old Bangumi import)
+  const tags = (content?.tags && content.tags.length > 0)
+    ? content.tags.map((t: { name: string }) => t.name)
+    : (metadata.tags || [])
   const director = metadata.director
   const studio = metadata.studio
   const airDate = metadata.air_date || content?.release_date
@@ -141,23 +217,64 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
           {user && (
             <button
               onClick={handleToggleFavorite}
-              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
               style={{
                 background: isFavorited ? '#FB71A7' : 'var(--bg-card)',
                 border: isFavorited ? 'none' : '1px solid var(--border-line)',
                 color: isFavorited ? 'white' : 'var(--text-muted)',
               }}
+              onMouseEnter={e => {
+                if (!isFavorited) {
+                  e.currentTarget.style.borderColor = '#FB71A7'
+                  e.currentTarget.style.color = '#FB71A7'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isFavorited) {
+                  e.currentTarget.style.borderColor = 'var(--border-line)'
+                  e.currentTarget.style.color = 'var(--text-muted)'
+                }
+              }}
             >
               <Heart size={14} fill={isFavorited ? 'white' : 'none'} />
             </button>
           )}
+          {user && content && (
+            <button
+              onClick={() => openEditContent(content.id)}
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-line)',
+                color: 'var(--text-muted)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = '#FB71A7'
+                e.currentTarget.style.color = '#FB71A7'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--border-line)'
+                e.currentTarget.style.color = 'var(--text-muted)'
+              }}
+            >
+              <Pencil size={14} />
+            </button>
+          )}
           <button
             onClick={closeDetail}
-            className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+            className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border-line)',
               color: 'var(--text-muted)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = '#FB71A7'
+              e.currentTarget.style.color = '#FB71A7'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--border-line)'
+              e.currentTarget.style.color = 'var(--text-muted)'
             }}
           >
             <X size={16} />
@@ -229,7 +346,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                     </span>
                   </div>
                 )}
-                
+
                 {(content.rating_count ?? 0) > 0 && (
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Users size={14} />
@@ -299,104 +416,187 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
 
               {content.description && (
                 <p
-                  className="text-sm leading-relaxed mb-6"
+                  className="text-sm leading-relaxed mb-6 whitespace-pre-line"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {content.description}
                 </p>
               )}
 
+              {/* ===== 我的评论（查看态 / 编辑态） ===== */}
               {user && (
-                <div
-                  className="p-4 rounded-xl mb-6"
-                  style={{
-                    background: 'var(--bg-card-warm)',
-                    border: '1px solid var(--border-line)',
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      我的评分
-                    </h3>
-                    
-                    {content.source_type === 'bangumi' && content.source_id && (
-                      <button
-                        onClick={handleFetchBangumiScore}
-                        disabled={bangumiLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80 disabled:opacity-50"
-                        style={{
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-line)',
-                          color: 'var(--text-muted)',
-                        }}
-                      >
-                        {bangumiLoading ? (
-                          <div
-                            className="animate-spin w-3 h-3 border rounded-full"
-                            style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }}
-                          />
-                        ) : (
-                          <ExternalLink size={10} />
+                myRatingId && !editing ? (
+                  /* 查看态 — 评论卡片，样式与站内评论统一 */
+                  <div
+                    className="p-3 rounded-lg mb-6 cursor-pointer transition-all duration-200 hover:opacity-80"
+                    style={{
+                      background: 'var(--bg-card-warm)',
+                      border: '1px solid rgba(251,113,167,0.3)',
+                    }}
+                    onClick={() => setEditing(true)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
+                          style={{ background: '#FB71A7', color: 'white' }}
+                        >
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {user.username}
+                          <span className="ml-1.5 font-normal" style={{ color: '#FB71A7' }}>
+                            点击编辑
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                        <span className="text-xs" style={{ color: '#FB71A7' }}>
+                          {score.toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+                    {reviewText && (
+                      <p className="text-xs whitespace-pre-line" style={{ color: 'var(--text-secondary)' }}>
+                        {reviewText}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  /* 编辑态 — 星星 + 评论 + 保存 */
+                  <div
+                    className="p-4 rounded-xl mb-6"
+                    style={{
+                      background: 'var(--bg-card-warm)',
+                      border: '1px solid var(--border-line)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {myRatingId ? '修改评分' : '我的评分'}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        {content && (
+                          <button
+                            onClick={handleFetchBangumiScore}
+                            disabled={bangumiLoading}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+                            style={{
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-line)',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            {bangumiLoading ? (
+                              <div className="animate-spin w-3 h-3 border rounded-full" style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }} />
+                            ) : (
+                              <ExternalLink size={10} />
+                            )}
+                            {bangumiScore !== null ? `BGM ${bangumiScore}` : 'Bangumi 参考'}
+                          </button>
                         )}
-                        {bangumiScore !== null ? `BGM ${bangumiScore}` : 'Bangumi 参考'}
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                        {myRatingId && (
+                          <>
+                            <button
+                              onClick={handleDeleteRating}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80"
+                              style={{ background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
+                            >
+                              <Trash2 size={10} />
+                              删除
+                            </button>
+                            <button
+                              onClick={() => setEditing(false)}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80"
+                              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+                            >
+                              取消
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 星星 — 只改本地状态 */}
+                    <div className="flex items-center gap-1 mb-3">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => {
+                        const display = hoverScore || score
+                        const isFull = display >= i
+                        const isHalf = !isFull && display >= i - 0.5
+                        return (
+                          <button
+                            key={i}
+                            className="relative transition-transform duration-150 hover:scale-125"
+                            onMouseMove={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setHoverScore(e.clientX - rect.left < rect.width / 2 ? i - 0.5 : i)
+                            }}
+                            onMouseLeave={() => setHoverScore(0)}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              handleStarClick(e.clientX - rect.left < rect.width / 2 ? i - 0.5 : i)
+                            }}
+                          >
+                            <Star size={24} style={{ color: 'var(--border-line)', fill: 'transparent' }} />
+                            {(isFull || isHalf) && (
+                              <div className="absolute inset-0 overflow-hidden" style={{ width: isHalf ? '50%' : '100%' }}>
+                                <Star size={24} style={{ color: '#FB71A7', fill: '#FB71A7' }} />
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                      {(hoverScore || score) > 0 && (
+                        <span className="ml-2 text-sm font-medium" style={{ color: '#FB71A7' }}>
+                          {(hoverScore || score).toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 评论输入 */}
+                    <Textarea
+                      value={reviewText}
+                      onChange={e => setReviewText(e.target.value)}
+                      placeholder="写点评论吧...（可选）"
+                      rows={2}
+                      className="resize-none"
+                      style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                    />
+
+                    {/* 保存 */}
+                    {score > 0 && (
                       <button
-                        key={i}
-                        className="transition-transform duration-150 hover:scale-125"
-                        onMouseEnter={() => setHoverScore(i)}
-                        onMouseLeave={() => setHoverScore(0)}
-                        onClick={() => handleRate(i)}
+                        onClick={handleSave}
+                        className="mt-2 w-full py-2 text-sm font-semibold rounded-lg transition-all duration-200 hover:opacity-80"
+                        style={{ background: '#FB71A7', color: 'white', border: 'none' }}
                       >
-                        <Star
-                          size={24}
-                          style={{
-                            color: (hoverScore || score) >= i ? '#FB71A7' : 'var(--border-line)',
-                            fill: (hoverScore || score) >= i ? '#FB71A7' : 'transparent',
-                          }}
-                        />
+                        保存
                       </button>
-                    ))}
-                    {(hoverScore || score) > 0 && (
-                      <span
-                        className="ml-2 text-sm font-medium"
-                        style={{ color: '#FB71A7' }}
-                      >
-                        {hoverScore || score}
-                      </span>
                     )}
                   </div>
-                </div>
+                )
               )}
 
-              {reviews.length > 0 && (
+              {/* ===== 站内评论（仅他人） ===== */}
+              {allReviews.filter(r => !user || r.username !== user.username).length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <MessageCircle size={16} />
                     站内评论
                   </h3>
                   <div className="space-y-3">
-                    {reviews.map((review) => (
+                    {allReviews.filter(r => !user || r.username !== user.username).map((review) => (
                       <div
                         key={review.id}
                         className="p-3 rounded-lg"
-                        style={{
-                          background: 'var(--bg-card-warm)',
-                          border: '1px solid var(--border-line)',
-                        }}
+                        style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <div
                               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
-                              style={{
-                                background: '#FB71A7',
-                                color: 'white',
-                              }}
+                              style={{ background: 'var(--border-line)', color: 'var(--text-primary)' }}
                             >
                               {review.username.charAt(0).toUpperCase()}
                             </div>
@@ -412,7 +612,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                           </div>
                         </div>
                         {review.review && (
-                          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-xs whitespace-pre-line" style={{ color: 'var(--text-secondary)' }}>
                             {review.review}
                           </p>
                         )}

@@ -1,5 +1,7 @@
 """Rating service — CRUD, stats, recent activity for MoreAni v2."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,13 @@ def get_user_rating(db: Session, user_id: int, content_id: int) -> Rating | None
     )
 
 
+def _bump_content_updated_at(db: Session, content_id: int) -> None:
+    """Touch the content's updated_at so it sorts to top of updated_desc."""
+    content = db.query(ContentItem).filter(ContentItem.id == content_id).first()
+    if content:
+        content.updated_at = datetime.now(UTC)
+
+
 def upsert_rating(
     db: Session,
     *,
@@ -27,12 +36,14 @@ def upsert_rating(
     """Create or update a rating (upsert on unique constraint).
 
     If user already rated this content, update the existing rating.
+    Also bumps the parent content's updated_at so it sorts to top.
     """
     existing = get_user_rating(db, user_id, content_id)
     if existing:
         existing.score = score
         existing.recommend = recommend
         existing.review = review
+        _bump_content_updated_at(db, content_id)
         db.commit()
         db.refresh(existing)
         return existing
@@ -45,6 +56,7 @@ def upsert_rating(
         review=review,
     )
     db.add(rating)
+    _bump_content_updated_at(db, content_id)
     db.commit()
     db.refresh(rating)
     return rating

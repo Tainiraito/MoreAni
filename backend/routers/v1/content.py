@@ -22,7 +22,7 @@ from services import rating as rating_svc
 router = APIRouter(prefix="/content", tags=["content"])
 
 
-def _to_response(item: ContentItem, db: Session) -> ContentItemResponse:
+def _to_response(item: ContentItem, db: Session, user_id: int | None = None) -> ContentItemResponse:
     """Convert a ContentItem ORM to response schema with computed fields."""
     resp = ContentItemResponse.model_validate(item)
     stats = rating_svc.get_rating_stats(db, item.id)
@@ -30,6 +30,16 @@ def _to_response(item: ContentItem, db: Session) -> ContentItemResponse:
     resp.avg_recommend = stats["avg_recommend"]
     resp.rating_count = stats["rating_count"]
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
+    # User-specific fields
+    if user_id:
+        from models import Rating
+        my_rating = db.query(Rating).filter(
+            Rating.content_id == item.id,
+            Rating.user_id == user_id,
+        ).first()
+        if my_rating and my_rating.score > 0:
+            resp.my_score = my_rating.score / 10.0
+            resp.my_has_review = bool(my_rating.review and my_rating.review.strip())
     return resp
 
 
@@ -40,7 +50,9 @@ def list_content(
     status: str | None = Query(None, alias="status", description="Watch status filter"),
     tag: str | None = Query(None, description="Tag filter"),
     q: str | None = Query(None, description="Search keyword"),
-    sort: str = Query("newest", description="Sort: newest/oldest/rating/title"),
+    sort: str = Query("updated_desc", description="Sort: updated_desc/newest/oldest/rating/title/air_date_desc/air_date_asc"),
+    rated: str | None = Query(None, description="rated/unrated filter"),
+    user: User | None = Depends(get_current_user_optional),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ) -> ContentListResponse:
@@ -52,11 +64,13 @@ def list_content(
         tag=tag,
         q=q,
         sort=sort,
+        rated=rated,
+        user_id=user.id if user else None,
         page=page,
         size=size,
     )
     return ContentListResponse(
-        items=[_to_response(i, db) for i in items],
+        items=[_to_response(i, db, user.id if user else None) for i in items],
         total=total,
         page=page,
         size=size,
@@ -91,25 +105,28 @@ def create_content(
     db: Session = Depends(get_db),
 ) -> ContentItemResponse:
     """Create a new content item."""
-    item = content_svc.create_content(
-        db,
-        title=body.title,
-        title_alt=body.title_alt,
-        cover_url=body.cover_url,
-        description=body.description,
-        content_type=body.content_type,
-        episodes=body.episodes,
-        status=body.status,
-        release_date=body.release_date,
-        platform=body.platform,
-        source_type=body.source_type,
-        source_id=body.source_id,
-        source_url=body.source_url,
-        content_metadata=body.metadata,
-        is_public=body.is_public,
-        created_by=user.id,
-        tag_names=body.tags,
-    )
+    try:
+        item = content_svc.create_content(
+            db,
+            title=body.title,
+            title_alt=body.title_alt,
+            cover_url=body.cover_url,
+            description=body.description,
+            content_type=body.content_type,
+            episodes=body.episodes,
+            status=body.status,
+            release_date=body.release_date,
+            platform=body.platform,
+            source_type=body.source_type,
+            source_id=body.source_id,
+            source_url=body.source_url,
+            content_metadata=body.metadata,
+            is_public=body.is_public,
+            created_by=user.id,
+            tag_names=body.tags,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return _to_response(item, db)
 
 

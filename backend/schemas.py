@@ -157,6 +157,9 @@ class ContentItemResponse(BaseModel):
     avg_recommend: float | None = None
     rating_count: int | None = None
     tags: list[TagResponse] = []
+    # User-specific fields (only in list endpoint when authenticated)
+    my_score: float | None = None
+    my_has_review: bool = False
 
     model_config = {"from_attributes": True, "populate_by_name": True}
 

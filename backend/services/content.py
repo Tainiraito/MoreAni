@@ -10,8 +10,12 @@ from models import ContentItem, ContentTag, Rating, Tag
 
 
 def get_content_by_id(db: Session, content_id: int) -> ContentItem | None:
-    """Get a single content item by ID."""
-    return db.query(ContentItem).filter(ContentItem.id == content_id).first()
+    """Get a single content item by ID (excludes soft-deleted)."""
+    return (
+        db.query(ContentItem)
+        .filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None))
+        .first()
+    )
 
 
 def list_content(
@@ -21,7 +25,9 @@ def list_content(
     status: str | None = None,
     tag: str | None = None,
     q: str | None = None,
-    sort: Literal["newest", "oldest", "rating", "title"] = "newest",
+    sort: Literal["newest", "oldest", "rating", "title", "updated_desc", "air_date_desc", "air_date_asc"] = "updated_desc",
+    rated: str | None = None,
+    user_id: int | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[ContentItem], int]:
@@ -30,7 +36,10 @@ def list_content(
     Returns:
         (items, total_count)
     """
-    query = db.query(ContentItem).filter(ContentItem.is_public == True)  # noqa: E712
+    query = db.query(ContentItem).filter(
+        ContentItem.is_public == True,  # noqa: E712
+        ContentItem.deleted_at.is_(None),
+    )
 
     if content_type:
         query = query.filter(ContentItem.content_type == content_type)
@@ -40,11 +49,31 @@ def list_content(
 
     if q:
         like_pattern = f"%{q}%"
+        # Search across title, title_alt, description, AND tags
+        tag_sub = (
+            db.query(ContentTag.content_id)
+            .join(Tag, ContentTag.tag_id == Tag.id)
+            .filter(Tag.name.ilike(like_pattern))
+            .subquery()
+        )
         query = query.filter(
             (ContentItem.title.ilike(like_pattern))
             | (ContentItem.title_alt.ilike(like_pattern))
             | (ContentItem.description.ilike(like_pattern))
+            | (ContentItem.id.in_(db.query(tag_sub.c.content_id)))
         )
+
+    # Rated/unrated filter
+    if rated and user_id is not None:
+        rated_sub = (
+            db.query(Rating.content_id)
+            .filter(Rating.user_id == user_id, Rating.score > 0)
+            .subquery()
+        )
+        if rated == "rated":
+            query = query.filter(ContentItem.id.in_(db.query(rated_sub.c.content_id)))
+        elif rated == "unrated":
+            query = query.filter(~ContentItem.id.in_(db.query(rated_sub.c.content_id)))
 
     # Count before pagination
     total = query.count()
@@ -67,9 +96,13 @@ def list_content(
         )
         query = query.outerjoin(avg_sub, ContentItem.id == avg_sub.c.content_id)
         query = query.order_by(func.coalesce(avg_sub.c.avg_score, 0).desc())
+    elif sort == "air_date_desc":
+        query = query.order_by(ContentItem.release_date.desc())
+    elif sort == "air_date_asc":
+        query = query.order_by(ContentItem.release_date.asc())
     else:
-        # newest (default)
-        query = query.order_by(ContentItem.created_at.desc())
+        # updated_desc (default) — most recently updated first
+        query = query.order_by(ContentItem.updated_at.desc())
 
     items = query.offset((page - 1) * size).limit(size).all()
     return items, total
@@ -96,6 +129,32 @@ def create_content(
     tag_names: list[str] | None = None,
 ) -> ContentItem:
     """Create a new content item with optional tags."""
+    # Duplicate check: same source_id (from Bangumi) or same title (manual)
+    if source_id:
+        existing = (
+            db.query(ContentItem)
+            .filter(
+                ContentItem.source_id == source_id,
+                ContentItem.source_type == source_type,
+                ContentItem.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if existing:
+            raise ValueError(f"该内容已存在：{existing.title}")
+    else:
+        existing = (
+            db.query(ContentItem)
+            .filter(
+                ContentItem.title == title.strip(),
+                ContentItem.content_type == content_type,
+                ContentItem.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if existing:
+            raise ValueError(f"同名内容已存在：{existing.title}")
+
     content = ContentItem(
         title=title,
         title_alt=title_alt,
@@ -148,8 +207,9 @@ def update_content(
 
 
 def delete_content(db: Session, content: ContentItem) -> None:
-    """Delete a content item (cascades via ORM relationships)."""
-    db.delete(content)
+    """Soft-delete a content item (sets deleted_at, keeps DB rows)."""
+    from datetime import datetime, timezone
+    content.deleted_at = datetime.now(timezone.utc)
     db.commit()
 
 
@@ -157,7 +217,10 @@ def get_random_content(db: Session) -> ContentItem | None:
     """Return one random public content item."""
     return (
         db.query(ContentItem)
-        .filter(ContentItem.is_public == True)  # noqa: E712
+        .filter(
+            ContentItem.is_public == True,  # noqa: E712
+            ContentItem.deleted_at.is_(None),
+        )
         .order_by(func.random())
         .first()
     )

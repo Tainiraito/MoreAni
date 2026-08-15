@@ -77,6 +77,7 @@ class ContentItem(Base):
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+    deleted_at = Column(DateTime, nullable=True, index=True)  # soft delete
 
     creator = relationship("User", back_populates="content_items")
     ratings = relationship("Rating", back_populates="content", cascade="all, delete-orphan")
