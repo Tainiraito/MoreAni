@@ -15,6 +15,57 @@ function secureUrl(url: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
+/** 带懒加载和占位的图片组件 */
+function LazyImage({ src, alt }: {
+  src: string
+  alt: string
+}) {
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const imageSrc = error || !src ? '/placeholder.png' : secureUrl(src)
+
+  // 预加载图片
+  useEffect(() => {
+    if (!src || error) return
+    
+    const img = new Image()
+    img.onload = () => setLoaded(true)
+    img.onerror = () => setError(true)
+    img.src = secureUrl(src)
+    
+    // 如果图片已经在缓存中
+    if (img.complete) {
+      setLoaded(true)
+    }
+  }, [src, error])
+
+  return (
+    <div className="relative w-full h-full" style={{ background: 'var(--bg-card-warm)' }}>
+      {/* 占位图 — 始终先显示 */}
+      <img
+        src="/placeholder.png"
+        alt={alt}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+          loaded && !error ? 'opacity-0' : 'opacity-100'
+        }`}
+      />
+      {/* 真实图片 — 加载完成后显示 */}
+      {loaded && !error && (
+        <img
+          ref={imgRef}
+          src={imageSrc}
+          alt={alt}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            loaded ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      )}
+    </div>
+  )
+}
+
 export function HeroBrand() {
   const { openAuth } = useUIStore()
   const { user } = useAuthStore()
@@ -211,23 +262,18 @@ export function HeroBrand() {
                         transition: 'box-shadow 0.3s ease',
                       }}
                     >
-                      {/* 封面 — 固定在顶部 */}
+                      {/* 封面 */}
                       <div
                         className="w-full overflow-hidden"
                         style={{ height: `${coverHeight}px` }}
                       >
-                        <img
-                          src={secureUrl(item.cover_url)}
+                        <LazyImage
+                          src={item.cover_url}
                           alt={item.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = '/placeholder.png'
-                          }}
                         />
                       </div>
 
-                      {/* 信息区 — 从底部向上滑动 */}
+                      {/* 信息区 */}
                       <div
                         className="absolute left-0 right-0 bottom-0 overflow-hidden"
                         style={{
@@ -238,12 +284,10 @@ export function HeroBrand() {
                         }}
                       >
                         <div className="p-3 text-center">
-                          {/* 标题 */}
                           <h3 className="text-xs font-semibold truncate mb-1.5" style={{ color: 'var(--text-primary)' }}>
                             {item.title}
                           </h3>
 
-                          {/* 评分 + 打分人数 */}
                           <div className="flex items-center justify-center gap-3">
                             {item.avg_score && item.avg_score > 0 && (
                               <div className="flex items-center gap-1">
@@ -263,7 +307,6 @@ export function HeroBrand() {
                             )}
                           </div>
 
-                          {/* 集数 + 简介 — hover 时显示 */}
                           <div
                             className="overflow-hidden transition-all duration-300"
                             style={{
