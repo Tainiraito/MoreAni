@@ -98,7 +98,7 @@ export function AppHeader() {
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-                  animation: 'scale-in 150ms ease-out',
+                  animation: 'scale-in-center 150ms ease-out',
                   transformOrigin: 'top center',
                 }}
               >
@@ -130,7 +130,7 @@ export function AppHeader() {
                   onClick={() => { toggleTheme(); setMenuOpen(false) }}
                   className={menuItemStyle}
                   style={{ color: 'var(--text-primary)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   {theme === 'light' ? '深色模式' : '浅色模式'}
@@ -141,7 +141,7 @@ export function AppHeader() {
                     onClick={() => { openSettings(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--text-primary)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     设置
@@ -155,7 +155,7 @@ export function AppHeader() {
                     onClick={() => { logout(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--accent-coral)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     退出登录
@@ -165,7 +165,7 @@ export function AppHeader() {
                     onClick={() => { openAuth(); setMenuOpen(false) }}
                     className={menuItemStyle}
                     style={{ color: 'var(--brand)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255, 140, 212, 0.08)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     登录 / 注册
