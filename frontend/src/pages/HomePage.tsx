@@ -7,9 +7,14 @@ import { HeroBrand } from '@/components/layout/HeroBrand'
 import { CategoryTabs } from '@/components/content/CategoryTabs'
 import { AnimeCard } from '@/components/content/AnimeCard'
 import { ContentListItem } from '@/components/content/ContentListItem'
-import { HeroSection } from '@/components/content/HeroSection'
+import { HeroSection, type ContentStatus } from '@/components/content/HeroSection'
 import { RefreshCw } from 'lucide-react'
 import type { ContentItem, ContentType } from '@/types'
+
+interface ContentStatusItem {
+  content_id: number
+  status: string
+}
 
 export function HomePage() {
   const { user } = useAuthStore()
@@ -17,30 +22,38 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
+  const [heroStatus, setHeroStatus] = useState<ContentStatus>('none')
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
+  const [statusMap, setStatusMap] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
 
-  // 加载所有番剧（用于精选推荐），过滤掉已评分的
+  // 加载所有番剧和状态
   useEffect(() => {
     if (!user) return
 
     Promise.all([
       api.listContent({ type: 'anime' }),
-      api.getMyRatings({ size: '100' }),
+      api.getMyStatuses(),
     ])
-      .then(([contentRes, ratingsRes]) => {
+      .then(([contentRes, statusRes]) => {
         const animeList = (contentRes.items || []) as ContentItem[]
-        const ratings = (ratingsRes.items || []) as { content_id: number }[]
-        const ratedIds = new Set(ratings.map(r => r.content_id))
+        const statuses = (statusRes.items || []) as ContentStatusItem[]
         
-        // 过滤掉已评分和没有封面的番剧
-        const unwatched = animeList.filter(i => i.cover_url && !ratedIds.has(i.id))
-        setAllAnime(unwatched)
+        // 构建状态映射
+        const sMap: Record<number, string> = {}
+        statuses.forEach(s => { sMap[s.content_id] = s.status })
+        setStatusMap(sMap)
+        
+        // 只保留有封面的番剧
+        const withCover = animeList.filter(i => i.cover_url)
+        setAllAnime(withCover)
         
         // 随机选取一个
-        if (unwatched.length > 0) {
-          const randomIndex = Math.floor(Math.random() * unwatched.length)
-          setHero(unwatched[randomIndex])
+        if (withCover.length > 0) {
+          const randomIndex = Math.floor(Math.random() * withCover.length)
+          const selected = withCover[randomIndex]
+          setHero(selected)
+          setHeroStatus((sMap[selected.id] as ContentStatus) || 'none')
         }
       })
       .catch(() => {})
@@ -70,27 +83,42 @@ export function HomePage() {
       return
     }
     
-    // 从列表中移除当前 hero，然后随机选
     const remaining = allAnime.filter(a => a.id !== hero?.id)
     if (remaining.length === 0) {
-      // 如果只剩一个，重新从完整列表选
       const randomIndex = Math.floor(Math.random() * allAnime.length)
-      setHero(allAnime[randomIndex])
+      const selected = allAnime[randomIndex]
+      setHero(selected)
+      setHeroStatus((statusMap[selected.id] as ContentStatus) || 'none')
     } else {
       const randomIndex = Math.floor(Math.random() * remaining.length)
-      setHero(remaining[randomIndex])
+      const selected = remaining[randomIndex]
+      setHero(selected)
+      setHeroStatus((statusMap[selected.id] as ContentStatus) || 'none')
     }
-  }, [allAnime, hero])
+  }, [allAnime, hero, statusMap])
 
-  // 想看
-  const handleWantToWatch = useCallback(async () => {
+  // 更新状态
+  const handleStatusChange = useCallback(async (newStatus: ContentStatus) => {
     if (!hero) return
+    
     try {
-      await api.setStatus({ content_id: hero.id, status: 'wish' })
-      // 从 allAnime 中移除当前 hero
-      setAllAnime(prev => prev.filter(a => a.id !== hero.id))
-      // 换下一个
-      handleRefreshHero()
+      if (newStatus === 'none') {
+        await api.clearStatus(hero.id)
+      } else {
+        await api.setStatus({ content_id: hero.id, status: newStatus })
+      }
+      
+      // 更新状态映射
+      setStatusMap(prev => ({
+        ...prev,
+        [hero.id]: newStatus === 'none' ? '' : newStatus,
+      }))
+      setHeroStatus(newStatus)
+      
+      // 如果标记为已看或弃坑，自动换下一个
+      if (newStatus === 'done' || newStatus === 'dropped') {
+        handleRefreshHero()
+      }
     } catch {
       // ignore
     }
@@ -112,13 +140,14 @@ export function HomePage() {
 
       {/* 内容区域 */}
       <div className="pb-20 sm:pb-24">
-        {/* 精选推荐 — 独立于 tab，随机选取未观看的 */}
+        {/* 精选推荐 — 随机选取，显示状态按钮 */}
         {hero && (
           <div className="relative">
             <HeroSection
               content={hero}
+              status={heroStatus}
               onSelect={openDetail}
-              onWantToWatch={handleWantToWatch}
+              onStatusChange={handleStatusChange}
             />
             <button
               onClick={handleRefreshHero}
@@ -132,21 +161,6 @@ export function HomePage() {
               <RefreshCw size={12} />
               换一个
             </button>
-          </div>
-        )}
-
-        {/* 没有未观看番剧时提示 */}
-        {!hero && allAnime.length === 0 && (
-          <div
-            className="p-8 rounded-xl text-center mb-8"
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-line)',
-            }}
-          >
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              所有番剧都已评分或标记，太棒了！🎉
-            </p>
           </div>
         )}
 
@@ -165,7 +179,7 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {/* 番剧区域 — 使用统一的 AnimeCard */}
+            {/* 番剧区域 */}
             {animeItems.length > 0 && (
               <section className="mt-8">
                 {(activeType === 'all') && (
@@ -189,7 +203,7 @@ export function HomePage() {
               </section>
             )}
 
-            {/* 其他类型 — 列表 */}
+            {/* 其他类型 */}
             {otherItems.length > 0 && (
               <section className="mt-10">
                 {(activeType === 'all') && animeItems.length > 0 && (

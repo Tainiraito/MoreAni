@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Eye } from 'lucide-react'
+import { Star, Users, Play, Eye, Check, X } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -22,13 +22,16 @@ function secureUrl(url: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
+export type ContentStatus = 'none' | 'wish' | 'doing' | 'done' | 'dropped'
+
 interface HeroSectionProps {
   content: ContentItem
+  status?: ContentStatus
   onSelect: (id: number) => void
-  onWantToWatch?: () => void
+  onStatusChange?: (status: ContentStatus) => void
 }
 
-export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionProps) {
+export function HeroSection({ content, status = 'none', onSelect, onStatusChange }: HeroSectionProps) {
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
@@ -38,6 +41,11 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
   const tags = metadata.tags || []
   const director = metadata.director
   const studio = metadata.studio
+
+  const handleStatusClick = (e: React.MouseEvent, newStatus: ContentStatus) => {
+    e.stopPropagation()
+    onStatusChange?.(newStatus)
+  }
 
   return (
     <div
@@ -81,7 +89,6 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
 
           {/* 评分和统计 */}
           <div className="mt-5 flex flex-wrap items-center gap-4">
-            {/* 我们的评分 */}
             {avgScore && (
               <div className="flex items-center gap-1.5">
                 <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
@@ -91,7 +98,6 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
               </div>
             )}
             
-            {/* 评分人数 */}
             {(content.rating_count ?? 0) > 0 && (
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                 <Users size={14} />
@@ -99,7 +105,6 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
               </div>
             )}
 
-            {/* 集数 */}
             {content.episodes > 0 && (
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                 <Play size={14} />
@@ -111,7 +116,7 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
           {/* 标签 */}
           {tags.length > 0 && (
             <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-              {tags.map((tag: string, index: number) => (
+              {tags.slice(0, 10).map((tag: string, index: number) => (
                 <span key={index}>#{tag} </span>
               ))}
             </p>
@@ -131,32 +136,58 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
             </p>
           )}
 
-          {/* 按钮区 */}
-          <div className="mt-7 flex items-center gap-3">
-            <span
-              className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-            >
-              查看详情 →
-            </span>
-            {onWantToWatch && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onWantToWatch()
-                }}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-                style={{
-                  background: 'var(--bg-card-warm)',
-                  border: '1px solid var(--border-line)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <Eye size={16} />
-                想看
-              </button>
-            )}
-          </div>
+          {/* 状态按钮区 */}
+          {onStatusChange && (
+            <div className="mt-7 flex items-center gap-3">
+              {status === 'done' ? (
+                // 已看状态
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}>
+                  <Check size={16} />
+                  已看
+                </div>
+              ) : status === 'doing' ? (
+                // 正在看状态
+                <>
+                  <button
+                    onClick={(e) => handleStatusClick(e, 'done')}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+                    style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+                  >
+                    <Check size={16} />
+                    已看
+                  </button>
+                  <button
+                    onClick={(e) => handleStatusClick(e, 'dropped')}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+                  >
+                    <X size={16} />
+                    弃坑
+                  </button>
+                </>
+              ) : (
+                // 未看/想看/弃坑状态
+                <>
+                  <button
+                    onClick={(e) => handleStatusClick(e, 'doing')}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+                    style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+                  >
+                    <Play size={16} />
+                    正在看
+                  </button>
+                  <button
+                    onClick={(e) => handleStatusClick(e, 'wish')}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
+                  >
+                    <Eye size={16} />
+                    想看
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
