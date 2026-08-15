@@ -8,58 +8,44 @@ import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
 function secureUrl(url: string): string {
-  if (!url) return url
+  if (!url) return ''
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
   return url.replace(/^http:\/\//, 'https://')
 }
 
-/** 带懒加载和占位的图片组件 */
-function LazyImage({ src, alt }: {
+/** 带占位的图片组件 */
+function CoverImage({ src, alt }: {
   src: string
   alt: string
 }) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
 
-  const imageSrc = error || !src ? '/placeholder.png' : secureUrl(src)
-
-  // 预加载图片
-  useEffect(() => {
-    if (!src || error) return
-    
-    const img = new Image()
-    img.onload = () => setLoaded(true)
-    img.onerror = () => setError(true)
-    img.src = secureUrl(src)
-    
-    // 如果图片已经在缓存中
-    if (img.complete) {
-      setLoaded(true)
-    }
-  }, [src, error])
+  const imageSrc = (!error && src) ? secureUrl(src) : '/placeholder.png'
+  const showPlaceholder = !loaded || error
 
   return (
     <div className="relative w-full h-full" style={{ background: 'var(--bg-card-warm)' }}>
-      {/* 占位图 — 始终先显示 */}
-      <img
-        src="/placeholder.png"
-        alt={alt}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-          loaded && !error ? 'opacity-0' : 'opacity-100'
-        }`}
-      />
-      {/* 真实图片 — 加载完成后显示 */}
-      {loaded && !error && (
+      {/* 占位图 */}
+      {showPlaceholder && (
         <img
-          ref={imgRef}
+          src="/placeholder.png"
+          alt={alt}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+      {/* 真实图片 */}
+      {src && !error && (
+        <img
           src={imageSrc}
           alt={alt}
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
         />
       )}
     </div>
@@ -78,6 +64,7 @@ export function HeroBrand() {
   const animFrameRef = useRef<number>(0)
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
+  const isFirstLogin = useRef(true)
   const cardWidth = 160
   const gap = 20
   const coverHeight = 210
@@ -148,9 +135,10 @@ export function HeroBrand() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [user, openAuth])
 
-  // 登录后自动滚动出首屏
+  // 登录后自动滚动出首屏（仅首次登录）
   useEffect(() => {
-    if (user) {
+    if (user && isFirstLogin.current) {
+      isFirstLogin.current = false
       setTimeout(() => {
         window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })
       }, 500)
@@ -194,7 +182,18 @@ export function HeroBrand() {
 
         {/* 按钮区 */}
         <div className="flex items-center gap-3 mb-12">
-          {!user && (
+          {user ? (
+            <button
+              onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+              className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
+              }}
+            >
+              让我康康！
+            </button>
+          ) : (
             <button
               onClick={openAuth}
               className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
@@ -267,7 +266,7 @@ export function HeroBrand() {
                         className="w-full overflow-hidden"
                         style={{ height: `${coverHeight}px` }}
                       >
-                        <LazyImage
+                        <CoverImage
                           src={item.cover_url}
                           alt={item.title}
                         />
