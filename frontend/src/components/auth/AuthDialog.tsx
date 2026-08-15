@@ -32,7 +32,7 @@ export function AuthDialog() {
         if (res.token) setToken(res.token)
         useToastStore.getState().addToast('success', `欢迎回来，${userData.username}！`)
       } else {
-        const res = await api.register({ code, username, password })
+        const res = await api.register({ invite_code: code, username, password })
         const userData = res.user as { username: string }
         setUser(res.user as any)
         if (res.token) setToken(res.token)

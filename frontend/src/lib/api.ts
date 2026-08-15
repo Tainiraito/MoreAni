@@ -14,7 +14,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     try {
       const err = await res.json()
-      errorMessage = err.detail || `HTTP ${res.status}`
+      const detail = err.detail
+      if (typeof detail === 'string') {
+        errorMessage = detail
+      } else if (Array.isArray(detail)) {
+        // FastAPI 422 validation error: [{ loc, msg, type }, ...] — must flatten to string
+        const msgs = detail
+          .map((d: { msg?: unknown }) => (typeof d?.msg === 'string' ? d.msg : ''))
+          .filter(Boolean)
+        errorMessage = msgs.length > 0 ? msgs.join('；') : `HTTP ${res.status}`
+      } else {
+        errorMessage = `HTTP ${res.status}`
+      }
     } catch {
       errorMessage = `HTTP ${res.status}`
     }
@@ -48,7 +59,7 @@ export const api = {
   // Auth
   login: (data: { username: string; password: string }) =>
     request<{ user: unknown; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
-  register: (data: { code: string; username: string; password: string }) =>
+  register: (data: { invite_code: string; username: string; password: string }) =>
     request<{ user: unknown; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => request<{ id: number; username: string; avatar_id: number; role: string }>('/auth/me'),
   updateAvatar: (avatar_id: number) =>
