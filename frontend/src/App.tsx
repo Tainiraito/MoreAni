@@ -13,7 +13,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="min-h-screen" style={{ background: 'var(--bg-page, #f5f3ef)' }}>
+        <div className="min-h-screen">
           <AppHeader />
           <Routes>
             <Route path="/" element={<HomePage />} />
