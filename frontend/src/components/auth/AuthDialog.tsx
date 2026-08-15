@@ -53,7 +53,7 @@ export function AuthDialog() {
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border-line)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255, 140, 212, 0.1)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -61,22 +61,18 @@ export function AuthDialog() {
         <div className="flex rounded-xl overflow-hidden mb-7" style={{ border: '1px solid var(--border-line)' }}>
           <button
             className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 ${
-              mode === 'login'
-                ? 'bg-brand text-white'
-                : 'hover:opacity-80'
+              mode === 'login' ? 'text-white' : 'hover:opacity-80'
             }`}
-            style={mode !== 'login' ? { color: 'var(--text-muted)', background: 'var(--bg-card-warm)' } : {}}
+            style={mode === 'login' ? { background: 'var(--btn-primary-bg)' } : { color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}
             onClick={() => { setMode('login'); resetForm() }}
           >
             登录
           </button>
           <button
             className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 ${
-              mode === 'register'
-                ? 'bg-brand text-white'
-                : 'hover:opacity-80'
+              mode === 'register' ? 'text-white' : 'hover:opacity-80'
             }`}
-            style={mode !== 'register' ? { color: 'var(--text-muted)', background: 'var(--bg-card-warm)', borderLeft: '1px solid var(--border-line)' } : { borderLeft: '1px solid var(--border-line)' }}
+            style={mode === 'register' ? { background: 'var(--btn-primary-bg)' } : { color: 'var(--text-muted)', background: 'var(--bg-card-warm)', borderLeft: '1px solid var(--border-line)' }}
             onClick={() => { setMode('register'); resetForm() }}
           >
             注册
@@ -85,34 +81,11 @@ export function AuthDialog() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
-            <Input
-              label="邀请码"
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              placeholder="请输入邀请码"
-              required
-            />
+            <Input label="邀请码" value={code} onChange={e => setCode(e.target.value)} placeholder="请输入邀请码" required />
           )}
-          <Input
-            label="用户名"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="请输入用户名"
-            required
-          />
-          <Input
-            label="密码"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="请输入密码"
-            required
-          />
-
-          {error && (
-            <p className="text-sm text-accent-coral">{error}</p>
-          )}
-
+          <Input label="用户名" value={username} onChange={e => setUsername(e.target.value)} placeholder="请输入用户名" required />
+          <Input label="密码" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
+          {error && <p className="text-sm text-accent-coral">{error}</p>}
           <Button type="submit" loading={loading} className="w-full">
             {mode === 'login' ? '登录' : '注册'}
           </Button>

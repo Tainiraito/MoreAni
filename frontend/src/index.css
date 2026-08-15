@@ -42,7 +42,13 @@
   --accent-pink: #FF8CD4;
   --border-line: rgba(0, 0, 0, 0.08);
   --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.1);
-  --shadow-neon: none;
+
+  /* 按钮规范 — 确保对比度 */
+  --btn-primary-bg: linear-gradient(135deg, #E060B8, #C750A0);
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-text: #E060B8;
+  --btn-secondary-border: #E060B8;
 }
 
 /* 暗色主题 */
@@ -57,7 +63,12 @@
   --accent-pink: #FF8CD4;
   --border-line: rgba(255, 140, 212, 0.12);
   --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.5);
-  --shadow-neon: 0 0 10px rgba(255, 140, 212, 0.3), 0 0 30px rgba(255, 140, 212, 0.1);
+
+  --btn-primary-bg: linear-gradient(135deg, #FF8CD4, #E060B8);
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-text: #FF8CD4;
+  --btn-secondary-border: rgba(255, 140, 212, 0.3);
 }
 
 @layer base {

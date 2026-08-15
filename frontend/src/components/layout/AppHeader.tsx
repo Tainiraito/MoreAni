@@ -20,7 +20,6 @@ export function AppHeader() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // 点击外部关闭菜单
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -49,16 +48,11 @@ export function AppHeader() {
     >
       <PageContainer>
         <div className="flex items-center justify-between">
-          {/* Logo — icon + 文字 */}
           <a
             href="/"
             className="flex items-center gap-2 transition-opacity duration-300 hover:opacity-80"
           >
-            <img
-              src="/favicon-32.png"
-              alt="MoreAni"
-              className="w-6 h-6 rounded-sm"
-            />
+            <img src="/favicon-32.png" alt="MoreAni" className="w-6 h-6 rounded-sm" />
             <span
               className="text-xs font-medium uppercase tracking-[0.15em]"
               style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
@@ -99,8 +93,8 @@ export function AppHeader() {
               <div
                 className="absolute top-full mt-2 w-48 rounded-xl overflow-hidden"
                 style={{
-                  right: '50%',
-                  transform: 'translateX(50%)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
@@ -108,7 +102,6 @@ export function AppHeader() {
                   transformOrigin: 'top center',
                 }}
               >
-                {/* 用户信息卡片（已登录） */}
                 {user && (
                   <div
                     className="px-4 py-3"
@@ -133,7 +126,6 @@ export function AppHeader() {
                   </div>
                 )}
 
-                {/* 主题切换 */}
                 <button
                   onClick={() => { toggleTheme(); setMenuOpen(false) }}
                   className={menuItemStyle}
@@ -144,7 +136,6 @@ export function AppHeader() {
                   {theme === 'light' ? '深色模式' : '浅色模式'}
                 </button>
 
-                {/* 设置（已登录） */}
                 {user && (
                   <button
                     onClick={() => { openSettings(); setMenuOpen(false) }}
@@ -157,10 +148,8 @@ export function AppHeader() {
                   </button>
                 )}
 
-                {/* 分割线 */}
                 <div style={{ borderTop: '1px solid var(--border-line)' }} />
 
-                {/* 登录/退出 */}
                 {user ? (
                   <button
                     onClick={() => { logout(); setMenuOpen(false) }}

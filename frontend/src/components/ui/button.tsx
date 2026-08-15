@@ -6,10 +6,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-brand text-white hover:bg-brand-deep',
-        secondary: 'bg-surface text-primary border border-border hover:bg-card-warm',
-        outline: 'bg-transparent text-primary border border-border hover:bg-surface',
-        ghost: 'bg-transparent text-primary hover:bg-surface',
+        primary: 'text-white',
+        secondary: 'border',
+        outline: 'border hover:opacity-80',
+        ghost: 'hover:opacity-80',
         danger: 'bg-accent-coral text-white hover:opacity-90',
       },
       size: {
@@ -40,6 +40,28 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  const dynamicStyles: Record<string, React.CSSProperties> = {
+    primary: {
+      background: 'var(--btn-primary-bg)',
+      color: 'var(--btn-primary-text)',
+    },
+    secondary: {
+      background: 'var(--btn-secondary-bg)',
+      color: 'var(--btn-secondary-text)',
+      borderColor: 'var(--btn-secondary-border)',
+    },
+    outline: {
+      background: 'transparent',
+      color: 'var(--text-primary)',
+      borderColor: 'var(--border-line)',
+    },
+    ghost: {
+      background: 'transparent',
+      color: 'var(--text-primary)',
+    },
+    danger: {},
+  }
+
   return (
     <button
       className={cn(
@@ -47,6 +69,7 @@ export function Button({
         (disabled || loading) && 'opacity-50 cursor-not-allowed',
         className
       )}
+      style={dynamicStyles[variant || 'primary']}
       disabled={disabled || loading}
       {...props}
     >

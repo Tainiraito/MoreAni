@@ -17,10 +17,8 @@ const TYPE_COLORS: Record<string, string> = {
   book: 'bg-type-book/10 text-type-book',
 }
 
-/** Force HTTPS for external image URLs */
 function secureUrl(url: string): string {
   if (!url) return url
-  // Proxy external images to bypass CORP/CORS restrictions
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
@@ -40,14 +38,10 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
   return (
     <div
       className="relative rounded-xl overflow-hidden cursor-pointer group mb-8"
-      style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-line)',
-      }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
       onClick={() => onSelect(content.id)}
     >
       <div className="flex flex-col md:flex-row">
-        {/* Cover */}
         <div className="md:w-2/5 aspect-[3/4] md:aspect-auto md:min-h-[420px] overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
           {content.cover_url ? (
             <img
@@ -69,7 +63,6 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
           </div>
         </div>
 
-        {/* Info */}
         <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center">
           <span className={`inline-block w-fit px-3 py-1 text-xs font-medium rounded-lg mb-5 ${TYPE_COLORS[content.content_type] || 'bg-surface text-slate'}`}>
             {TYPE_LABELS[content.content_type] || content.content_type}
@@ -87,9 +80,7 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
             <div className="mt-5 flex items-center gap-3">
               <div
                 className="px-4 py-2 rounded-lg"
-                style={{
-                  background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
-                }}
+                style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
               >
                 <span className="font-display text-xl font-bold text-white">{avgScore}</span>
                 <span className="text-xs text-white/60 ml-1">/ 10</span>
@@ -108,10 +99,8 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
 
           <div className="mt-7">
             <span
-              className="inline-flex items-center px-5 py-2.5 text-white text-sm font-medium rounded-full transition-all duration-200"
-              style={{
-                background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))',
-              }}
+              className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
               查看详情 →
             </span>
