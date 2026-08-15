@@ -1,39 +1,7 @@
 import { useState } from 'react'
 import { Star, Users, Play, Heart } from 'lucide-react'
+import { CoverImage } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
-
-/** Force HTTPS for external image URLs */
-function secureUrl(url: string): string {
-  if (!url) return ''
-  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
-    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
-  }
-  return url.replace(/^http:\/\//, 'https://')
-}
-
-/** 带占位的封面图片 */
-function CoverImage({ src, alt }: { src: string; alt: string }) {
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
-  const imageSrc = (!error && src) ? secureUrl(src) : '/placeholder.png'
-
-  return (
-    <div className="relative w-full h-full" style={{ background: 'var(--bg-card-warm)' }}>
-      {!loaded && (
-        <img src="/placeholder.png" alt={alt} className="absolute inset-0 w-full h-full object-cover" />
-      )}
-      {src && !error && (
-        <img
-          src={imageSrc}
-          alt={alt}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-        />
-      )}
-    </div>
-  )
-}
 
 type CardMode = 'grid' | 'scroll'
 
@@ -60,7 +28,7 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
   if (mode === 'grid') {
     return (
       <article
-        className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:shadow-lg relative"
+        className="group cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:shadow-lg hover:scale-[1.03] relative"
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border-line)',
@@ -99,14 +67,14 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
           <div className="flex items-center justify-center gap-3">
             {avgScore && (
               <div className="flex items-center gap-1">
-                <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                <span className="text-xs font-semibold" style={{ color: '#FB71A7' }}>
+                <Star size={12} style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={content.my_score ? '#FB71A7' : 'none'} />
+                <span className="text-xs font-semibold" style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }}>
                   {avgScore}
                 </span>
               </div>
             )}
             {(content.rating_count ?? 0) > 0 && (
-              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex items-center gap-1" style={{ color: content.my_has_review ? '#FB71A7' : 'var(--text-muted)' }}>
                 <Users size={10} />
                 <span className="text-xs">{content.rating_count}</span>
               </div>
@@ -192,14 +160,14 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
             <div className="flex items-center justify-center gap-2">
               {avgScore && (
                 <div className="flex items-center gap-0.5">
-                  <Star size={10} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                  <span className="text-xs font-semibold" style={{ color: '#FB71A7' }}>
+                  <Star size={10} style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={content.my_score ? '#FB71A7' : 'none'} />
+                  <span className="text-xs font-semibold" style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }}>
                     {avgScore}
                   </span>
                 </div>
               )}
               {(content.rating_count ?? 0) > 0 && (
-                <div className="flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
+                <div className="flex items-center gap-0.5" style={{ color: content.my_has_review ? '#FB71A7' : 'var(--text-muted)' }}>
                   <Users size={10} />
                   <span className="text-xs">{content.rating_count}</span>
                 </div>

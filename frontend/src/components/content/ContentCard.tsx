@@ -1,13 +1,18 @@
-import { TypeBadge } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
+import { secureUrl } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
 
-/** Force HTTPS for external image URLs (lain.bgm.tv returns 301 for HTTP) */
-function secureUrl(url: string): string {
-  if (!url) return url
-  if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
-    return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
-  }
-  return url.replace(/^http:\/\//, 'https://')
+const TYPE_LABELS: Record<string, string> = {
+  anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  anime: 'bg-type-anime/10 text-type-anime',
+  movie: 'bg-type-movie/10 text-type-movie',
+  game: 'bg-type-game/10 text-type-game',
+  software: 'bg-type-software/10 text-type-software',
+  website: 'bg-type-website/10 text-type-website',
+  book: 'bg-type-book/10 text-type-book',
 }
 
 interface ContentCardProps {
@@ -53,7 +58,9 @@ export function ContentCard({ content, onSelect }: ContentCardProps) {
 
       {/* Info */}
       <div className="p-3">
-        <TypeBadge type={content.content_type} />
+        <Badge className={TYPE_COLORS[content.content_type] || ''}>
+          {TYPE_LABELS[content.content_type] || content.content_type}
+        </Badge>
 
         <h3
           className="mt-2 line-clamp-1 text-base font-semibold"
