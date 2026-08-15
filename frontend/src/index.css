@@ -63,9 +63,13 @@
   border-color: var(--border-line);
 }
 
+html {
+  background-color: var(--bg-page);
+}
+
 body {
   font-family: var(--font-sans);
-  background: var(--bg-page);
+  background-color: var(--bg-page);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
