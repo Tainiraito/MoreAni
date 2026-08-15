@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useUIStore } from '@/stores/ui-store'
+import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
@@ -10,6 +11,7 @@ import { HeroSection } from '@/components/content/HeroSection'
 import type { ContentItem, ContentType } from '@/types'
 
 export function HomePage() {
+  const { user } = useAuthStore()
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
@@ -17,6 +19,8 @@ export function HomePage() {
   const { openDetail } = useUIStore()
 
   useEffect(() => {
+    if (!user) return // 未登录不加载内容
+
     setLoading(true)
     const params: Record<string, string> = {}
     if (activeType !== 'all') params.type = activeType
@@ -32,7 +36,12 @@ export function HomePage() {
       })
       .catch(() => { setItems([]); setHero(null) })
       .finally(() => setLoading(false))
-  }, [activeType])
+  }, [activeType, user])
+
+  // 未登录只显示首屏
+  if (!user) {
+    return <HeroBrand />
+  }
 
   // Separate anime (cover cards) from other types (list)
   const animeItems = items.filter(i => i.content_type === 'anime')
@@ -40,7 +49,7 @@ export function HomePage() {
 
   return (
     <PageMain>
-      {/* Hero 品牌区域 — 页面顶部大 icon + 标题 */}
+      {/* Hero 品牌区域 */}
       <HeroBrand />
 
       {/* 内容区域 */}
