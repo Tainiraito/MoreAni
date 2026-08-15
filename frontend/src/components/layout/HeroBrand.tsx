@@ -253,7 +253,7 @@ export function HeroBrand() {
                                 </span>
                               </div>
                             )}
-                            {item.rating_count && item.rating_count > 0 && (
+                            {(item.rating_count ?? 0) > 0 && (
                               <div className="flex items-center gap-1">
                                 <Users size={10} style={{ color: 'var(--text-muted)' }} />
                                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
