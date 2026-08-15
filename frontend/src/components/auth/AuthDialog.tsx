@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 
 export function AuthDialog() {
   const { authOpen, closeAuth } = useUIStore()
-  const { setUser } = useAuthStore()
+  const { setUser, setToken } = useAuthStore()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -25,9 +25,11 @@ export function AuthDialog() {
       if (mode === 'login') {
         const res = await api.login({ username, password })
         setUser(res.user as any)
+        if (res.token) setToken(res.token)
       } else {
         const res = await api.register({ code, username, password })
         setUser(res.user as any)
+        if (res.token) setToken(res.token)
       }
       closeAuth()
       resetForm()

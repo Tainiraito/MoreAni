@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 
 interface AuthState {
@@ -12,19 +13,31 @@ interface AuthState {
   isAuthenticated: () => boolean
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  token: null,
-  isGuest: false,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: null,
+      isGuest: false,
 
-  setUser: (user) => set({ user }),
-  setToken: (token) => set({ token }),
-  setGuest: (isGuest) => set({ isGuest }),
+      setUser: (user) => set({ user }),
+      setToken: (token) => set({ token }),
+      setGuest: (isGuest) => set({ isGuest }),
 
-  logout: () => set({ user: null, token: null, isGuest: false }),
+      logout: () => set({ user: null, token: null, isGuest: false }),
 
-  isAuthenticated: () => {
-    const state = get()
-    return state.user !== null || state.isGuest
-  },
-}))
+      isAuthenticated: () => {
+        const state = get()
+        return state.user !== null || state.isGuest
+      },
+    }),
+    {
+      name: 'moreani-auth', // localStorage key
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isGuest: state.isGuest,
+      }),
+    }
+  )
+)
