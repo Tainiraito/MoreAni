@@ -174,18 +174,13 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
             <div
               className="overflow-hidden transition-all duration-300"
               style={{
-                maxHeight: isHovered ? '100px' : '0px',
+                maxHeight: isHovered ? '120px' : '0px',
                 opacity: isHovered ? 1 : 0,
                 marginTop: isHovered ? '8px' : '0px',
               }}
             >
-              {content.episodes > 0 && (
-                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                  {content.episodes}集
-                </p>
-              )}
               {content.description && (
-                <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs text-center" style={{ color: 'var(--text-secondary)' }}>
                   {content.description}
                 </p>
               )}
