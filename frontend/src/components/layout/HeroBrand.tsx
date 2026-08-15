@@ -174,8 +174,8 @@ export function HeroBrand() {
       {/* 滚动推荐卡片 — 竖版卡片 */}
       {items.length > 0 && (
         <div
-          className="absolute left-0 right-0 overflow-hidden"
-          style={{ top: '58%', bottom: '48px' }}
+          className="absolute left-0 right-0"
+          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '16px 0' }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
         >
@@ -192,13 +192,13 @@ export function HeroBrand() {
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   borderRadius: '12px',
-                  width: `${hoveredId === item.id ? cardWidth + 16 : cardWidth}px`,
-                  transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
+                  width: `${cardWidth}px`,
+                  transform: hoveredId === item.id ? 'scale(1.08)' : 'scale(1)',
                   boxShadow: hoveredId === item.id
-                    ? '0 8px 30px rgba(0,0,0,0.15)'
+                    ? '0 12px 40px rgba(0,0,0,0.2)'
                     : 'none',
                   zIndex: hoveredId === item.id ? 10 : 1,
-                  transformOrigin: 'center bottom',
+                  transformOrigin: 'center center',
                   overflow: 'hidden',
                 }}
                 onMouseEnter={() => setHoveredId(item.id)}
