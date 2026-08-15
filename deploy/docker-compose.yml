@@ -16,7 +16,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: moreani-tunnel
     restart: unless-stopped
-    command: tunnel run
+    command: tunnel run --protocol http2
     environment:
       - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
     networks:
