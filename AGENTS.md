@@ -266,6 +266,31 @@ import { PageContainer, PageMain } from '@/components/layout/PageContainer'
 - 页面级容器不得使用自定义 `max-w-*` 或 `mx-auto`
 - 背景色: `var(--bg-page, #0a0a0a)`
 
+### 滚动触发导航栏
+
+页面顶部显示大品牌区域（`HeroBrand`：icon + 标题 + 副标题），导航栏在顶部时隐藏，向下滚动超过 80px 后平滑出现：
+
+```tsx
+// AppHeader.tsx
+const [scrolled, setScrolled] = useState(false)
+
+useEffect(() => {
+  const handleScroll = () => setScrolled(window.scrollY > 80)
+  window.addEventListener('scroll', handleScroll, { passive: true })
+  return () => window.removeEventListener('scroll', handleScroll)
+}, [])
+
+// 导航栏样式
+style={{
+  opacity: scrolled ? 1 : 0,
+  transform: scrolled ? 'translateY(0)' : 'translateY(-100%)',
+  pointerEvents: scrolled ? 'auto' : 'none',
+  backdropFilter: scrolled ? 'blur(12px)' : 'none',
+}}
+```
+
+**适用场景**：首页有大 Hero 区域时，其他页面（Profile等）可直接显示导航栏。
+
 ## 配色规范（霓虹粉深色主题）
 
 基于 favicon 图标的霓虹粉猫耳女孩设计，采用深色主题 + 霓虹粉强调色：
