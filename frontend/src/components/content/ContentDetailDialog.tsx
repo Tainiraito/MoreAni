@@ -4,7 +4,7 @@ import { api } from '@/lib/api'
 import { TypeBadge } from '@/components/ui/badge'
 import { ScoreBadge } from '@/components/rating/ScoreBadge'
 import { RatingForm } from '@/components/rating/RatingForm'
-import type { ContentItem, Rating } from '@/types'
+import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
 function secureUrl(url: string): string {
@@ -19,7 +19,6 @@ function secureUrl(url: string): string {
 export function ContentDetailDialog() {
   const { detailOpen, detailContentId, closeDetail } = useUIStore()
   const [content, setContent] = useState<ContentItem | null>(null)
-  const [ratings, setRatings] = useState<Rating[]>([])
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -132,22 +131,6 @@ export function ContentDetailDialog() {
                   </div>
                 )}
               </div>
-
-              {/* Ratings List */}
-              {ratings.length > 0 && (
-                <div className="border-t border-black/[0.06] pt-5">
-                  <h3 className="text-sm font-semibold text-ink mb-3">评分记录</h3>
-                  <div className="space-y-2.5">
-                    {ratings.map(r => (
-                      <div key={r.id} className="flex items-center gap-2 text-sm">
-                        <ScoreBadge score={r.score} size="sm" />
-                        <span className="text-muted">{r.username || '匿名用户'}</span>
-                        {r.review && <span className="text-slate">— {r.review}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         ) : (
