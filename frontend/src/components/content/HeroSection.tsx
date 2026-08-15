@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Eye, Check, X, RotateCcw, EyeOff } from 'lucide-react'
+import { Star, Users, Play, Heart } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -22,20 +22,14 @@ function secureUrl(url: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
-// 后端状态值
-export type BackendStatus = 'want' | 'watching' | 'watched' | 'dropped'
-
-// 前端显示状态（用于UI逻辑）
-export type DisplayStatus = 'none' | 'want' | 'watching' | 'watched' | 'dropped'
-
 interface HeroSectionProps {
   content: ContentItem
-  status?: DisplayStatus
+  isFavorited?: boolean
   onSelect: (id: number) => void
-  onStatusChange?: (status: BackendStatus | null) => void
+  onToggleFavorite?: () => void
 }
 
-export function HeroSection({ content, status = 'none', onSelect, onStatusChange }: HeroSectionProps) {
+export function HeroSection({ content, isFavorited = false, onSelect, onToggleFavorite }: HeroSectionProps) {
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
@@ -45,124 +39,9 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
   const director = metadata.director
   const studio = metadata.studio
 
-  const handleStatusClick = (e: React.MouseEvent, newStatus: BackendStatus | null) => {
+  const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    onStatusChange?.(newStatus)
-  }
-
-  const renderStatusButtons = () => {
-    if (!onStatusChange) return null
-
-    switch (status) {
-      case 'none':
-        return (
-          <>
-            <button
-              onClick={(e) => handleStatusClick(e, 'watching')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-            >
-              <Play size={16} />
-              正在看
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, 'want')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
-            >
-              <Eye size={16} />
-              想看
-            </button>
-          </>
-        )
-
-      case 'want':
-        return (
-          <>
-            <button
-              onClick={(e) => handleStatusClick(e, 'watching')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-            >
-              <Play size={16} />
-              正在看
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, null)}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
-            >
-              <EyeOff size={16} />
-              取消想看
-            </button>
-          </>
-        )
-
-      case 'watching':
-        return (
-          <>
-            <button
-              onClick={(e) => handleStatusClick(e, 'watched')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-            >
-              <Check size={16} />
-              已看
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, 'dropped')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
-            >
-              <X size={16} />
-              弃坑
-            </button>
-          </>
-        )
-
-      case 'watched':
-        return (
-          <>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}>
-              <Check size={16} />
-              已看
-            </div>
-            <button
-              onClick={(e) => handleStatusClick(e, 'watching')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
-            >
-              <RotateCcw size={16} />
-              重新看
-            </button>
-          </>
-        )
-
-      case 'dropped':
-        return (
-          <>
-            <button
-              onClick={(e) => handleStatusClick(e, 'watching')}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-            >
-              <RotateCcw size={16} />
-              重新看
-            </button>
-            <button
-              onClick={(e) => handleStatusClick(e, null)}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
-            >
-              <EyeOff size={16} />
-              取消弃坑
-            </button>
-          </>
-        )
-
-      default:
-        return null
-    }
+    onToggleFavorite?.()
   }
 
   return (
@@ -251,9 +130,23 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
             </p>
           )}
 
-          <div className="mt-7 flex items-center gap-3">
-            {renderStatusButtons()}
-          </div>
+          {/* 收藏按钮 */}
+          {onToggleFavorite && (
+            <div className="mt-7">
+              <button
+                onClick={handleFavoriteClick}
+                className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+                style={{
+                  background: isFavorited ? 'var(--brand)' : 'var(--bg-card-warm)',
+                  border: isFavorited ? 'none' : '1px solid var(--border-line)',
+                  color: isFavorited ? 'white' : 'var(--text-primary)',
+                }}
+              >
+                <Heart size={16} fill={isFavorited ? 'white' : 'none'} />
+                {isFavorited ? '已收藏' : '收藏'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

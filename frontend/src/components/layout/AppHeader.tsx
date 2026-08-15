@@ -53,7 +53,11 @@ export function AppHeader() {
             href="/"
             className="flex items-center gap-2 transition-opacity duration-300 hover:opacity-80"
           >
-            <img src="/favicon-32.png" alt="MoreAni" className="w-6 h-6 rounded-sm" />
+            <img 
+              src={theme === 'dark' ? '/favicon-white-32.png' : '/favicon-32.png'} 
+              alt="MoreAni" 
+              className="w-6 h-6 rounded-sm" 
+            />
             <span
               className="text-xs font-medium uppercase tracking-[0.15em]"
               style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
