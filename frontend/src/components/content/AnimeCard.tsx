@@ -144,13 +144,13 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
           }}
         >
           <div className="p-3 text-center">
-            <h3 className="text-xs font-semibold truncate mb-1.5" style={{ color: 'var(--text-primary)' }}>
+            <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
               {content.title}
             </h3>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-2">
               {avgScore && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   <Star size={10} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
                   <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
                     {avgScore}
@@ -158,9 +158,15 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
                 </div>
               )}
               {(content.rating_count ?? 0) > 0 && (
-                <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <div className="flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
                   <Users size={10} />
                   <span className="text-xs">{content.rating_count}</span>
+                </div>
+              )}
+              {content.episodes > 0 && (
+                <div className="flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
+                  <Play size={10} />
+                  <span className="text-xs">{content.episodes}集</span>
                 </div>
               )}
             </div>
