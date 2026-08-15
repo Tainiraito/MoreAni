@@ -183,21 +183,21 @@ export function HeroBrand() {
               {displayItems.map((item, index) => (
                 <div
                   key={index}
-                  className="flex-shrink-0 cursor-pointer relative"
+                  className="flex-shrink-0 cursor-pointer"
                   style={{
                     width: `${cardWidth}px`,
                     height: '280px',
                     transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
                     zIndex: hoveredIndex === index ? 20 : 1,
                     transformOrigin: 'center bottom',
-                    transition: 'transform 0.3s ease, z-index 0s',
+                    transition: 'transform 0.3s ease',
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {/* 默认状态：封面 + 信息 */}
+                  {/* 卡片容器 */}
                   <div
-                    className="absolute inset-0 rounded-xl overflow-hidden"
+                    className="relative w-full h-full rounded-xl overflow-hidden"
                     style={{
                       background: 'var(--bg-card)',
                       border: '1px solid var(--border-line)',
@@ -209,11 +209,11 @@ export function HeroBrand() {
                   >
                     {/* 封面 */}
                     <div
-                      className="w-full"
+                      className="w-full overflow-hidden"
                       style={{ 
                         background: 'var(--bg-card-warm)',
                         height: '210px',
-                        overflow: 'hidden',
+                        transition: 'height 0.3s ease',
                       }}
                     >
                       <img
@@ -227,13 +227,25 @@ export function HeroBrand() {
                       />
                     </div>
 
-                    {/* 信息 */}
-                    <div className="p-3 text-center">
+                    {/* 信息区 — 向上滑动遮住封面 */}
+                    <div
+                      className="absolute left-0 right-0 p-3"
+                      style={{
+                        bottom: 0,
+                        background: 'var(--bg-card)',
+                        borderTop: '1px solid var(--border-line)',
+                        transition: 'transform 0.3s ease',
+                        transform: hoveredIndex === index ? 'translateY(-70px)' : 'translateY(0)',
+                      }}
+                    >
+                      {/* 标题 */}
                       <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
                         {item.title}
                       </h3>
+
+                      {/* 分数 */}
                       {item.avg_score && item.avg_score > 0 && (
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center gap-1 mb-1">
                           <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
                             ★ {(item.avg_score / 10).toFixed(1)}
                           </span>
@@ -242,66 +254,28 @@ export function HeroBrand() {
                           </span>
                         </div>
                       )}
-                    </div>
-                  </div>
 
-                  {/* Hover 覆盖层：覆盖整个卡片 */}
-                  {hoveredIndex === index && (
-                    <div
-                      className="absolute inset-0 rounded-xl overflow-hidden flex flex-col"
-                      style={{
-                        background: 'var(--bg-card)',
-                        border: '2px solid var(--brand)',
-                        boxShadow: '0 12px 40px rgba(251, 113, 167, 0.25)',
-                      }}
-                    >
-                      {/* 封面（半透明） */}
+                      {/* 集数 + 简介 — hover 时显示 */}
                       <div
-                        className="w-full relative"
-                        style={{ height: '120px', overflow: 'hidden' }}
+                        className="overflow-hidden transition-all duration-300"
+                        style={{
+                          maxHeight: hoveredIndex === index ? '80px' : '0px',
+                          opacity: hoveredIndex === index ? 1 : 0,
+                        }}
                       >
-                        <img
-                          src={secureUrl(item.cover_url)}
-                          alt={item.title}
-                          className="w-full h-full object-cover opacity-40"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = '/placeholder.png'
-                          }}
-                        />
-                        {/* 分数覆盖在封面上 */}
-                        {item.avg_score && item.avg_score > 0 && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold" style={{ color: 'var(--brand)' }}>
-                                ★ {(item.avg_score / 10).toFixed(1)}
-                              </div>
-                              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                {item.rating_count || 0}人评分
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 详细信息 */}
-                      <div className="flex-1 p-3 flex flex-col">
-                        <h3 className="text-sm font-semibold mb-2 line-clamp-1" style={{ color: 'var(--text-primary)' }}>
-                          {item.title}
-                        </h3>
                         {item.episodes > 0 && (
-                          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+                          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
                             {item.episodes}集
                           </p>
                         )}
                         {item.description && (
-                          <p className="text-xs line-clamp-4 flex-1" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-xs line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
                             {item.description}
                           </p>
                         )}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
