@@ -239,6 +239,33 @@ function secureUrl(url: string): string {
 
 This applies to: `ContentCard`, `HeroSection`, `ContentDetailDialog`.
 
+## Layout System (Gleamory Style)
+
+All pages must use `PageContainer` or `PageMain` for consistent centering:
+
+```tsx
+import { PageContainer, PageMain } from '@/components/layout/PageContainer'
+
+// For page content (uses <main> element)
+<PageMain className="py-20 sm:py-24">
+  {/* Content here */}
+</PageMain>
+
+// For other containers (uses <div> element)
+<PageContainer>
+  {/* Content here */}
+</PageContainer>
+```
+
+**Width modes**:
+- `standard` (default): `px-6 sm:px-[5.5%]` + `max-w-[90rem]` — for most pages
+- `wide`: `px-4 sm:px-6 lg:px-8` + `max-w-[100rem]` — for wide workspaces
+
+**Critical rules**:
+- `AppHeader` must use same width mode as page content
+- Never use custom `max-w-*` or `mx-auto` on page-level containers
+- Background color: `var(--bg-page, #f5f3ef)`
+
 ## What NOT to Do
 
 - ❌ Don't put business logic in routers
