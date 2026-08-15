@@ -63,30 +63,27 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function HeroBrand() {
-  const { openAuth } = useUIStore()
+  const { openAuth, authOpen } = useUIStore()
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
   const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(0)
+  const hasTriggeredRef = useRef(false)
   const cardWidth = 160
   const gap = 20
-  const totalSteps = 10 // 需要滚动10次达到100%
+  const totalSteps = 10
 
   // 加载番剧内容并随机选取
   useEffect(() => {
     api.listContent({ type: 'anime' })
       .then(res => {
         const list = (res.items || []) as ContentItem[]
-        // 只选取有封面的番剧
         const withCover = list.filter(i => i.cover_url)
-        // 随机打乱
         const shuffled = shuffleArray(withCover)
-        // 至少取 12 个，确保不会出现空白
         const selected = shuffled.slice(0, Math.max(12, shuffled.length))
         setItems(selected)
       })
@@ -98,6 +95,9 @@ export function HeroBrand() {
     if (user) return
 
     const handleWheel = (e: WheelEvent) => {
+      // 如果登录框打开，不处理
+      if (authOpen) return
+      
       e.preventDefault()
       
       // 向下滚动增加进度
@@ -107,42 +107,55 @@ export function HeroBrand() {
       // 向上滚动减少进度
       else if (e.deltaY < 0) {
         progressRef.current = Math.max(0, progressRef.current - (1 / totalSteps))
+        // 向上滚动时重置触发标记
+        if (progressRef.current < 0.8) {
+          hasTriggeredRef.current = false
+        }
       }
       
       setScrollProgress(progressRef.current)
       
-      // 进度达到100%时显示登录提示
-      if (progressRef.current >= 1 && !showLoginPrompt) {
-        setShowLoginPrompt(true)
+      // 进度达到100%时显示登录提示（只触发一次）
+      if (progressRef.current >= 1 && !hasTriggeredRef.current) {
+        hasTriggeredRef.current = true
         openAuth()
       }
     }
 
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
-  }, [user, openAuth, showLoginPrompt])
+  }, [user, openAuth, authOpen])
 
-  // 自动循环滚动 - 使用 CSS animation
+  // 登录框关闭时重置进度
   useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container || items.length === 0) return
-
-    // 计算一组卡片的宽度
-    const singleSetWidth = items.length * (cardWidth + gap)
-    
-    // 设置动画
-    const duration = singleSetWidth / 25 // 25px/s
-    container.style.animationDuration = `${duration}s`
-  }, [items])
+    if (!authOpen && hasTriggeredRef.current) {
+      // 延迟重置，避免立即触发
+      setTimeout(() => {
+        progressRef.current = 0
+        setScrollProgress(0)
+        hasTriggeredRef.current = false
+      }, 500)
+    }
+  }, [authOpen])
 
   // 登录后重置进度
   useEffect(() => {
     if (user) {
       progressRef.current = 0
       setScrollProgress(0)
-      setShowLoginPrompt(false)
+      hasTriggeredRef.current = false
     }
   }, [user])
+
+  // 自动循环滚动 - 使用 CSS animation
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container || items.length === 0) return
+
+    const singleSetWidth = items.length * (cardWidth + gap)
+    const duration = singleSetWidth / 25
+    container.style.animationDuration = `${duration}s`
+  }, [items])
 
   // 生成足够的卡片用于无缝循环（4组）
   const minSets = 4
@@ -349,17 +362,12 @@ export function HeroBrand() {
       {!user && (
         <div className="fixed bottom-6 left-0 right-0 flex flex-col items-center gap-2">
           {/* 进度条 */}
-          <div
-            className="w-48 h-1.5 rounded-full overflow-hidden"
-            style={{ background: 'var(--border-line)' }}
-          >
+          <div className="w-48 h-1.5 rounded-full bg-gray-200 overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300 ease-out"
               style={{
                 width: `${scrollProgress * 100}%`,
-                background: scrollProgress >= 1 
-                  ? 'var(--brand)' 
-                  : `linear-gradient(90deg, var(--brand) 0%, var(--brand-deep) 100%)`,
+                backgroundColor: '#FB71A7',
               }}
             />
           </div>
@@ -391,40 +399,6 @@ export function HeroBrand() {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 5v14M19 12l-7 7-7-7" />
             </svg>
-          </div>
-        </div>
-      )}
-
-      {/* 进度条满时的遮罩 */}
-      {showLoginPrompt && !user && (
-        <div
-          className="fixed inset-0 flex items-center justify-center"
-          style={{
-            background: 'rgba(0,0,0,0.3)',
-            animation: 'fade-in 300ms ease-out',
-          }}
-          onClick={() => setShowLoginPrompt(false)}
-        >
-          <div
-            className="px-8 py-4 rounded-xl text-center"
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-line)',
-            }}
-          >
-            <p className="text-sm mb-3" style={{ color: 'var(--text-primary)' }}>
-              登录后解锁完整内容
-            </p>
-            <button
-              onClick={(e) => { e.stopPropagation(); openAuth() }}
-              className="px-6 py-2 text-sm font-semibold rounded-full"
-              style={{
-                background: 'var(--btn-primary-bg)',
-                color: 'var(--btn-primary-text)',
-              }}
-            >
-              登录 / 注册
-            </button>
           </div>
         </div>
       )}
