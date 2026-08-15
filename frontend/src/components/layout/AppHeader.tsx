@@ -5,6 +5,7 @@ import { useToastStore } from '@/stores/toast-store'
 import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
+import { Avatar } from '@/components/ui/Avatar'
 import { User, Sun, Moon, Settings, LogOut } from 'lucide-react'
 
 export function AppHeader() {
@@ -76,12 +77,8 @@ export function AppHeader() {
               style={{ border: '2px solid var(--border-line)' }}
             >
               {user ? (
-                <div
-                  className="w-full h-full flex items-center justify-center text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
-                >
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
+                <Avatar name={user.nickname} size={28}
+                  style={{ border: '2px solid var(--border-line)' }} />
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center"
@@ -112,15 +109,10 @@ export function AppHeader() {
                     style={{ borderBottom: '1px solid var(--border-line)' }}
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
-                      >
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
+                      <Avatar name={user.nickname} size={40} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                          {user.username}
+                          {user.nickname}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                           {user.role === 'admin' ? '管理员' : '成员'}

@@ -39,6 +39,14 @@
 ### 修复
 - 注册白屏：注册请求字段名与后端对齐（`invite_code`），API 错误处理规范化（FastAPI 422 detail 为对象数组，须转字符串后再渲染，否则 React 崩溃整页白屏）
 
+### 用户体系
+- 账号/昵称分离：User 新增唯一 nickname 字段，账号与昵称均可登录（登录二义性校验）
+- 初始化脚本 `scripts/manage_users.py`：迁移 nickname 字段 + 固定创建管理员（Elysia/爱莉希雅）+ 查看用户
+- 注册表单新增昵称输入（对外显示）；公开显示（header/个人页/评论）改用昵称，账号仅登录用
+- 修改密码功能上线（SettingsDialog 表单，原密码+新密码+确认）
+- 头像优化：统一 Avatar 组件（昵称首字 + 品牌粉背景，适配亮暗主题），替换全部显示点
+- 修复后端跨 session 写用户导致的改密码 500（update_password/update_avatar 在传入 session 内重查用户）
+
 
 
 ### 重构

@@ -30,6 +30,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
           setUser({
             id: userData.id,
             username: userData.username,
+            nickname: userData.nickname,
             avatar_id: userData.avatar_id,
             role: userData.role as 'user' | 'admin',
             created_at: new Date().toISOString(),

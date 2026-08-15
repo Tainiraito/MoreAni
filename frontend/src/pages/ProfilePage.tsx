@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { ScoreBadge } from '@/components/rating/ScoreBadge'
+import { Avatar } from '@/components/ui/Avatar'
 import type { User, Rating } from '@/types'
 
 export function ProfilePage() {
@@ -56,22 +57,12 @@ export function ProfilePage() {
         }}
       >
         <div className="flex items-center gap-5">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, var(--brand-light), var(--brand))',
-              border: '2px solid var(--brand)',
-              boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)',
-            }}
-          >
-            <span className="text-white text-xl font-semibold">
-              {user.username.charAt(0).toUpperCase()}
-            </span>
-          </div>
+          <Avatar name={user.nickname} size={64}
+            style={{ border: '2px solid var(--brand)', boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)' }} />
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.username}</h1>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.nickname}</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {user.role === 'admin' ? '管理员' : '成员'} · 加入于 {new Date(user.created_at).toLocaleDateString('zh-CN')}
+              @{user.username} · {user.role === 'admin' ? '管理员' : '成员'} · 加入于 {new Date(user.created_at).toLocaleDateString('zh-CN')}
             </p>
           </div>
         </div>

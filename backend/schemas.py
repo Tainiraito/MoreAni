@@ -42,6 +42,7 @@ class RegisterRequest(BaseModel):
     """Registration request body."""
 
     username: str = Field(min_length=3, max_length=50)
+    nickname: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=6, max_length=128)
     invite_code: str
 
@@ -51,6 +52,7 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
+    nickname: str
     avatar_id: int = 0
     role: str = 'user'
     created_at: datetime
@@ -219,6 +221,7 @@ class RatingResponse(BaseModel):
     content_id: int
     user_id: int
     username: str = ''
+    nickname: str = ''
     score: int
     recommend: int
     review: str = ''

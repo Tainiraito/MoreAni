@@ -32,6 +32,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
+    nickname = Column(String(50), unique=True, nullable=False, index=True)  # display name, unique
     password_hash = Column(String(128), nullable=False)
     avatar_id = Column(Integer, default=0)
     role = Column(String(20), default='user')  # admin / user

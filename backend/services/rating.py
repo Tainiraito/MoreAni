@@ -130,6 +130,7 @@ def get_recent_activity(
                 'recommend': rating.recommend,
                 'review': rating.review,
                 'username': '匿名用户' if guest_mode else user.username,
+                'nickname': '匿名用户' if guest_mode else user.nickname,
                 'avatar_id': 0 if guest_mode else user.avatar_id,
                 'created_at': rating.created_at,
             }
@@ -203,6 +204,7 @@ def get_content_ratings(
                 'content_id': content_id,
                 'user_id': rating.user_id,
                 'username': user.username,
+                'nickname': user.nickname,
                 'avatar_id': user.avatar_id,
                 'score': rating.score,
                 'recommend': rating.recommend,

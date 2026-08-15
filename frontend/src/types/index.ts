@@ -47,6 +47,7 @@ export interface Rating {
 export interface User {
   id: number
   username: string
+  nickname: string
   avatar_id: number
   role: string
   created_at: string

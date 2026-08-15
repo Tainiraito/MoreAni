@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/components/ui/CoverImage'
+import { Avatar } from '@/components/ui/Avatar'
 import type { ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
@@ -22,6 +23,7 @@ interface Review {
   content_id: number
   user_id: number
   username: string
+  nickname: string
   avatar_id: number
   score: number
   recommend: number
@@ -437,14 +439,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
-                          style={{ background: '#FB71A7', color: 'white' }}
-                        >
-                          {user.username.charAt(0).toUpperCase()}
-                        </div>
+                        <Avatar name={user.nickname} size={24} />
                         <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {user.username}
+                          {user.nickname}
                           <span className="ml-1.5 font-normal" style={{ color: '#FB71A7' }}>
                             点击编辑
                           </span>
@@ -594,14 +591,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
-                              style={{ background: 'var(--border-line)', color: 'var(--text-primary)' }}
-                            >
-                              {review.username.charAt(0).toUpperCase()}
-                            </div>
+                            <Avatar name={review.nickname || review.username} size={24} />
                             <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                              {review.username}
+                              {review.nickname || review.username}
                             </span>
                           </div>
                           <div className="flex items-center gap-1">

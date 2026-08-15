@@ -16,7 +16,7 @@ from schemas import (
 )
 from services.user import (
     create_user,
-    get_user_by_username,
+    get_user_by_login,
     update_avatar,
     update_password,
 )
@@ -34,11 +34,11 @@ def login(
 
     Sets httpOnly cookie 'access_token' on success.
     """
-    user = get_user_by_username(db, body.username)
+    user = get_user_by_login(db, body.username)
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='用户名或密码错误',
+            detail='账号/昵称或密码错误',
         )
 
     token = create_access_token({'sub': user.id})
@@ -76,16 +76,27 @@ def register(
             detail='邀请码已用完',
         )
 
-    # Check username uniqueness
-    if get_user_by_username(db, body.username):
+    # Check username & nickname uniqueness — both must not collide with ANY
+    # existing username/nickname, otherwise login lookup becomes ambiguous.
+    if get_user_by_login(db, body.username):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail='用户名已存在',
+            detail='账号已被使用',
+        )
+    if get_user_by_login(db, body.nickname):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='昵称已被使用',
         )
 
     # Create user
     password_hash = get_password_hash(body.password)
-    user = create_user(db, username=body.username, password_hash=password_hash)
+    user = create_user(
+        db,
+        username=body.username,
+        nickname=body.nickname,
+        password_hash=password_hash,
+    )
 
     # Increment invite code usage
     invite.use_count += 1

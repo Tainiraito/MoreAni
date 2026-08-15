@@ -13,6 +13,7 @@ export function AuthDialog() {
   const { setUser, setToken } = useAuthStore()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
+  const [nickname, setNickname] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
@@ -27,16 +28,16 @@ export function AuthDialog() {
     try {
       if (mode === 'login') {
         const res = await api.login({ username, password })
-        const userData = res.user as { username: string }
+        const userData = res.user as { nickname: string }
         setUser(res.user as any)
         if (res.token) setToken(res.token)
-        useToastStore.getState().addToast('success', `欢迎回来，${userData.username}！`)
+        useToastStore.getState().addToast('success', `欢迎回来，${userData.nickname}！`)
       } else {
-        const res = await api.register({ invite_code: code, username, password })
-        const userData = res.user as { username: string }
+        const res = await api.register({ invite_code: code, username, nickname, password })
+        const userData = res.user as { nickname: string }
         setUser(res.user as any)
         if (res.token) setToken(res.token)
-        useToastStore.getState().addToast('success', `注册成功，欢迎加入，${userData.username}！`)
+        useToastStore.getState().addToast('success', `注册成功，欢迎加入，${userData.nickname}！`)
       }
       closeAuth()
       resetForm()
@@ -49,6 +50,7 @@ export function AuthDialog() {
 
   const resetForm = () => {
     setUsername('')
+    setNickname('')
     setPassword('')
     setCode('')
     setError('')
@@ -96,9 +98,15 @@ export function AuthDialog() {
             </div>
           )}
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>用户名</Label>
-            <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="请输入用户名" required />
+            <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>账号</Label>
+            <Input value={username} onChange={e => setUsername(e.target.value)} placeholder={mode === 'login' ? '账号或昵称' : '请输入账号（用于登录）'} required />
           </div>
+          {mode === 'register' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>昵称</Label>
+              <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="请输入昵称（对外显示）" required />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>密码</Label>
             <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="请输入密码" required />
