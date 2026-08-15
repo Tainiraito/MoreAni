@@ -65,12 +65,21 @@ export function HomePage() {
 
   // 换一个精选
   const handleRefreshHero = useCallback(() => {
-    if (allAnime.length <= 1) return
-    let newIndex: number
-    do {
-      newIndex = Math.floor(Math.random() * allAnime.length)
-    } while (allAnime[newIndex]?.id === hero?.id && allAnime.length > 1)
-    setHero(allAnime[newIndex])
+    if (allAnime.length === 0) {
+      setHero(null)
+      return
+    }
+    
+    // 从列表中移除当前 hero，然后随机选
+    const remaining = allAnime.filter(a => a.id !== hero?.id)
+    if (remaining.length === 0) {
+      // 如果只剩一个，重新从完整列表选
+      const randomIndex = Math.floor(Math.random() * allAnime.length)
+      setHero(allAnime[randomIndex])
+    } else {
+      const randomIndex = Math.floor(Math.random() * remaining.length)
+      setHero(remaining[randomIndex])
+    }
   }, [allAnime, hero])
 
   // 想看
@@ -78,6 +87,8 @@ export function HomePage() {
     if (!hero) return
     try {
       await api.setStatus({ content_id: hero.id, status: 'wish' })
+      // 从 allAnime 中移除当前 hero
+      setAllAnime(prev => prev.filter(a => a.id !== hero.id))
       // 换下一个
       handleRefreshHero()
     } catch {
@@ -121,6 +132,21 @@ export function HomePage() {
               <RefreshCw size={12} />
               换一个
             </button>
+          </div>
+        )}
+
+        {/* 没有未观看番剧时提示 */}
+        {!hero && allAnime.length === 0 && (
+          <div
+            className="p-8 rounded-xl text-center mb-8"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-line)',
+            }}
+          >
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              所有番剧都已评分或标记，太棒了！🎉
+            </p>
           </div>
         )}
 
