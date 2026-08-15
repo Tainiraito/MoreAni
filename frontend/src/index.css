@@ -2,19 +2,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 /* ============================================
-   MoreAni 配色规范 — 基于霓虹粉猫耳 icon
+   MoreAni 配色规范 — 基于 icon 主色 #FB71A7
    支持浅色/暗色主题切换，默认浅色
    ============================================ */
 
 @theme {
-  /* 品牌色系 — 霓虹粉 */
-  --color-brand: #FF8CD4;
-  --color-brand-light: #FFBDEA;
-  --color-brand-deep: #E060B8;
+  /* 品牌色系 — 统一使用 icon 的粉色 */
+  --color-brand: #FB71A7;
+  --color-brand-light: #FECDDA;
+  --color-brand-deep: #E85D93;
   --color-brand-neon: #FF00FF;
 
   /* 内容类型色 */
-  --color-type-anime: #FF8CD4;
+  --color-type-anime: #FB71A7;
   --color-type-movie: #00B894;
   --color-type-game: #E17055;
   --color-type-software: #D4A017;
@@ -38,17 +38,17 @@
   --text-primary: #1a1a1a;
   --text-secondary: #555555;
   --text-muted: #999999;
-  --accent-amber: #FF8CD4;
-  --accent-pink: #FF8CD4;
+  --accent-amber: #FB71A7;
+  --accent-pink: #FB71A7;
   --border-line: rgba(0, 0, 0, 0.08);
   --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.1);
 
-  /* 按钮规范 — 确保对比度 */
-  --btn-primary-bg: linear-gradient(135deg, #E060B8, #C750A0);
+  /* 按钮规范 — 使用 icon 粉色渐变 */
+  --btn-primary-bg: linear-gradient(135deg, #FB71A7, #E85D93);
   --btn-primary-text: #ffffff;
   --btn-secondary-bg: transparent;
-  --btn-secondary-text: #E060B8;
-  --btn-secondary-border: #E060B8;
+  --btn-secondary-text: #FB71A7;
+  --btn-secondary-border: #FB71A7;
 }
 
 /* 暗色主题 */
@@ -59,16 +59,16 @@
   --text-primary: #f0f0f0;
   --text-secondary: #b0b0b0;
   --text-muted: #808080;
-  --accent-amber: #FF8CD4;
-  --accent-pink: #FF8CD4;
-  --border-line: rgba(255, 140, 212, 0.12);
+  --accent-amber: #FB71A7;
+  --accent-pink: #FB71A7;
+  --border-line: rgba(251, 113, 167, 0.15);
   --shadow-popup: 0 4px 20px rgba(0, 0, 0, 0.5);
 
-  --btn-primary-bg: linear-gradient(135deg, #FF8CD4, #E060B8);
+  --btn-primary-bg: linear-gradient(135deg, #FB71A7, #E85D93);
   --btn-primary-text: #ffffff;
   --btn-secondary-bg: transparent;
-  --btn-secondary-text: #FF8CD4;
-  --btn-secondary-border: rgba(255, 140, 212, 0.3);
+  --btn-secondary-text: #FB71A7;
+  --btn-secondary-border: rgba(251, 113, 167, 0.3);
 }
 
 @layer base {
@@ -96,8 +96,8 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
-:root.dark ::-webkit-scrollbar-thumb { background: rgba(255, 140, 212, 0.2); }
-:root.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255, 140, 212, 0.4); }
+:root.dark ::-webkit-scrollbar-thumb { background: rgba(251, 113, 167, 0.2); }
+:root.dark ::-webkit-scrollbar-thumb:hover { background: rgba(251, 113, 167, 0.4); }
 
 /* Smooth animations */
 @keyframes slide-in-right {
