@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Award, Building, Calendar, MessageCircle } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -43,10 +43,13 @@ export function ContentDetailDialog() {
   const [score, setScore] = useState(0)
   const [hoverScore, setHoverScore] = useState(0)
   const [reviews, setReviews] = useState<Review[]>([])
+  const [bangumiScore, setBangumiScore] = useState<number | null>(null)
+  const [bangumiLoading, setBangumiLoading] = useState(false)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
+      setBangumiScore(null) // 重置 Bangumi 评分
       Promise.all([
         api.getContent(detailContentId) as Promise<ContentItem>,
         api.getContentRatings(detailContentId, { size: '10' }),
@@ -79,16 +82,29 @@ export function ContentDetailDialog() {
     }
   }
 
+  // 查询 Bangumi 评分
+  const handleFetchBangumiScore = async () => {
+    if (!content?.source_id || content.source_type !== 'bangumi') return
+    setBangumiLoading(true)
+    try {
+      const res = await api.getBangumiScore(parseInt(content.source_id))
+      setBangumiScore(res.score)
+    } catch {
+      toast.addToast('error', '查询失败')
+    } finally {
+      setBangumiLoading(false)
+    }
+  }
+
   const typeConfig = content?.content_type ? TYPE_CONFIG[content.content_type] : null
   const TypeIcon = typeConfig?.icon || Star
   const avgScore = content?.avg_score ? (content.avg_score / 10).toFixed(1) : null
 
-  // Parse metadata
+  // Parse metadata (不包含 bangumi 评分了)
   const metadata = content?.metadata 
     ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) 
     : {}
   const tags = metadata.tags || []
-  const bangumiScore = metadata.bangumi_score
   const director = metadata.director
   const studio = metadata.studio
   const airDate = metadata.air_date || content?.release_date
@@ -215,12 +231,19 @@ export function ContentDetailDialog() {
                   </div>
                 )}
 
-                {/* Bangumi 评分 */}
-                {bangumiScore && (
-                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                    <Award size={14} />
-                    <span className="text-sm">BGM {bangumiScore}</span>
-                  </div>
+                {/* Bangumi 链接 */}
+                {content.source_url && (
+                  <a
+                    href={content.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <ExternalLink size={12} />
+                    Bangumi
+                  </a>
                 )}
               </div>
 
@@ -274,7 +297,7 @@ export function ContentDetailDialog() {
                 </p>
               )}
 
-              {/* 我的评分 */}
+              {/* 我的评分 + Bangumi 参考 */}
               {user && (
                 <div
                   className="p-4 rounded-xl mb-6"
@@ -283,9 +306,36 @@ export function ContentDetailDialog() {
                     border: '1px solid var(--border-line)',
                   }}
                 >
-                  <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
-                    我的评分
-                  </h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      我的评分
+                    </h3>
+                    
+                    {/* Bangumi 参考评分按钮 */}
+                    {content.source_type === 'bangumi' && content.source_id && (
+                      <button
+                        onClick={handleFetchBangumiScore}
+                        disabled={bangumiLoading}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+                        style={{
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-line)',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        {bangumiLoading ? (
+                          <div
+                            className="animate-spin w-3 h-3 border rounded-full"
+                            style={{ borderColor: 'var(--border-line)', borderTopColor: 'var(--brand)' }}
+                          />
+                        ) : (
+                          <ExternalLink size={10} />
+                        )}
+                        {bangumiScore !== null ? `BGM ${bangumiScore}` : 'Bangumi 参考'}
+                      </button>
+                    )}
+                  </div>
+                  
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
                       <button

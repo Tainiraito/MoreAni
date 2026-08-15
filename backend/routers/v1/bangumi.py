@@ -89,3 +89,19 @@ async def import_from_bangumi(
     )
 
     return BangumiImportResponse(content_id=content.id, status="created")
+
+
+@router.get("/score/{bgm_id}")
+async def get_bangumi_score(
+    bgm_id: int,
+) -> dict:
+    """Get real-time score from Bangumi API.
+
+    Returns the current score without caching.
+    """
+    detail = await bangumi_svc.get_subject_detail(bgm_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Bangumi subject not found")
+    
+    score = detail.get("rating", {}).get("score", 0)
+    return {"score": score}

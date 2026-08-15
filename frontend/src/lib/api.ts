@@ -97,6 +97,8 @@ export const api = {
   searchBangumi: (q: string) => request<{ items: unknown[] }>(`/bangumi/search?q=${encodeURIComponent(q)}`),
   importBangumi: (bgm_id: number) =>
     request<{ id: number }>('/bangumi/import', { method: 'POST', body: JSON.stringify({ bgm_id }) }),
+  getBangumiScore: (bgm_id: number) =>
+    request<{ score: number }>(`/bangumi/score/${bgm_id}`),
 
   // User
   getUser: (id: number) => request<unknown>(`/user/${id}`),
