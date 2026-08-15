@@ -64,7 +64,7 @@ export function HeroBrand() {
   const animFrameRef = useRef<number>(0)
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
-  const isFirstLogin = useRef(true)
+  const isFirstLogin = useRef(!sessionStorage.getItem('moreani-scrolled'))
   const cardWidth = 160
   const gap = 20
   const coverHeight = 210
@@ -139,8 +139,11 @@ export function HeroBrand() {
   useEffect(() => {
     if (user && isFirstLogin.current) {
       isFirstLogin.current = false
+      sessionStorage.setItem('moreani-scrolled', '1')
       setTimeout(() => {
-        window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })
+        // 滚动到内容区域，留出导航栏空间
+        const scrollTarget = window.innerHeight - 48
+        window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
       }, 500)
     }
   }, [user])
@@ -184,7 +187,10 @@ export function HeroBrand() {
         <div className="flex items-center gap-3 mb-12">
           {user ? (
             <button
-              onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+              onClick={() => {
+                const scrollTarget = window.innerHeight - 48
+                window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
+              }}
               className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{
                 background: 'var(--btn-primary-bg)',
