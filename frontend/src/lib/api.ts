@@ -76,6 +76,10 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`)
   },
+  getMyRatings: (params?: Record<string, string>) => {
+    const q = params ? '?' + new URLSearchParams(params).toString() : ''
+    return request<{ items: unknown[]; total: number }>(`/rating/history${q}`)
+  },
 
   // Status
   setStatus: (data: { content_id: number; status: string }) =>

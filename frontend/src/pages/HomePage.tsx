@@ -20,18 +20,27 @@ export function HomePage() {
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 加载所有番剧（用于精选推荐）
+  // 加载所有番剧（用于精选推荐），过滤掉已评分的
   useEffect(() => {
     if (!user) return
 
-    api.listContent({ type: 'anime' })
-      .then(res => {
-        const list = (res.items || []) as ContentItem[]
-        const withCover = list.filter(i => i.cover_url)
-        setAllAnime(withCover)
-        if (withCover.length > 0) {
-          const randomIndex = Math.floor(Math.random() * withCover.length)
-          setHero(withCover[randomIndex])
+    Promise.all([
+      api.listContent({ type: 'anime' }),
+      api.getMyRatings({ size: '200' }),
+    ])
+      .then(([contentRes, ratingsRes]) => {
+        const animeList = (contentRes.items || []) as ContentItem[]
+        const ratings = (ratingsRes.items || []) as { content_id: number }[]
+        const ratedIds = new Set(ratings.map(r => r.content_id))
+        
+        // 过滤掉已评分和没有封面的番剧
+        const unwatched = animeList.filter(i => i.cover_url && !ratedIds.has(i.id))
+        setAllAnime(unwatched)
+        
+        // 随机选取一个
+        if (unwatched.length > 0) {
+          const randomIndex = Math.floor(Math.random() * unwatched.length)
+          setHero(unwatched[randomIndex])
         }
       })
       .catch(() => {})
@@ -64,6 +73,18 @@ export function HomePage() {
     setHero(allAnime[newIndex])
   }, [allAnime, hero])
 
+  // 想看
+  const handleWantToWatch = useCallback(async () => {
+    if (!hero) return
+    try {
+      await api.setStatus({ content_id: hero.id, status: 'wish' })
+      // 换下一个
+      handleRefreshHero()
+    } catch {
+      // ignore
+    }
+  }, [hero, handleRefreshHero])
+
   // 未登录只显示首屏
   if (!user) {
     return <HeroBrand />
@@ -80,10 +101,14 @@ export function HomePage() {
 
       {/* 内容区域 */}
       <div className="pb-20 sm:pb-24">
-        {/* 精选推荐 — 独立于 tab，随机选取 */}
+        {/* 精选推荐 — 独立于 tab，随机选取未观看的 */}
         {hero && (
           <div className="relative">
-            <HeroSection content={hero} onSelect={openDetail} />
+            <HeroSection
+              content={hero}
+              onSelect={openDetail}
+              onWantToWatch={handleWantToWatch}
+            />
             <button
               onClick={handleRefreshHero}
               className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 hover:opacity-80"

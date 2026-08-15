@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Award, TrendingUp } from 'lucide-react'
+import { Star, Users, Play, Award, TrendingUp, Eye } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -25,9 +25,10 @@ function secureUrl(url: string): string {
 interface HeroSectionProps {
   content: ContentItem
   onSelect: (id: number) => void
+  onWantToWatch?: () => void
 }
 
-export function HeroSection({ content, onSelect }: HeroSectionProps) {
+export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionProps) {
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
     : null
@@ -136,7 +137,7 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
 
           {/* 制作信息 */}
           {(director || studio) && (
-            <div className="mt-4 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
               {director && <span>导演: {director}</span>}
               {studio && <span>制作: {studio}</span>}
             </div>
@@ -148,13 +149,31 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
             </p>
           )}
 
-          <div className="mt-7">
+          {/* 按钮区 */}
+          <div className="mt-7 flex items-center gap-3">
             <span
               className="inline-flex items-center px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
               查看详情 →
             </span>
+            {onWantToWatch && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onWantToWatch()
+                }}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+                style={{
+                  background: 'var(--bg-card-warm)',
+                  border: '1px solid var(--border-line)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <Eye size={16} />
+                想看
+              </button>
+            )}
           </div>
         </div>
       </div>
