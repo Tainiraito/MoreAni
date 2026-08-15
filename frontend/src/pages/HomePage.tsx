@@ -26,7 +26,7 @@ export function HomePage() {
 
     Promise.all([
       api.listContent({ type: 'anime' }),
-      api.getMyRatings({ size: '200' }),
+      api.getMyRatings({ size: '100' }),
     ])
       .then(([contentRes, ratingsRes]) => {
         const animeList = (contentRes.items || []) as ContentItem[]

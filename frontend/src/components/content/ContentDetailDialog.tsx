@@ -3,7 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Award, TrendingUp, Building, Calendar, MessageCircle } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Award, Building, Calendar, MessageCircle } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
@@ -89,7 +89,6 @@ export function ContentDetailDialog() {
     : {}
   const tags = metadata.tags || []
   const bangumiScore = metadata.bangumi_score
-  const bangumiRank = metadata.bangumi_rank
   const director = metadata.director
   const studio = metadata.studio
   const airDate = metadata.air_date || content?.release_date
@@ -221,14 +220,6 @@ export function ContentDetailDialog() {
                   <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     <Award size={14} />
                     <span className="text-sm">BGM {bangumiScore}</span>
-                  </div>
-                )}
-
-                {/* 排名 */}
-                {bangumiRank && bangumiRank > 0 && (
-                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                    <TrendingUp size={14} />
-                    <span className="text-sm">#{bangumiRank}</span>
                   </div>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Award, TrendingUp, Eye } from 'lucide-react'
+import { Star, Users, Play, Eye } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -33,11 +33,9 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
     ? (content.avg_score / 10).toFixed(1)
     : null
 
-  // Parse metadata if available
+  // Parse metadata if available (只用于标签和制作信息)
   const metadata = content.metadata ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) : {}
   const tags = metadata.tags || []
-  const bangumiScore = metadata.bangumi_score
-  const bangumiRank = metadata.bangumi_rank
   const director = metadata.director
   const studio = metadata.studio
 
@@ -106,22 +104,6 @@ export function HeroSection({ content, onSelect, onWantToWatch }: HeroSectionPro
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                 <Play size={14} />
                 <span className="text-sm">{content.episodes}集</span>
-              </div>
-            )}
-
-            {/* Bangumi 评分 */}
-            {bangumiScore && (
-              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                <Award size={14} />
-                <span className="text-sm">BGM {bangumiScore}</span>
-              </div>
-            )}
-
-            {/* 排名 */}
-            {bangumiRank && bangumiRank > 0 && (
-              <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                <TrendingUp size={14} />
-                <span className="text-sm">#{bangumiRank}</span>
               </div>
             )}
           </div>
