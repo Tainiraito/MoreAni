@@ -177,7 +177,7 @@ export function HeroBrand() {
           >
             <div
               ref={scrollContainerRef}
-              className="flex will-change-transform"
+              className="flex"
               style={{ gap: `${gap}px`, width: 'max-content' }}
             >
               {displayItems.map((item, index) => (
@@ -198,8 +198,6 @@ export function HeroBrand() {
                     transformOrigin: 'center center',
                     overflow: 'hidden',
                     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                    // 非 hover 状态时降低透明度，突出当前卡片
-                    opacity: hoveredIndex !== null && hoveredIndex !== index ? 0.7 : 1,
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
