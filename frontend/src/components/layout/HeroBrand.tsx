@@ -21,7 +21,7 @@ export function HeroBrand() {
   const { theme, toggleTheme } = useTheme()
   const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
-  const [hoveredId, setHoveredId] = useState<number | null>(null)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const animFrameRef = useRef<number>(0)
@@ -171,13 +171,13 @@ export function HeroBrand() {
         </div>
       </div>
 
-      {/* 滚动推荐卡片 — 竖版卡片 */}
+      {/* 滚动推荐卡片 */}
       {items.length > 0 && (
         <div
           className="absolute left-0 right-0"
-          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '16px 0' }}
+          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '24px 0' }}
           onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
+          onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
         >
           <div
             ref={scrollContainerRef}
@@ -186,23 +186,23 @@ export function HeroBrand() {
           >
             {displayItems.map((item, index) => (
               <div
-                key={`${item.id}-${index}`}
+                key={index}
                 className="flex-shrink-0 transition-all duration-300 cursor-pointer"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   borderRadius: '12px',
                   width: `${cardWidth}px`,
-                  transform: hoveredId === item.id ? 'scale(1.08)' : 'scale(1)',
-                  boxShadow: hoveredId === item.id
+                  transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
+                  boxShadow: hoveredIndex === index
                     ? '0 12px 40px rgba(0,0,0,0.2)'
                     : 'none',
-                  zIndex: hoveredId === item.id ? 10 : 1,
+                  zIndex: hoveredIndex === index ? 10 : 1,
                   transformOrigin: 'center center',
                   overflow: 'hidden',
                 }}
-                onMouseEnter={() => setHoveredId(item.id)}
-                onMouseLeave={() => setHoveredId(null)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
                 {/* 封面 */}
                 <div
