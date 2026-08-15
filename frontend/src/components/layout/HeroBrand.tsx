@@ -189,13 +189,15 @@ export function HeroBrand() {
                     border: '1px solid var(--border-line)',
                     borderRadius: '12px',
                     width: `${cardWidth}px`,
+                    height: hoveredIndex === index ? 'auto' : undefined,
                     transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
                     boxShadow: hoveredIndex === index
                       ? '0 12px 40px rgba(0,0,0,0.2)'
-                      : 'none',
+                      : '0 2px 8px rgba(0,0,0,0.05)',
                     zIndex: hoveredIndex === index ? 10 : 1,
                     transformOrigin: 'center center',
                     overflow: 'hidden',
+                    position: 'relative',
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
