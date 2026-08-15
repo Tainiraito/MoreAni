@@ -9,20 +9,21 @@ import { AuthDialog } from '@/components/auth/AuthDialog'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
+import { useFavoriteStore } from '@/stores/favorite-store'
+import { useUIStore } from '@/stores/ui-store'
 import { api } from '@/lib/api'
 
 const queryClient = new QueryClient()
 
 function AuthValidator({ children }: { children: React.ReactNode }) {
   const { user, setUser, logout } = useAuthStore()
+  const { loadFavorites } = useFavoriteStore()
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    // 如果 localStorage 中有用户信息，验证 cookie 是否有效
     if (user) {
       api.getMe()
         .then(userData => {
-          // cookie 有效，更新用户信息
           setUser({
             id: userData.id,
             username: userData.username,
@@ -30,9 +31,10 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
             role: userData.role as 'user' | 'admin',
             created_at: new Date().toISOString(),
           })
+          // 加载收藏状态
+          loadFavorites()
         })
         .catch(() => {
-          // cookie 无效，清除登录状态
           logout()
         })
         .finally(() => setChecking(false))
@@ -52,6 +54,18 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function GlobalDialogs() {
+  const { detailContentId } = useUIStore()
+  const { isFavorited, toggleFavorite } = useFavoriteStore()
+  
+  return (
+    <ContentDetailDialog
+      isFavorited={detailContentId ? isFavorited(detailContentId) : false}
+      onToggleFavorite={toggleFavorite}
+    />
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -66,7 +80,7 @@ export default function App() {
           </div>
 
           {/* Global Dialogs */}
-          <ContentDetailDialog />
+          <GlobalDialogs />
           <AuthDialog />
           <SettingsDialog />
           <ToastContainer />

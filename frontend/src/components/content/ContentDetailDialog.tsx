@@ -34,7 +34,12 @@ interface Review {
   created_at: string
 }
 
-export function ContentDetailDialog() {
+interface ContentDetailDialogProps {
+  isFavorited?: boolean
+  onToggleFavorite?: (id: number) => void
+}
+
+export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
   const { detailOpen, detailContentId, closeDetail } = useUIStore()
   const { user } = useAuthStore()
   const toast = useToastStore.getState()
@@ -45,34 +50,26 @@ export function ContentDetailDialog() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
-  const [isFavorited, setIsFavorited] = useState(false)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
       setBangumiScore(null)
       setScore(0)
-      setIsFavorited(false)
       
       Promise.all([
         api.getContent(detailContentId) as Promise<ContentItem>,
         api.getContentRatings(detailContentId, { size: '10' }),
-        user ? api.getMyStatuses() : Promise.resolve({ items: [] }),
       ])
-        .then(([c, ratingsRes, statusRes]) => {
+        .then(([c, ratingsRes]) => {
           setContent(c)
           setScore(c.my_rating?.score || 0)
           setReviews((ratingsRes.items || []) as Review[])
-          
-          // 检查收藏状态
-          const statuses = (statusRes.items || []) as { content_id: number; status: string }[]
-          const found = statuses.find(s => s.content_id === c.id)
-          setIsFavorited(found?.status === 'want')
         })
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId, user])
+  }, [detailOpen, detailContentId])
 
   if (!detailOpen) return null
 
@@ -91,21 +88,9 @@ export function ContentDetailDialog() {
     }
   }
 
-  const handleToggleFavorite = async () => {
-    if (!content || !user) return
-    try {
-      if (isFavorited) {
-        await api.clearStatus(content.id)
-        setIsFavorited(false)
-        toast.addToast('success', '已取消收藏')
-      } else {
-        await api.setStatus({ content_id: content.id, status: 'want' })
-        setIsFavorited(true)
-        toast.addToast('success', '已收藏')
-      }
-    } catch {
-      toast.addToast('error', '操作失败')
-    }
+  const handleToggleFavorite = () => {
+    if (!content || !onToggleFavorite) return
+    onToggleFavorite(content.id)
   }
 
   const handleFetchBangumiScore = async () => {
@@ -151,7 +136,7 @@ export function ContentDetailDialog() {
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* 顶部按钮区 - 收藏 + 关闭 */}
+        {/* 顶部按钮区 */}
         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
           {user && (
             <button
@@ -183,7 +168,7 @@ export function ContentDetailDialog() {
           <div className="flex items-center justify-center h-64">
             <div
               className="animate-spin w-8 h-8 border-2 rounded-full"
-              style={{ borderColor: 'var(--border-line)', borderTopColor: 'var(--brand)' }}
+              style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }}
             />
           </div>
         ) : content ? (
@@ -238,8 +223,8 @@ export function ContentDetailDialog() {
               <div className="flex flex-wrap items-center gap-4 mb-4">
                 {avgScore && (
                   <div className="flex items-center gap-1.5">
-                    <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
-                    <span className="text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                    <Star size={18} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                    <span className="text-lg font-bold" style={{ color: '#FB71A7' }}>
                       {avgScore}
                     </span>
                   </div>
@@ -348,7 +333,7 @@ export function ContentDetailDialog() {
                         {bangumiLoading ? (
                           <div
                             className="animate-spin w-3 h-3 border rounded-full"
-                            style={{ borderColor: 'var(--border-line)', borderTopColor: 'var(--brand)' }}
+                            style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }}
                           />
                         ) : (
                           <ExternalLink size={10} />
@@ -370,8 +355,8 @@ export function ContentDetailDialog() {
                         <Star
                           size={24}
                           style={{
-                            color: (hoverScore || score) >= i ? 'var(--brand)' : 'var(--border-line)',
-                            fill: (hoverScore || score) >= i ? 'var(--brand)' : 'transparent',
+                            color: (hoverScore || score) >= i ? '#FB71A7' : 'var(--border-line)',
+                            fill: (hoverScore || score) >= i ? '#FB71A7' : 'transparent',
                           }}
                         />
                       </button>
@@ -379,7 +364,7 @@ export function ContentDetailDialog() {
                     {(hoverScore || score) > 0 && (
                       <span
                         className="ml-2 text-sm font-medium"
-                        style={{ color: 'var(--brand)' }}
+                        style={{ color: '#FB71A7' }}
                       >
                         {hoverScore || score}
                       </span>
@@ -409,7 +394,7 @@ export function ContentDetailDialog() {
                             <div
                               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
                               style={{
-                                background: 'var(--brand)',
+                                background: '#FB71A7',
                                 color: 'white',
                               }}
                             >
@@ -420,8 +405,8 @@ export function ContentDetailDialog() {
                             </span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Star size={12} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
-                            <span className="text-xs" style={{ color: 'var(--brand)' }}>
+                            <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                            <span className="text-xs" style={{ color: '#FB71A7' }}>
                               {(review.score / 10).toFixed(1)}
                             </span>
                           </div>

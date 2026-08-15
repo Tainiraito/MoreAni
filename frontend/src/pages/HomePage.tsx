@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { useFavoriteStore } from '@/stores/favorite-store'
 import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
@@ -14,31 +15,23 @@ import type { ContentItem, ContentType } from '@/types'
 export function HomePage() {
   const { user } = useAuthStore()
   const { openDetail } = useUIStore()
+  const { isFavorited, toggleFavorite } = useFavoriteStore()
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
-  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
 
-  // hero 的收藏状态直接从 favoriteIds 派生
-  const heroFavorited = hero ? favoriteIds.has(hero.id) : false
+  // hero 的收藏状态直接从 store 派生
+  const heroFavorited = hero ? isFavorited(hero.id) : false
 
-  // 加载所有番剧和收藏状态
+  // 加载所有番剧
   useEffect(() => {
     if (!user) return
 
-    Promise.all([
-      api.listContent({ type: 'anime' }),
-      api.getMyStatuses(),
-    ])
-      .then(([contentRes, statusRes]) => {
-        const animeList = (contentRes.items || []) as ContentItem[]
-        const statuses = (statusRes.items || []) as { content_id: number; status: string }[]
-        
-        const favIds = new Set(statuses.filter(s => s.status === 'want').map(s => s.content_id))
-        setFavoriteIds(favIds)
-        
+    api.listContent({ type: 'anime' })
+      .then(res => {
+        const animeList = (res.items || []) as ContentItem[]
         const withCover = animeList.filter(i => i.cover_url)
         setAllAnime(withCover)
         
@@ -84,27 +77,6 @@ export function HomePage() {
     }
   }, [allAnime, hero])
 
-  // 统一的收藏切换函数
-  const handleToggleFavorite = useCallback(async (id: number) => {
-    const isFav = favoriteIds.has(id)
-    
-    try {
-      if (isFav) {
-        await api.clearStatus(id)
-        setFavoriteIds(prev => {
-          const next = new Set(prev)
-          next.delete(id)
-          return next
-        })
-      } else {
-        await api.setStatus({ content_id: id, status: 'want' })
-        setFavoriteIds(prev => new Set(prev).add(id))
-      }
-    } catch (err) {
-      console.error('Toggle favorite failed:', err)
-    }
-  }, [favoriteIds])
-
   // 未登录只显示首屏
   if (!user) {
     return <HeroBrand />
@@ -124,7 +96,7 @@ export function HomePage() {
               content={hero}
               isFavorited={heroFavorited}
               onSelect={openDetail}
-              onToggleFavorite={() => handleToggleFavorite(hero.id)}
+              onToggleFavorite={() => toggleFavorite(hero.id)}
             />
             <button
               onClick={handleRefreshHero}
@@ -171,9 +143,9 @@ export function HomePage() {
                       key={item.id}
                       content={item}
                       mode="grid"
-                      isFavorited={favoriteIds.has(item.id)}
+                      isFavorited={isFavorited(item.id)}
                       onSelect={openDetail}
-                      onToggleFavorite={handleToggleFavorite}
+                      onToggleFavorite={toggleFavorite}
                     />
                   ))}
                 </div>
