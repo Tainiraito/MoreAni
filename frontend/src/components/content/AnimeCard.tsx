@@ -180,7 +180,7 @@ export function AnimeCard({ content, mode = 'grid', onSelect }: AnimeCardProps) 
               }}
             >
               {content.description && (
-                <p className="text-xs text-center" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs line-clamp-6 text-center" style={{ color: 'var(--text-secondary)' }}>
                   {content.description}
                 </p>
               )}
