@@ -61,8 +61,6 @@ export function HeroBrand() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [scrollProgress, setScrollProgress] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const animFrameRef = useRef<number>(0)
-  const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
   const isFirstLogin = useRef(!sessionStorage.getItem('moreani-scrolled'))
   const cardWidth = 160
@@ -81,33 +79,18 @@ export function HeroBrand() {
       .catch(() => {})
   }, [])
 
-  // 自动循环滚动
+  // 自动循环滚动 - 使用 CSS animation 实现无缝循环
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
 
-    let lastTime = performance.now()
-    const speed = 25
-
-    const animate = (currentTime: number) => {
-      const delta = (currentTime - lastTime) / 1000
-      lastTime = currentTime
-
-      if (!isPaused) {
-        scrollPosRef.current += speed * delta
-        const singleSetWidth = items.length * (cardWidth + gap)
-        if (scrollPosRef.current >= singleSetWidth) {
-          scrollPosRef.current -= singleSetWidth
-        }
-        container.style.transform = `translateX(-${scrollPosRef.current}px)`
-      }
-
-      animFrameRef.current = requestAnimationFrame(animate)
-    }
-
-    animFrameRef.current = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animFrameRef.current)
-  }, [items, isPaused])
+    // 计算一组卡片的宽度
+    const singleSetWidth = items.length * (cardWidth + gap)
+    
+    // 设置动画
+    const duration = singleSetWidth / 25 // 25px/s
+    container.style.animationDuration = `${duration}s`
+  }, [items])
 
   // 监听页面滚动
   useEffect(() => {
@@ -148,8 +131,9 @@ export function HeroBrand() {
     }
   }, [user])
 
-  // 3组卡片用于无缝循环
-  const displayItems = [...items, ...items, ...items]
+  // 生成足够的卡片用于无缝循环（至少覆盖 2 倍屏幕宽度）
+  const minSets = 4 // 确保足够多
+  const displayItems = Array(minSets).fill(items).flat()
 
   return (
     <div className="relative min-h-screen" style={{ background: 'var(--bg-page)' }}>
@@ -225,7 +209,7 @@ export function HeroBrand() {
           </button>
         </div>
 
-        {/* 滚动推荐卡片 */}
+        {/* 滚动推荐卡片 — 使用 CSS animation 实现无缝循环 */}
         {items.length > 0 && (
           <div
             className="w-screen overflow-hidden"
@@ -235,8 +219,12 @@ export function HeroBrand() {
           >
             <div
               ref={scrollContainerRef}
-              className="flex items-end"
-              style={{ gap: `${gap}px`, width: 'max-content' }}
+              className="flex items-end animate-scroll-left"
+              style={{
+                gap: `${gap}px`,
+                width: 'max-content',
+                animationPlayState: isPaused ? 'paused' : 'running',
+              }}
             >
               {displayItems.map((item, index) => {
                 const isHovered = hoveredIndex === index

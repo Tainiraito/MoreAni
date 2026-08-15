@@ -117,3 +117,33 @@ body {
   from { opacity: 0; transform: translateX(-50%) scale(0.95); }
   to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-25%);
+  }
+}
+
+/* Animation classes */
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 200ms ease-out;
+}
+
+.animate-scale-in-center {
+  animation: scale-in-center 200ms ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 300ms ease-out;
+}
+
+.animate-scroll-left {
+  animation: scroll-left linear infinite;
+}
