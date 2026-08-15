@@ -180,90 +180,102 @@ export function HeroBrand() {
               className="flex items-end"
               style={{ gap: `${gap}px`, width: 'max-content' }}
             >
-              {displayItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex-shrink-0 cursor-pointer"
-                  style={{
-                    width: `${cardWidth}px`,
-                    height: '280px',
-                    transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
-                    zIndex: hoveredIndex === index ? 20 : 1,
-                    transformOrigin: 'center bottom',
-                    transition: 'transform 0.3s ease',
-                  }}
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                >
-                  {/* 卡片容器 */}
+              {displayItems.map((item, index) => {
+                const isHovered = hoveredIndex === index
+                return (
                   <div
-                    className="relative w-full h-full rounded-xl overflow-hidden"
+                    key={index}
+                    className="flex-shrink-0 cursor-pointer"
                     style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-line)',
-                      boxShadow: hoveredIndex === index
-                        ? '0 12px 40px rgba(0,0,0,0.2)'
-                        : '0 2px 8px rgba(0,0,0,0.05)',
-                      transition: 'box-shadow 0.3s ease',
+                      width: `${cardWidth}px`,
+                      height: '280px',
+                      transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+                      zIndex: isHovered ? 20 : 1,
+                      transformOrigin: 'center bottom',
+                      transition: 'transform 0.3s ease',
                     }}
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
                   >
-                    {/* 封面 — 填满整个卡片 */}
-                    <div className="absolute inset-0 overflow-hidden">
-                      <img
-                        src={secureUrl(item.cover_url)}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = '/placeholder.png'
-                        }}
-                      />
-                    </div>
-
-                    {/* 信息区 — 从底部滑上来 */}
+                    {/* 卡片容器 */}
                     <div
-                      className="absolute left-0 right-0 bottom-0 text-center"
+                      className="relative w-full h-full rounded-xl overflow-hidden"
                       style={{
                         background: 'var(--bg-card)',
-                        borderTop: '1px solid var(--border-line)',
-                        transition: 'transform 0.3s ease',
-                        transform: hoveredIndex === index ? 'translateY(0)' : 'translateY(calc(100% - 70px))',
+                        border: '1px solid var(--border-line)',
+                        boxShadow: isHovered
+                          ? '0 12px 40px rgba(0,0,0,0.2)'
+                          : '0 2px 8px rgba(0,0,0,0.05)',
+                        transition: 'box-shadow 0.3s ease',
                       }}
                     >
-                      {/* 标题 + 分数（默认显示部分） */}
-                      <div className="p-3">
-                        <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                          {item.title}
-                        </h3>
-                        {item.avg_score && item.avg_score > 0 && (
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                              ★ {(item.avg_score / 10).toFixed(1)}
-                            </span>
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                              {item.rating_count || 0}人
-                            </span>
-                          </div>
-                        )}
+                      {/* 封面 — 填满整个卡片 */}
+                      <div className="absolute inset-0 overflow-hidden">
+                        <img
+                          src={secureUrl(item.cover_url)}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = '/placeholder.png'
+                          }}
+                        />
                       </div>
 
-                      {/* 额外信息（hover 时显示） */}
-                      <div className="px-3 pb-3">
-                        {item.episodes > 0 && (
-                          <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                            {item.episodes}集
-                          </p>
-                        )}
-                        {item.description && (
-                          <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
-                            {item.description}
-                          </p>
-                        )}
+                      {/* 信息区 — 从底部滑上来 */}
+                      <div
+                        className="absolute left-0 right-0 bottom-0 overflow-hidden"
+                        style={{
+                          background: 'var(--bg-card)',
+                          borderTop: '1px solid var(--border-line)',
+                          height: isHovered ? '180px' : '70px',
+                          transition: 'height 0.3s ease',
+                        }}
+                      >
+                        <div className="p-3 text-center">
+                          {/* 标题 */}
+                          <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                            {item.title}
+                          </h3>
+
+                          {/* 分数 */}
+                          {item.avg_score && item.avg_score > 0 && (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                                ★ {(item.avg_score / 10).toFixed(1)}
+                              </span>
+                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                                {item.rating_count || 0}人
+                              </span>
+                            </div>
+                          )}
+
+                          {/* 集数 + 简介 — hover 时显示 */}
+                          <div
+                            className="overflow-hidden transition-all duration-300"
+                            style={{
+                              maxHeight: isHovered ? '100px' : '0px',
+                              opacity: isHovered ? 1 : 0,
+                              marginTop: isHovered ? '8px' : '0px',
+                            }}
+                          >
+                            {item.episodes > 0 && (
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                                {item.episodes}集
+                              </p>
+                            )}
+                            {item.description && (
+                              <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
