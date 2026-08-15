@@ -17,10 +17,12 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
-  const [heroFavorited, setHeroFavorited] = useState(false)
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
+
+  // hero 的收藏状态直接从 favoriteIds 派生
+  const heroFavorited = hero ? favoriteIds.has(hero.id) : false
 
   // 加载所有番剧和收藏状态
   useEffect(() => {
@@ -42,9 +44,7 @@ export function HomePage() {
         
         if (withCover.length > 0) {
           const randomIndex = Math.floor(Math.random() * withCover.length)
-          const selected = withCover[randomIndex]
-          setHero(selected)
-          setHeroFavorited(favIds.has(selected.id))
+          setHero(withCover[randomIndex])
         }
       })
       .catch(() => {})
@@ -77,42 +77,15 @@ export function HomePage() {
     const remaining = allAnime.filter(a => a.id !== hero?.id)
     if (remaining.length === 0) {
       const randomIndex = Math.floor(Math.random() * allAnime.length)
-      const selected = allAnime[randomIndex]
-      setHero(selected)
-      setHeroFavorited(favoriteIds.has(selected.id))
+      setHero(allAnime[randomIndex])
     } else {
       const randomIndex = Math.floor(Math.random() * remaining.length)
-      const selected = remaining[randomIndex]
-      setHero(selected)
-      setHeroFavorited(favoriteIds.has(selected.id))
+      setHero(remaining[randomIndex])
     }
-  }, [allAnime, hero, favoriteIds])
+  }, [allAnime, hero])
 
-  // 切换精选的收藏
-  const handleToggleHeroFavorite = useCallback(async () => {
-    if (!hero) return
-    
-    try {
-      if (heroFavorited) {
-        await api.clearStatus(hero.id)
-        setFavoriteIds(prev => {
-          const next = new Set(prev)
-          next.delete(hero.id)
-          return next
-        })
-        setHeroFavorited(false)
-      } else {
-        await api.setStatus({ content_id: hero.id, status: 'want' })
-        setFavoriteIds(prev => new Set(prev).add(hero.id))
-        setHeroFavorited(true)
-      }
-    } catch (err) {
-      console.error('Toggle favorite failed:', err)
-    }
-  }, [hero, heroFavorited])
-
-  // 切换卡片的收藏
-  const handleToggleCardFavorite = useCallback(async (id: number) => {
+  // 统一的收藏切换函数
+  const handleToggleFavorite = useCallback(async (id: number) => {
     const isFav = favoriteIds.has(id)
     
     try {
@@ -151,7 +124,7 @@ export function HomePage() {
               content={hero}
               isFavorited={heroFavorited}
               onSelect={openDetail}
-              onToggleFavorite={handleToggleHeroFavorite}
+              onToggleFavorite={() => handleToggleFavorite(hero.id)}
             />
             <button
               onClick={handleRefreshHero}
@@ -200,7 +173,7 @@ export function HomePage() {
                       mode="grid"
                       isFavorited={favoriteIds.has(item.id)}
                       onSelect={openDetail}
-                      onToggleFavorite={handleToggleCardFavorite}
+                      onToggleFavorite={handleToggleFavorite}
                     />
                   ))}
                 </div>
