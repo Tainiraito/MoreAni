@@ -51,6 +51,8 @@ class InviteCode(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
     used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    max_uses = Column(Integer, default=1)  # 可重复使用次数
+    use_count = Column(Integer, default=0)  # 已使用次数
     created_at = Column(DateTime, default=_utcnow)
 
 

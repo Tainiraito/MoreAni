@@ -67,10 +67,10 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="邀请码无效",
         )
-    if invite.used_by is not None:
+    if invite.use_count >= invite.max_uses:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="邀请码已被使用",
+            detail="邀请码已用完",
         )
 
     # Check username uniqueness
@@ -84,8 +84,10 @@ def register(
     password_hash = get_password_hash(body.password)
     user = create_user(db, username=body.username, password_hash=password_hash)
 
-    # Mark invite code as used
-    invite.used_by = user.id
+    # Increment invite code usage
+    invite.use_count += 1
+    if invite.use_count >= invite.max_uses:
+        invite.used_by = user.id  # last use — mark with the user
     db.commit()
 
     # Auto-login
