@@ -103,5 +103,6 @@ async def get_bangumi_score(
     if not detail:
         raise HTTPException(status_code=404, detail="Bangumi subject not found")
     
-    score = detail.get("rating", {}).get("score", 0)
+    # 注意：get_subject_detail 返回的是 rating_score，不是 rating.score
+    score = detail.get("rating_score", 0)
     return {"score": score}
