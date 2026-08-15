@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Hash } from 'lucide-react'
+import { Star, Users, Play, Award, TrendingUp } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -111,14 +111,15 @@ export function HeroSection({ content, onSelect }: HeroSectionProps) {
             {/* Bangumi 评分 */}
             {bangumiScore && (
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                <Hash size={14} />
+                <Award size={14} />
                 <span className="text-sm">BGM {bangumiScore}</span>
               </div>
             )}
 
             {/* 排名 */}
-            {bangumiRank && (
+            {bangumiRank && bangumiRank > 0 && (
               <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                <TrendingUp size={14} />
                 <span className="text-sm">#{bangumiRank}</span>
               </div>
             )}
