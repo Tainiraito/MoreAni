@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useTheme } from '@/hooks/use-theme'
@@ -9,6 +9,8 @@ export function AppHeader() {
   const { openAuth, openSettings } = useUIStore()
   const { theme, toggleTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,6 +19,19 @@ export function AppHeader() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
 
   return (
     <header
@@ -50,49 +65,107 @@ export function AppHeader() {
             </span>
           </a>
 
-          {/* Right side: theme toggle + functional buttons */}
-          <div className="flex items-center gap-3">
-            {/* 主题切换 */}
+          {/* 右侧：头像菜单 */}
+          <div className="relative" ref={menuRef}>
             <button
-              onClick={toggleTheme}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-all duration-200 hover:opacity-70"
-              style={{ color: 'var(--text-muted)' }}
-              title={theme === 'light' ? '切换到暗色模式' : '切换到浅色模式'}
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-8 h-8 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
+              style={{
+                border: '2px solid var(--border-line)',
+              }}
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              {user ? (
+                <div
+                  className="w-full h-full flex items-center justify-center text-sm font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg, var(--brand), var(--brand-deep))' }}
+                >
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+              )}
             </button>
 
-            {user ? (
-              <>
-                <span
-                  className="hidden text-xs sm:inline"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  {user.username}
-                </span>
-                <button
-                  onClick={openSettings}
-                  className="text-xs transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  设置
-                </button>
-                <button
-                  onClick={logout}
-                  className="text-xs transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  退出
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={openAuth}
-                className="text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: 'var(--accent-pink)' }}
+            {/* 下拉菜单 */}
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-48 rounded-xl overflow-hidden"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-line)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
+                  animation: 'scale-in 150ms ease-out',
+                }}
               >
-                登录
-              </button>
+                {/* 用户信息（已登录） */}
+                {user && (
+                  <div
+                    className="px-4 py-3"
+                    style={{ borderBottom: '1px solid var(--border-line)' }}
+                  >
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {user.username}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {user.role === 'admin' ? '管理员' : '成员'}
+                    </p>
+                  </div>
+                )}
+
+                {/* 主题切换 */}
+                <button
+                  onClick={() => { toggleTheme(); setMenuOpen(false) }}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  <span>{theme === 'light' ? '🌙' : '☀️'}</span>
+                  <span>{theme === 'light' ? '深色模式' : '浅色模式'}</span>
+                </button>
+
+                {/* 设置（已登录） */}
+                {user && (
+                  <button
+                    onClick={() => { openSettings(); setMenuOpen(false) }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    <span>⚙️</span>
+                    <span>设置</span>
+                  </button>
+                )}
+
+                {/* 分割线 */}
+                <div style={{ borderTop: '1px solid var(--border-line)' }} />
+
+                {/* 登录/退出 */}
+                {user ? (
+                  <button
+                    onClick={() => { logout(); setMenuOpen(false) }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    style={{ color: 'var(--accent-coral)' }}
+                  >
+                    <span>🚪</span>
+                    <span>退出登录</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { openAuth(); setMenuOpen(false) }}
+                    className="w-full px-4 py-2.5 flex items-center gap-3 text-sm transition-colors hover:opacity-80"
+                    style={{ color: 'var(--brand)' }}
+                  >
+                    <span>👤</span>
+                    <span>登录 / 注册</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
