@@ -105,7 +105,7 @@ export function HeroBrand() {
   const displayItems = [...items, ...items]
 
   return (
-    <div className="relative h-screen overflow-hidden" style={{ background: 'var(--bg-page)' }}>
+    <div className="relative" style={{ height: '100vh', background: 'var(--bg-page)' }}>
       {/* 背景装饰 */}
       <div
         className="absolute inset-0 -z-10"
@@ -116,8 +116,11 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
+      {/* 主内容区 — 靠上定位（约 35% 位置） */}
+      <div
+        className="absolute left-0 right-0 flex flex-col items-center text-center px-6"
+        style={{ top: '20%' }}
+      >
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
           <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
@@ -163,78 +166,77 @@ export function HeroBrand() {
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
         </div>
-
-        {/* 滚动推荐卡片区域 — 添加 padding 防止放大截断 */}
-        {items.length > 0 && (
-          <div
-            className="w-screen py-4"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
-          >
-            <div className="overflow-hidden">
-              <div
-                ref={scrollContainerRef}
-                className="flex gap-4 will-change-transform px-4"
-                style={{ width: 'max-content' }}
-              >
-                {displayItems.map((item, index) => (
-                  <div
-                    key={`${item.id}-${index}`}
-                    className="flex-shrink-0 flex rounded-xl overflow-visible transition-all duration-300 cursor-pointer"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-line)',
-                      width: hoveredId === item.id ? '300px' : '260px',
-                      transform: hoveredId === item.id ? 'scale(1.08)' : 'scale(1)',
-                      boxShadow: hoveredId === item.id
-                        ? '0 12px 40px rgba(0,0,0,0.2)'
-                        : 'none',
-                      zIndex: hoveredId === item.id ? 10 : 1,
-                      transformOrigin: 'center center',
-                    }}
-                    onMouseEnter={() => setHoveredId(item.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                  >
-                    <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
-                      <img
-                        src={secureUrl(item.cover_url)}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                        style={{ aspectRatio: '3/4' }}
-                      />
-                    </div>
-                    <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                      <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                        {item.title}
-                      </h3>
-                      {item.title_alt && (
-                        <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
-                          {item.title_alt}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2">
-                        {item.avg_score && item.avg_score > 0 && (
-                          <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
-                            ★ {(item.avg_score / 10).toFixed(1)}
-                          </span>
-                        )}
-                        {item.episodes > 0 && (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {item.episodes}集
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
+      {/* 滚动推荐卡片 — 撑满窗口底部，带 padding 防止放大截断 */}
+      {items.length > 0 && (
+        <div
+          className="absolute bottom-0 left-0 right-0"
+          style={{ padding: '20px 0' }}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
+        >
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 will-change-transform px-4"
+            style={{ width: 'max-content' }}
+          >
+            {displayItems.map((item, index) => (
+              <div
+                key={`${item.id}-${index}`}
+                className="flex-shrink-0 flex rounded-xl transition-all duration-300 cursor-pointer"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-line)',
+                  width: hoveredId === item.id ? '300px' : '260px',
+                  transform: hoveredId === item.id ? 'scale(1.08)' : 'scale(1)',
+                  boxShadow: hoveredId === item.id
+                    ? '0 12px 40px rgba(0,0,0,0.2)'
+                    : 'none',
+                  zIndex: hoveredId === item.id ? 10 : 1,
+                  transformOrigin: 'center center',
+                }}
+                onMouseEnter={() => setHoveredId(item.id)}
+                onMouseLeave={() => setHoveredId(null)}
+              >
+                <div className="w-20 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
+                  <img
+                    src={secureUrl(item.cover_url)}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                    style={{ aspectRatio: '3/4' }}
+                  />
+                </div>
+                <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                  <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                    {item.title}
+                  </h3>
+                  {item.title_alt && (
+                    <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
+                      {item.title_alt}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {item.avg_score && item.avg_score > 0 && (
+                      <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+                        ★ {(item.avg_score / 10).toFixed(1)}
+                      </span>
+                    )}
+                    {item.episodes > 0 && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {item.episodes}集
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 底部进度条 */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+      <div className="absolute bottom-2 left-0 right-0 flex justify-center">
         {!user ? (
           <div className="flex flex-col items-center gap-1.5">
             <div
