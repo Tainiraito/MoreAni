@@ -207,15 +207,8 @@ export function HeroBrand() {
                       transition: 'box-shadow 0.3s ease',
                     }}
                   >
-                    {/* 封面 */}
-                    <div
-                      className="w-full overflow-hidden"
-                      style={{ 
-                        background: 'var(--bg-card-warm)',
-                        height: '210px',
-                        transition: 'height 0.3s ease',
-                      }}
-                    >
+                    {/* 封面 — 填满整个卡片 */}
+                    <div className="absolute inset-0 overflow-hidden">
                       <img
                         src={secureUrl(item.cover_url)}
                         alt={item.title}
@@ -227,49 +220,42 @@ export function HeroBrand() {
                       />
                     </div>
 
-                    {/* 信息区 — 向上滑动遮住封面 */}
+                    {/* 信息区 — 从底部滑上来 */}
                     <div
-                      className="absolute left-0 right-0 p-3"
+                      className="absolute left-0 right-0 bottom-0 text-center"
                       style={{
-                        bottom: 0,
                         background: 'var(--bg-card)',
                         borderTop: '1px solid var(--border-line)',
                         transition: 'transform 0.3s ease',
-                        transform: hoveredIndex === index ? 'translateY(-70px)' : 'translateY(0)',
+                        transform: hoveredIndex === index ? 'translateY(0)' : 'translateY(calc(100% - 70px))',
                       }}
                     >
-                      {/* 标题 */}
-                      <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                        {item.title}
-                      </h3>
+                      {/* 标题 + 分数（默认显示部分） */}
+                      <div className="p-3">
+                        <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                          {item.title}
+                        </h3>
+                        {item.avg_score && item.avg_score > 0 && (
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                              ★ {(item.avg_score / 10).toFixed(1)}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {item.rating_count || 0}人
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                      {/* 分数 */}
-                      {item.avg_score && item.avg_score > 0 && (
-                        <div className="flex items-center gap-1 mb-1">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                            ★ {(item.avg_score / 10).toFixed(1)}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {item.rating_count || 0}人
-                          </span>
-                        </div>
-                      )}
-
-                      {/* 集数 + 简介 — hover 时显示 */}
-                      <div
-                        className="overflow-hidden transition-all duration-300"
-                        style={{
-                          maxHeight: hoveredIndex === index ? '80px' : '0px',
-                          opacity: hoveredIndex === index ? 1 : 0,
-                        }}
-                      >
+                      {/* 额外信息（hover 时显示） */}
+                      <div className="px-3 pb-3">
                         {item.episodes > 0 && (
                           <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
                             {item.episodes}集
                           </p>
                         )}
                         {item.description && (
-                          <p className="text-xs line-clamp-3" style={{ color: 'var(--text-secondary)' }}>
+                          <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
                             {item.description}
                           </p>
                         )}
