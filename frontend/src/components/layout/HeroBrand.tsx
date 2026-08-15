@@ -20,11 +20,14 @@ export function HeroBrand() {
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
   const [items, setItems] = useState<ContentItem[]>([])
-  const [scrollProgress, setScrollProgress] = useState(0)
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const animFrameRef = useRef<number>(0)
+  const scrollPosRef = useRef(0)
+  const lastLoginPromptRef = useRef(0) // 上次提示时的滚动进度
 
-  // 加载推荐内容（取前 8 个有封面的）
+  // 加载推荐内容
   useEffect(() => {
     api.listContent({ sort: 'rating', limit: '20' })
       .then(res => {
@@ -40,53 +43,57 @@ export function HeroBrand() {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
 
-    let animFrame: number
-    let scrollPos = 0
-    const speed = 0.5 // 每帧滚动像素
+    const speed = 0.3 // 每帧滚动像素（调慢）
 
     const animate = () => {
-      scrollPos += speed
-      const halfWidth = container.scrollWidth / 2
-      
-      // 无缝循环：滚动到一半时重置
-      if (scrollPos >= halfWidth) {
-        scrollPos = 0
+      if (!isPaused) {
+        scrollPosRef.current += speed
+        const halfWidth = container.scrollWidth / 2
+
+        if (scrollPosRef.current >= halfWidth) {
+          scrollPosRef.current = 0
+        }
+
+        container.scrollLeft = scrollPosRef.current
       }
-      
-      container.scrollLeft = scrollPos
-      animFrame = requestAnimationFrame(animate)
+      animFrameRef.current = requestAnimationFrame(animate)
     }
 
-    animFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animFrame)
-  }, [items])
+    animFrameRef.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(animFrameRef.current)
+  }, [items, isPaused])
 
-  // 监听页面滚动
+  // 监听页面滚动（未登录限制）
   useEffect(() => {
+    if (user) return
+
     const handleScroll = () => {
-      if (user) return // 已登录不限制
-
       const scrollY = window.scrollY
-      const maxScroll = window.innerHeight * 0.5
-      
-      const progress = Math.min(scrollY / maxScroll, 1)
-      setScrollProgress(progress)
-
-      // 滚动到 70% 时弹出登录框
-      if (progress >= 0.7 && !showLoginPrompt) {
-        setShowLoginPrompt(true)
-        openAuth()
-      }
+      const maxScroll = window.innerHeight * 0.35 // 只允许滚动 35%
 
       // 限制滚动
       if (scrollY > maxScroll) {
         window.scrollTo(0, maxScroll)
       }
+
+      // 计算进度
+      const progress = Math.min(scrollY / maxScroll, 1)
+
+      // 滚动满时弹出登录框（每次满都提示，不只是第一次）
+      if (progress >= 1 && lastLoginPromptRef.current < 1) {
+        lastLoginPromptRef.current = 1
+        openAuth()
+      }
+
+      // 滚回时重置标记
+      if (progress < 0.5) {
+        lastLoginPromptRef.current = 0
+      }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('scroll', handleScroll, { passive: false })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [user, showLoginPrompt, openAuth])
+  }, [user, openAuth])
 
   // 登录后自动滚动出首屏
   useEffect(() => {
@@ -113,31 +120,31 @@ export function HeroBrand() {
       />
 
       {/* 主内容区 */}
-      <div className="flex flex-col items-center text-center px-6 mb-8">
+      <div className="flex flex-col items-center text-center px-6 mb-12">
         {/* 大 icon */}
-        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden mb-6">
+        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-8">
           <img src="/favicon.png" alt="MoreAni" className="w-full h-full object-cover" />
         </div>
 
         {/* 标题 */}
         <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight mb-2"
+          className="text-4xl sm:text-5xl font-bold tracking-tight mb-3"
           style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
         >
           又看一集
         </h1>
 
         {/* 副标题 */}
-        <p className="text-sm sm:text-base mb-8" style={{ color: 'var(--text-muted)' }}>
+        <p className="text-base sm:text-lg mb-10" style={{ color: 'var(--text-muted)' }}>
           记录看过的番，看看朋友的评价
         </p>
 
-        {/* 按钮区：登录注册 + 主题切换 */}
+        {/* 按钮区 */}
         {!user && (
           <div className="flex items-center gap-3">
             <button
               onClick={openAuth}
-              className="px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{
                 background: 'var(--btn-primary-bg)',
                 color: 'var(--btn-primary-text)',
@@ -161,39 +168,64 @@ export function HeroBrand() {
         )}
       </div>
 
-      {/* 滚动推荐卡片 — 水平铺满，自动循环 */}
+      {/* 滚动推荐卡片 — 撑满窗口，横向卡片 */}
       {items.length > 0 && (
         <div
           ref={scrollContainerRef}
-          className="w-full overflow-hidden"
+          className="absolute bottom-16 left-0 right-0 overflow-hidden"
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
           style={{ scrollBehavior: 'auto' }}
         >
           <div className="flex gap-4 px-4" style={{ width: 'max-content' }}>
             {displayItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
-                className="flex-shrink-0 w-48 rounded-xl overflow-hidden"
+                className="flex-shrink-0 flex rounded-xl overflow-hidden transition-all duration-300 cursor-pointer"
                 style={{
                   background: 'var(--bg-card)',
-                  border: '1px solid var(--border-line)',
+                  border: hoveredIndex === index
+                    ? '2px solid var(--brand)'
+                    : '1px solid var(--border-line)',
+                  width: hoveredIndex === index ? '280px' : '260px',
+                  boxShadow: hoveredIndex === index
+                    ? '0 4px 20px rgba(251, 113, 167, 0.15)'
+                    : 'none',
                 }}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
-                <div className="aspect-[3/4]" style={{ background: 'var(--bg-card-warm)' }}>
+                {/* 封面 */}
+                <div className="w-20 h-28 flex-shrink-0" style={{ background: 'var(--bg-card-warm)' }}>
                   <img
                     src={secureUrl(item.cover_url)}
                     alt={item.title}
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="p-3">
-                  <h3 className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+
+                {/* 信息 */}
+                <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                  <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
                     {item.title}
                   </h3>
-                  {item.avg_score && item.avg_score > 0 && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--brand)' }}>
-                      ★ {(item.avg_score / 10).toFixed(1)}
+                  {item.title_alt && (
+                    <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
+                      {item.title_alt}
                     </p>
                   )}
+                  <div className="flex items-center gap-2">
+                    {item.avg_score && item.avg_score > 0 && (
+                      <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+                        ★ {(item.avg_score / 10).toFixed(1)}
+                      </span>
+                    )}
+                    {item.episodes > 0 && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {item.episodes}集
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -201,29 +233,33 @@ export function HeroBrand() {
         </div>
       )}
 
-      {/* 底部：滚动进度（未登录）/ 滚动提示（已登录） */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+      {/* 底部：滚动进度 / 滚动提示 */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
         {!user ? (
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{
-              background: 'var(--bg-card)',
-              border: '2px solid var(--border-line)',
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" fill="none" stroke="var(--border-line)" strokeWidth="2" />
-              <circle
-                cx="12" cy="12" r="10"
-                fill="none"
-                stroke="var(--brand)"
-                strokeWidth="2"
-                strokeDasharray={`${scrollProgress * 63} 63`}
-                strokeLinecap="round"
-                transform="rotate(-90 12 12)"
-                className="transition-all duration-300"
-              />
-            </svg>
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{
+                background: 'var(--bg-card)',
+                border: '2px solid var(--border-line)',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="var(--border-line)" strokeWidth="2" />
+                <circle
+                  cx="12" cy="12" r="10"
+                  fill="none"
+                  stroke="var(--brand)"
+                  strokeWidth="2"
+                  strokeDasharray="0 63"
+                  strokeLinecap="round"
+                  transform="rotate(-90 12 12)"
+                />
+              </svg>
+            </div>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              登录后查看更多
+            </span>
           </div>
         ) : (
           <div className="animate-bounce" style={{ color: 'var(--text-muted)' }}>
