@@ -1,140 +1,244 @@
 import { useEffect, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
+import { useAuthStore } from '@/stores/auth-store'
+import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
-import { TypeBadge } from '@/components/ui/badge'
-import { ScoreBadge } from '@/components/rating/ScoreBadge'
-import { RatingForm } from '@/components/rating/RatingForm'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe } from 'lucide-react'
 import type { ContentItem } from '@/types'
 
 /** Force HTTPS for external image URLs */
 function secureUrl(url: string): string {
-  if (!url) return url
-  // Proxy external images to bypass CORP/CORS restrictions
+  if (!url) return ''
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
   return url.replace(/^http:\/\//, 'https://')
 }
 
+const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
+  anime: { label: '番剧', icon: Play, color: 'var(--type-anime)' },
+  movie: { label: '电影', icon: Film, color: 'var(--type-movie)' },
+  game: { label: '游戏', icon: Gamepad2, color: 'var(--type-game)' },
+  software: { label: '软件', icon: Monitor, color: 'var(--type-software)' },
+  website: { label: '网站', icon: Globe, color: 'var(--type-website)' },
+  book: { label: '书籍', icon: BookOpen, color: 'var(--type-book)' },
+}
+
 export function ContentDetailDialog() {
   const { detailOpen, detailContentId, closeDetail } = useUIStore()
+  const { user } = useAuthStore()
+  const toast = useToastStore.getState()
   const [content, setContent] = useState<ContentItem | null>(null)
-  const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [score, setScore] = useState(0)
+  const [hoverScore, setHoverScore] = useState(0)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
       setLoading(true)
-      Promise.all([
-        api.getContent(detailContentId) as Promise<ContentItem>,
-      ]).then(([c]) => {
-        setContent(c)
-        setLoading(false)
-      }).catch(() => setLoading(false))
+      api.getContent(detailContentId)
+        .then(c => {
+          setContent(c as ContentItem)
+          setScore((c as ContentItem).my_rating?.score || 0)
+        })
+        .catch(() => toast.addToast('error', '加载失败'))
+        .finally(() => setLoading(false))
     }
   }, [detailOpen, detailContentId])
 
   if (!detailOpen) return null
 
-  const handleRatingSubmit = async (score: number, recommend: number, review: string) => {
-    if (!content) return
-    await api.upsertRating({ content_id: content.id, score, recommend, review })
-    setEditing(false)
-    const updated = await api.getContent(content.id) as ContentItem
-    setContent(updated)
+  const handleRate = async (newScore: number) => {
+    if (!content || !user) return
+    setScore(newScore)
+    try {
+      await api.upsertRating({ content_id: content.id, score: newScore * 10 })
+      const updated = await api.getContent(content.id) as ContentItem
+      setContent(updated)
+      toast.addToast('success', '评分成功')
+    } catch {
+      toast.addToast('error', '评分失败')
+    }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={closeDetail}>
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" style={{ animation: 'fade-in 150ms ease-out' }} />
+  const typeConfig = content?.content_type ? TYPE_CONFIG[content.content_type] : null
+  const TypeIcon = typeConfig?.icon || Star
+  const avgScore = content?.avg_score ? (content.avg_score / 10).toFixed(1) : null
 
-      {/* Panel */}
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={closeDetail}
+      style={{ animation: 'fade-in 200ms ease-out' }}
+    >
+      {/* 背景遮罩 */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+      {/* 弹窗 */}
       <div
-        className="relative w-full md:w-[720px] bg-white h-full overflow-y-auto shadow-[-4px_0_24px_rgba(0,0,0,0.08)]"
+        className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-line)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          animation: 'scale-in 200ms ease-out',
+        }}
         onClick={e => e.stopPropagation()}
-        style={{ animation: 'slide-in-right 200ms ease-out' }}
       >
-        {/* Close */}
+        {/* 关闭按钮 */}
         <button
           onClick={closeDetail}
-          className="absolute top-5 right-5 z-10 w-8 h-8 flex items-center justify-center
-                     bg-white/80 backdrop-blur-sm border border-black/[0.08] rounded-full text-muted hover:text-ink hover:bg-white transition-all duration-200"
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:opacity-80"
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-line)',
+            color: 'var(--text-muted)',
+          }}
         >
-          ✕
+          <X size={16} />
         </button>
 
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full" />
+          <div className="flex items-center justify-center h-64">
+            <div
+              className="animate-spin w-8 h-8 border-2 rounded-full"
+              style={{ borderColor: 'var(--border-line)', borderTopColor: 'var(--brand)' }}
+            />
           </div>
         ) : content ? (
-          <div className="flex flex-col md:flex-row">
-            {/* Cover */}
-            <div className="md:w-1/2 aspect-[3/4] md:aspect-auto bg-paper">
+          <div className="overflow-y-auto max-h-[85vh]">
+            {/* 封面区域 */}
+            <div className="relative" style={{ height: '280px', background: 'var(--bg-card-warm)' }}>
               {content.cover_url ? (
-                <img src={secureUrl(content.cover_url)} alt={content.title} className="w-full h-full object-cover" />
+                <img
+                  src={secureUrl(content.cover_url)}
+                  alt={content.title}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-8xl opacity-30">📺</div>
+                <div className="w-full h-full flex items-center justify-center">
+                  <TypeIcon size={64} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+                </div>
               )}
+              {/* 渐变遮罩 */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: 'linear-gradient(transparent 50%, var(--bg-card) 100%)',
+                }}
+              />
             </div>
 
-            {/* Info */}
-            <div className="md:w-1/2 p-7 space-y-4">
-              <TypeBadge type={content.content_type} />
+            {/* 内容区域 */}
+            <div className="px-6 pb-6 -mt-16 relative">
+              {/* 类型标签 */}
+              {typeConfig && (
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-3"
+                  style={{
+                    background: `${typeConfig.color}20`,
+                    color: typeConfig.color,
+                  }}
+                >
+                  <TypeIcon size={12} />
+                  {typeConfig.label}
+                </div>
+              )}
 
-              <h2 className="text-2xl font-bold text-ink tracking-tight leading-snug">
+              {/* 标题 */}
+              <h2
+                className="text-2xl font-bold mb-1"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {content.title}
               </h2>
 
               {content.title_alt && (
-                <p className="text-sm text-muted">{content.title_alt}</p>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+                  {content.title_alt}
+                </p>
               )}
 
-              {/* Score */}
-              <div className="flex items-center gap-3">
-                <ScoreBadge score={content.avg_score} size="lg" />
-                <span className="text-sm text-muted">
-                  {content.rating_count || 0} 人评分
-                </span>
-              </div>
-
-              {/* Description */}
-              {content.description && (
-                <p className="text-sm text-slate leading-relaxed">{content.description}</p>
-              )}
-
-              {/* Rating Section */}
-              <div className="border-t border-black/[0.06] pt-5">
-                <h3 className="text-sm font-semibold text-ink mb-3">我的评分</h3>
-                {editing ? (
-                  <RatingForm
-                    initialScore={content.my_rating?.score || 0}
-                    initialRecommend={content.my_rating?.recommend || 0}
-                    initialReview={content.my_rating?.review || ''}
-                    onSubmit={handleRatingSubmit}
-                    onCancel={() => setEditing(false)}
-                  />
-                ) : (
-                  <div
-                    className="cursor-pointer hover:bg-paper/60 p-2.5 rounded-lg transition-colors duration-200"
-                    onClick={() => setEditing(true)}
-                  >
-                    {content.my_rating ? (
-                      <div className="flex items-center gap-3">
-                        <ScoreBadge score={content.my_rating.score} />
-                        <span className="text-sm text-muted">点击修改</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-brand font-medium">点击评分 →</span>
-                    )}
+              {/* 评分和信息 */}
+              <div className="flex items-center gap-4 mb-4">
+                {avgScore && (
+                  <div className="flex items-center gap-1.5">
+                    <Star size={18} style={{ color: 'var(--brand)' }} fill="var(--brand)" />
+                    <span className="text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                      {avgScore}
+                    </span>
                   </div>
                 )}
+                {(content.rating_count ?? 0) > 0 && (
+                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <Users size={14} />
+                    <span className="text-sm">{content.rating_count}人评分</span>
+                  </div>
+                )}
+                {content.episodes > 0 && (
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {content.episodes}集
+                  </span>
+                )}
               </div>
+
+              {/* 简介 */}
+              {content.description && (
+                <p
+                  className="text-sm leading-relaxed mb-6"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {content.description}
+                </p>
+              )}
+
+              {/* 我的评分 */}
+              {user && (
+                <div
+                  className="p-4 rounded-xl"
+                  style={{
+                    background: 'var(--bg-card-warm)',
+                    border: '1px solid var(--border-line)',
+                  }}
+                >
+                  <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--text-primary)' }}>
+                    我的评分
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
+                      <button
+                        key={i}
+                        className="transition-transform duration-150 hover:scale-125"
+                        onMouseEnter={() => setHoverScore(i)}
+                        onMouseLeave={() => setHoverScore(0)}
+                        onClick={() => handleRate(i)}
+                      >
+                        <Star
+                          size={24}
+                          style={{
+                            color: (hoverScore || score) >= i ? 'var(--brand)' : 'var(--border-line)',
+                            fill: (hoverScore || score) >= i ? 'var(--brand)' : 'transparent',
+                          }}
+                        />
+                      </button>
+                    ))}
+                    {(hoverScore || score) > 0 && (
+                      <span
+                        className="ml-2 text-sm font-medium"
+                        style={{ color: 'var(--brand)' }}
+                      >
+                        {hoverScore || score}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-muted">内容不存在</div>
+          <div className="flex items-center justify-center h-64" style={{ color: 'var(--text-muted)' }}>
+            内容不存在
+          </div>
         )}
       </div>
     </div>
