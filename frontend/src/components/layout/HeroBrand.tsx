@@ -28,7 +28,7 @@ export function HeroBrand() {
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
   const cardWidth = 160
-  const gap = 16
+  const gap = 20 // 增加间距给放大留空间
 
   // 加载推荐内容
   useEffect(() => {
@@ -183,20 +183,23 @@ export function HeroBrand() {
               {displayItems.map((item, index) => (
                 <div
                   key={index}
-                  className="flex-shrink-0 transition-all duration-300 cursor-pointer"
+                  className="flex-shrink-0 cursor-pointer"
                   style={{
                     background: 'var(--bg-card)',
-                    border: hoveredIndex === index
-                      ? '2px solid var(--brand)'
-                      : '1px solid var(--border-line)',
+                    border: '1px solid var(--border-line)',
                     borderRadius: '12px',
                     width: `${cardWidth}px`,
                     minHeight: '280px',
+                    transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
                     boxShadow: hoveredIndex === index
-                      ? '0 12px 40px rgba(251, 113, 167, 0.25)'
+                      ? '0 12px 40px rgba(0,0,0,0.2)'
                       : '0 2px 8px rgba(0,0,0,0.05)',
-                    zIndex: hoveredIndex === index ? 10 : 1,
+                    zIndex: hoveredIndex === index ? 20 : 1,
+                    transformOrigin: 'center center',
                     overflow: 'hidden',
+                    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                    // 非 hover 状态时降低透明度，突出当前卡片
+                    opacity: hoveredIndex !== null && hoveredIndex !== index ? 0.7 : 1,
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
@@ -207,17 +210,14 @@ export function HeroBrand() {
                     style={{ 
                       background: 'var(--bg-card-warm)',
                       aspectRatio: '3/4',
-                      borderRadius: '10px 10px 0 0',
+                      borderRadius: '12px 12px 0 0',
                       overflow: 'hidden',
                     }}
                   >
                     <img
                       src={secureUrl(item.cover_url)}
                       alt={item.title}
-                      className="w-full h-full object-cover transition-transform duration-300"
-                      style={{
-                        transform: hoveredIndex === index ? 'scale(1.05)' : 'scale(1)',
-                      }}
+                      className="w-full h-full object-cover"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.src = '/placeholder.png'
