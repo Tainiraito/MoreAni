@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
@@ -8,6 +8,7 @@ import { CategoryTabs } from '@/components/content/CategoryTabs'
 import { ContentCard } from '@/components/content/ContentCard'
 import { ContentListItem } from '@/components/content/ContentListItem'
 import { HeroSection } from '@/components/content/HeroSection'
+import { RefreshCw } from 'lucide-react'
 import type { ContentItem, ContentType } from '@/types'
 
 export function HomePage() {
@@ -15,11 +16,31 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
+  const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const { openDetail } = useUIStore()
 
+  // 加载所有番剧（用于精选推荐）
   useEffect(() => {
-    if (!user) return // 未登录不加载内容
+    if (!user) return
+
+    api.listContent({ type: 'anime' })
+      .then(res => {
+        const list = (res.items || []) as ContentItem[]
+        const withCover = list.filter(i => i.cover_url)
+        setAllAnime(withCover)
+        // 随机选取一个作为精选
+        if (withCover.length > 0) {
+          const randomIndex = Math.floor(Math.random() * withCover.length)
+          setHero(withCover[randomIndex])
+        }
+      })
+      .catch(() => {})
+  }, [user])
+
+  // 加载当前 tab 的内容
+  useEffect(() => {
+    if (!user) return
 
     setLoading(true)
     const params: Record<string, string> = {}
@@ -29,14 +50,20 @@ export function HomePage() {
       .then(res => {
         const list = (res.items || []) as ContentItem[]
         setItems(list)
-        const heroCandidate = list.find(i => i.content_type === 'anime' && i.cover_url)
-          || list.find(i => i.cover_url && (i.avg_score || 0) > 0)
-          || list[0]
-        setHero(heroCandidate || null)
       })
-      .catch(() => { setItems([]); setHero(null) })
+      .catch(() => { setItems([]) })
       .finally(() => setLoading(false))
   }, [activeType, user])
+
+  // 换一个精选
+  const handleRefreshHero = useCallback(() => {
+    if (allAnime.length <= 1) return
+    let newIndex: number
+    do {
+      newIndex = Math.floor(Math.random() * allAnime.length)
+    } while (allAnime[newIndex]?.id === hero?.id && allAnime.length > 1)
+    setHero(allAnime[newIndex])
+  }, [allAnime, hero])
 
   // 未登录只显示首屏
   if (!user) {
@@ -54,9 +81,23 @@ export function HomePage() {
 
       {/* 内容区域 */}
       <div className="pb-20 sm:pb-24">
-        {/* Hero — 只有番剧才显示 */}
-        {hero && hero.content_type === 'anime' && (
-          <HeroSection content={hero} onSelect={openDetail} />
+        {/* 精选推荐 — 独立于 tab，随机选取 */}
+        {hero && (
+          <div className="relative">
+            <HeroSection content={hero} onSelect={openDetail} />
+            <button
+              onClick={handleRefreshHero}
+              className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 hover:opacity-80"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-line)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <RefreshCw size={12} />
+              换一个
+            </button>
+          </div>
         )}
 
         {/* 分类标签 */}
