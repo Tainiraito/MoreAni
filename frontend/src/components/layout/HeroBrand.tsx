@@ -18,7 +18,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function HeroBrand() {
-  const { openAuth, authOpen } = useUIStore()
+  const { openAuth, authOpen, detailOpen } = useUIStore()
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
   const { openDetail } = useUIStore()
@@ -49,7 +49,8 @@ export function HeroBrand() {
     if (user) return
 
     const handleWheel = (e: WheelEvent) => {
-      if (authOpen) return
+      // 如果登录框或详情弹窗打开，不处理
+      if (authOpen || detailOpen) return
       
       e.preventDefault()
       
@@ -72,7 +73,7 @@ export function HeroBrand() {
 
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
-  }, [user, openAuth, authOpen])
+  }, [user, openAuth, authOpen, detailOpen])
 
   // 登录框关闭时立即重置进度
   useEffect(() => {
