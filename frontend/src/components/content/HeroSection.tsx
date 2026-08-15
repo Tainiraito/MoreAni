@@ -1,5 +1,5 @@
 import type { ContentItem } from '@/types'
-import { Star, Users, Play, Eye, Check, X } from 'lucide-react'
+import { Star, Users, Play, Eye, Check, X, RotateCcw, EyeOff } from 'lucide-react'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -36,7 +36,6 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
     ? (content.avg_score / 10).toFixed(1)
     : null
 
-  // Parse metadata if available (只用于标签和制作信息)
   const metadata = content.metadata ? (typeof content.metadata === 'string' ? JSON.parse(content.metadata) : content.metadata) : {}
   const tags = metadata.tags || []
   const director = metadata.director
@@ -45,6 +44,122 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
   const handleStatusClick = (e: React.MouseEvent, newStatus: ContentStatus) => {
     e.stopPropagation()
     onStatusChange?.(newStatus)
+  }
+
+  // 根据当前状态渲染按钮
+  const renderStatusButtons = () => {
+    if (!onStatusChange) return null
+
+    switch (status) {
+      case 'none':
+        return (
+          <>
+            <button
+              onClick={(e) => handleStatusClick(e, 'doing')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              <Play size={16} />
+              正在看
+            </button>
+            <button
+              onClick={(e) => handleStatusClick(e, 'wish')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
+            >
+              <Eye size={16} />
+              想看
+            </button>
+          </>
+        )
+
+      case 'wish':
+        return (
+          <>
+            <button
+              onClick={(e) => handleStatusClick(e, 'doing')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              <Play size={16} />
+              正在看
+            </button>
+            <button
+              onClick={(e) => handleStatusClick(e, 'none')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+            >
+              <EyeOff size={16} />
+              取消想看
+            </button>
+          </>
+        )
+
+      case 'doing':
+        return (
+          <>
+            <button
+              onClick={(e) => handleStatusClick(e, 'done')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              <Check size={16} />
+              已看
+            </button>
+            <button
+              onClick={(e) => handleStatusClick(e, 'dropped')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+            >
+              <X size={16} />
+              弃坑
+            </button>
+          </>
+        )
+
+      case 'done':
+        return (
+          <>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}>
+              <Check size={16} />
+              已看
+            </div>
+            <button
+              onClick={(e) => handleStatusClick(e, 'doing')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
+            >
+              <RotateCcw size={16} />
+              重新看
+            </button>
+          </>
+        )
+
+      case 'dropped':
+        return (
+          <>
+            <button
+              onClick={(e) => handleStatusClick(e, 'doing')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+              style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+            >
+              <RotateCcw size={16} />
+              重新看
+            </button>
+            <button
+              onClick={(e) => handleStatusClick(e, 'none')}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+            >
+              <EyeOff size={16} />
+              取消弃坑
+            </button>
+          </>
+        )
+
+      default:
+        return null
+    }
   }
 
   return (
@@ -87,7 +202,6 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
             <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>{content.title_alt}</p>
           )}
 
-          {/* 评分和统计 */}
           <div className="mt-5 flex flex-wrap items-center gap-4">
             {avgScore && (
               <div className="flex items-center gap-1.5">
@@ -113,7 +227,6 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
             )}
           </div>
 
-          {/* 标签 */}
           {tags.length > 0 && (
             <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
               {tags.slice(0, 10).map((tag: string, index: number) => (
@@ -122,7 +235,6 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
             </p>
           )}
 
-          {/* 制作信息 */}
           {(director || studio) && (
             <div className="mt-3 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
               {director && <span>导演: {director}</span>}
@@ -137,57 +249,9 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
           )}
 
           {/* 状态按钮区 */}
-          {onStatusChange && (
-            <div className="mt-7 flex items-center gap-3">
-              {status === 'done' ? (
-                // 已看状态
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}>
-                  <Check size={16} />
-                  已看
-                </div>
-              ) : status === 'doing' ? (
-                // 正在看状态
-                <>
-                  <button
-                    onClick={(e) => handleStatusClick(e, 'done')}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-                    style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-                  >
-                    <Check size={16} />
-                    已看
-                  </button>
-                  <button
-                    onClick={(e) => handleStatusClick(e, 'dropped')}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
-                  >
-                    <X size={16} />
-                    弃坑
-                  </button>
-                </>
-              ) : (
-                // 未看/想看/弃坑状态
-                <>
-                  <button
-                    onClick={(e) => handleStatusClick(e, 'doing')}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-                    style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
-                  >
-                    <Play size={16} />
-                    正在看
-                  </button>
-                  <button
-                    onClick={(e) => handleStatusClick(e, 'wish')}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
-                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
-                  >
-                    <Eye size={16} />
-                    想看
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          <div className="mt-7 flex items-center gap-3">
+            {renderStatusButtons()}
+          </div>
         </div>
       </div>
     </div>
