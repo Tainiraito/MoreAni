@@ -175,7 +175,7 @@ export function HeroBrand() {
       {items.length > 0 && (
         <div
           className="absolute left-0 right-0"
-          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '24px 0' }}
+          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '48px 0' }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
         >
