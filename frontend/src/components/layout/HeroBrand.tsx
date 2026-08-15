@@ -186,18 +186,17 @@ export function HeroBrand() {
                   className="flex-shrink-0 transition-all duration-300 cursor-pointer"
                   style={{
                     background: 'var(--bg-card)',
-                    border: '1px solid var(--border-line)',
+                    border: hoveredIndex === index
+                      ? '2px solid var(--brand)'
+                      : '1px solid var(--border-line)',
                     borderRadius: '12px',
                     width: `${cardWidth}px`,
-                    minHeight: '280px', // 固定最小高度
-                    transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
+                    minHeight: '280px',
                     boxShadow: hoveredIndex === index
-                      ? '0 12px 40px rgba(0,0,0,0.2)'
+                      ? '0 12px 40px rgba(251, 113, 167, 0.25)'
                       : '0 2px 8px rgba(0,0,0,0.05)',
                     zIndex: hoveredIndex === index ? 10 : 1,
-                    transformOrigin: 'center center',
                     overflow: 'hidden',
-                    willChange: 'transform', // 创建独立合成层
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
@@ -208,14 +207,17 @@ export function HeroBrand() {
                     style={{ 
                       background: 'var(--bg-card-warm)',
                       aspectRatio: '3/4',
-                      borderRadius: '12px 12px 0 0',
+                      borderRadius: '10px 10px 0 0',
                       overflow: 'hidden',
                     }}
                   >
                     <img
                       src={secureUrl(item.cover_url)}
                       alt={item.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300"
+                      style={{
+                        transform: hoveredIndex === index ? 'scale(1.05)' : 'scale(1)',
+                      }}
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.src = '/placeholder.png'
