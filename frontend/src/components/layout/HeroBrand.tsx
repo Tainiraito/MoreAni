@@ -199,7 +199,7 @@ export function HeroBrand() {
                   >
                     {/* 卡片容器 */}
                     <div
-                      className="relative w-full h-full rounded-xl overflow-hidden"
+                      className="relative w-full h-full rounded-xl overflow-hidden flex flex-col"
                       style={{
                         background: 'var(--bg-card)',
                         border: '1px solid var(--border-line)',
@@ -209,8 +209,11 @@ export function HeroBrand() {
                         transition: 'box-shadow 0.3s ease',
                       }}
                     >
-                      {/* 封面 — 填满整个卡片 */}
-                      <div className="absolute inset-0 overflow-hidden">
+                      {/* 封面区域 — 固定高度 */}
+                      <div
+                        className="w-full overflow-hidden flex-shrink-0"
+                        style={{ height: '210px', background: 'var(--bg-card-warm)' }}
+                      >
                         <img
                           src={secureUrl(item.cover_url)}
                           alt={item.title}
@@ -222,54 +225,44 @@ export function HeroBrand() {
                         />
                       </div>
 
-                      {/* 信息区 — 从底部滑上来 */}
-                      <div
-                        className="absolute left-0 right-0 bottom-0 overflow-hidden"
-                        style={{
-                          background: 'var(--bg-card)',
-                          borderTop: '1px solid var(--border-line)',
-                          height: isHovered ? '180px' : '70px',
-                          transition: 'height 0.3s ease',
-                        }}
-                      >
-                        <div className="p-3 text-center">
-                          {/* 标题 */}
-                          <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                            {item.title}
-                          </h3>
+                      {/* 信息区 — 填充剩余空间 */}
+                      <div className="flex-1 p-3 text-center flex flex-col">
+                        {/* 标题 */}
+                        <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                          {item.title}
+                        </h3>
 
-                          {/* 分数 */}
-                          {item.avg_score && item.avg_score > 0 && (
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
-                                ★ {(item.avg_score / 10).toFixed(1)}
-                              </span>
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                {item.rating_count || 0}人
-                              </span>
-                            </div>
-                          )}
-
-                          {/* 集数 + 简介 — hover 时显示 */}
-                          <div
-                            className="overflow-hidden transition-all duration-300"
-                            style={{
-                              maxHeight: isHovered ? '100px' : '0px',
-                              opacity: isHovered ? 1 : 0,
-                              marginTop: isHovered ? '8px' : '0px',
-                            }}
-                          >
-                            {item.episodes > 0 && (
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                                {item.episodes}集
-                              </p>
-                            )}
-                            {item.description && (
-                              <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
-                                {item.description}
-                              </p>
-                            )}
+                        {/* 分数 */}
+                        {item.avg_score && item.avg_score > 0 && (
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                              ★ {(item.avg_score / 10).toFixed(1)}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                              {item.rating_count || 0}人
+                            </span>
                           </div>
+                        )}
+
+                        {/* 集数 + 简介 — hover 时显示 */}
+                        <div
+                          className="overflow-hidden transition-all duration-300 flex-1"
+                          style={{
+                            maxHeight: isHovered ? '100px' : '0px',
+                            opacity: isHovered ? 1 : 0,
+                            marginTop: isHovered ? '6px' : '0px',
+                          }}
+                        >
+                          {item.episodes > 0 && (
+                            <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                              {item.episodes}集
+                            </p>
+                          )}
+                          {item.description && (
+                            <p className="text-xs line-clamp-3 text-center" style={{ color: 'var(--text-secondary)' }}>
+                              {item.description}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
