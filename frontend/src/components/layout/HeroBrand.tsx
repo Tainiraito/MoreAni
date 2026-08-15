@@ -28,7 +28,7 @@ export function HeroBrand() {
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
   const cardWidth = 160
-  const gap = 20 // 增加间距给放大留空间
+  const gap = 20
 
   // 加载推荐内容
   useEffect(() => {
@@ -177,7 +177,7 @@ export function HeroBrand() {
           >
             <div
               ref={scrollContainerRef}
-              className="flex"
+              className="flex items-end"
               style={{ gap: `${gap}px`, width: 'max-content' }}
             >
               {displayItems.map((item, index) => (
@@ -189,25 +189,24 @@ export function HeroBrand() {
                     border: '1px solid var(--border-line)',
                     borderRadius: '12px',
                     width: `${cardWidth}px`,
-                    minHeight: '280px',
                     transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
                     boxShadow: hoveredIndex === index
                       ? '0 12px 40px rgba(0,0,0,0.2)'
                       : '0 2px 8px rgba(0,0,0,0.05)',
                     zIndex: hoveredIndex === index ? 20 : 1,
-                    transformOrigin: 'center center',
+                    transformOrigin: 'center bottom', // 从底部中心放大
                     overflow: 'hidden',
                     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
                   }}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {/* 封面 */}
+                  {/* 封面 — 固定高度 */}
                   <div
                     className="w-full"
                     style={{ 
                       background: 'var(--bg-card-warm)',
-                      aspectRatio: '3/4',
+                      height: '210px', // 固定高度
                       borderRadius: '12px 12px 0 0',
                       overflow: 'hidden',
                     }}
@@ -223,8 +222,8 @@ export function HeroBrand() {
                     />
                   </div>
 
-                  {/* 信息 — 居中展示 */}
-                  <div className="p-3 text-center">
+                  {/* 信息区 — 固定高度 */}
+                  <div className="p-3 text-center" style={{ minHeight: '70px' }}>
                     {/* 标题 */}
                     <h3 className="text-xs font-semibold truncate mb-2" style={{ color: 'var(--text-primary)' }}>
                       {item.title}
@@ -232,7 +231,7 @@ export function HeroBrand() {
 
                     {/* 分数 + 打分人数 — 默认展示 */}
                     {item.avg_score && item.avg_score > 0 && (
-                      <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>
                           ★ {(item.avg_score / 10).toFixed(1)}
                         </span>
@@ -241,29 +240,28 @@ export function HeroBrand() {
                         </span>
                       </div>
                     )}
+                  </div>
 
-                    {/* 集数 + 简介 — hover 时展示 */}
-                    <div
-                      className="overflow-hidden transition-all duration-300"
-                      style={{
-                        maxHeight: hoveredIndex === index ? '80px' : '0px',
-                        opacity: hoveredIndex === index ? 1 : 0,
-                      }}
-                    >
-                      {item.episodes > 0 && (
-                        <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-                          {item.episodes}集
-                        </p>
-                      )}
-                      {item.description && (
-                        <p
-                          className="text-xs line-clamp-2"
-                          style={{ color: 'var(--text-secondary)' }}
-                        >
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
+                  {/* 额外信息 — 绝对定位，不影响卡片高度 */}
+                  <div
+                    className="absolute left-0 right-0 bottom-0 px-3 pb-3 text-center"
+                    style={{
+                      background: 'linear-gradient(transparent, var(--bg-card) 30%)',
+                      opacity: hoveredIndex === index ? 1 : 0,
+                      transition: 'opacity 0.3s ease',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {item.episodes > 0 && (
+                      <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
+                        {item.episodes}集
+                      </p>
+                    )}
+                    {item.description && (
+                      <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                        {item.description}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
