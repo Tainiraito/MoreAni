@@ -22,13 +22,17 @@ function secureUrl(url: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
-export type ContentStatus = 'none' | 'wish' | 'doing' | 'done' | 'dropped'
+// 后端状态值
+export type BackendStatus = 'want' | 'watching' | 'watched' | 'dropped'
+
+// 前端显示状态（用于UI逻辑）
+export type DisplayStatus = 'none' | 'want' | 'watching' | 'watched' | 'dropped'
 
 interface HeroSectionProps {
   content: ContentItem
-  status?: ContentStatus
+  status?: DisplayStatus
   onSelect: (id: number) => void
-  onStatusChange?: (status: ContentStatus) => void
+  onStatusChange?: (status: BackendStatus | null) => void
 }
 
 export function HeroSection({ content, status = 'none', onSelect, onStatusChange }: HeroSectionProps) {
@@ -41,12 +45,11 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
   const director = metadata.director
   const studio = metadata.studio
 
-  const handleStatusClick = (e: React.MouseEvent, newStatus: ContentStatus) => {
+  const handleStatusClick = (e: React.MouseEvent, newStatus: BackendStatus | null) => {
     e.stopPropagation()
     onStatusChange?.(newStatus)
   }
 
-  // 根据当前状态渲染按钮
   const renderStatusButtons = () => {
     if (!onStatusChange) return null
 
@@ -55,7 +58,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
         return (
           <>
             <button
-              onClick={(e) => handleStatusClick(e, 'doing')}
+              onClick={(e) => handleStatusClick(e, 'watching')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
@@ -63,7 +66,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
               正在看
             </button>
             <button
-              onClick={(e) => handleStatusClick(e, 'wish')}
+              onClick={(e) => handleStatusClick(e, 'want')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
               style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
             >
@@ -73,11 +76,11 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
           </>
         )
 
-      case 'wish':
+      case 'want':
         return (
           <>
             <button
-              onClick={(e) => handleStatusClick(e, 'doing')}
+              onClick={(e) => handleStatusClick(e, 'watching')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
@@ -85,7 +88,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
               正在看
             </button>
             <button
-              onClick={(e) => handleStatusClick(e, 'none')}
+              onClick={(e) => handleStatusClick(e, null)}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
               style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
             >
@@ -95,11 +98,11 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
           </>
         )
 
-      case 'doing':
+      case 'watching':
         return (
           <>
             <button
-              onClick={(e) => handleStatusClick(e, 'done')}
+              onClick={(e) => handleStatusClick(e, 'watched')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
@@ -117,7 +120,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
           </>
         )
 
-      case 'done':
+      case 'watched':
         return (
           <>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}>
@@ -125,7 +128,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
               已看
             </div>
             <button
-              onClick={(e) => handleStatusClick(e, 'doing')}
+              onClick={(e) => handleStatusClick(e, 'watching')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
               style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
             >
@@ -139,7 +142,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
         return (
           <>
             <button
-              onClick={(e) => handleStatusClick(e, 'doing')}
+              onClick={(e) => handleStatusClick(e, 'watching')}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
               style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
             >
@@ -147,7 +150,7 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
               重新看
             </button>
             <button
-              onClick={(e) => handleStatusClick(e, 'none')}
+              onClick={(e) => handleStatusClick(e, null)}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
               style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
             >
@@ -248,7 +251,6 @@ export function HeroSection({ content, status = 'none', onSelect, onStatusChange
             </p>
           )}
 
-          {/* 状态按钮区 */}
           <div className="mt-7 flex items-center gap-3">
             {renderStatusButtons()}
           </div>

@@ -7,11 +7,11 @@ import { HeroBrand } from '@/components/layout/HeroBrand'
 import { CategoryTabs } from '@/components/content/CategoryTabs'
 import { AnimeCard } from '@/components/content/AnimeCard'
 import { ContentListItem } from '@/components/content/ContentListItem'
-import { HeroSection, type ContentStatus } from '@/components/content/HeroSection'
+import { HeroSection, type DisplayStatus, type BackendStatus } from '@/components/content/HeroSection'
 import { RefreshCw } from 'lucide-react'
 import type { ContentItem, ContentType } from '@/types'
 
-interface ContentStatusItem {
+interface StatusItem {
   content_id: number
   status: string
 }
@@ -22,7 +22,7 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('all')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
-  const [heroStatus, setHeroStatus] = useState<ContentStatus>('none')
+  const [heroStatus, setHeroStatus] = useState<DisplayStatus>('none')
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [statusMap, setStatusMap] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
@@ -37,7 +37,7 @@ export function HomePage() {
     ])
       .then(([contentRes, statusRes]) => {
         const animeList = (contentRes.items || []) as ContentItem[]
-        const statuses = (statusRes.items || []) as ContentStatusItem[]
+        const statuses = (statusRes.items || []) as StatusItem[]
         
         // 构建状态映射
         const sMap: Record<number, string> = {}
@@ -53,7 +53,7 @@ export function HomePage() {
           const randomIndex = Math.floor(Math.random() * withCover.length)
           const selected = withCover[randomIndex]
           setHero(selected)
-          setHeroStatus((sMap[selected.id] as ContentStatus) || 'none')
+          setHeroStatus((sMap[selected.id] as DisplayStatus) || 'none')
         }
       })
       .catch(() => {})
@@ -88,39 +88,38 @@ export function HomePage() {
       const randomIndex = Math.floor(Math.random() * allAnime.length)
       const selected = allAnime[randomIndex]
       setHero(selected)
-      setHeroStatus((statusMap[selected.id] as ContentStatus) || 'none')
+      setHeroStatus((statusMap[selected.id] as DisplayStatus) || 'none')
     } else {
       const randomIndex = Math.floor(Math.random() * remaining.length)
       const selected = remaining[randomIndex]
       setHero(selected)
-      setHeroStatus((statusMap[selected.id] as ContentStatus) || 'none')
+      setHeroStatus((statusMap[selected.id] as DisplayStatus) || 'none')
     }
   }, [allAnime, hero, statusMap])
 
   // 更新状态
-  const handleStatusChange = useCallback(async (newStatus: ContentStatus) => {
+  const handleStatusChange = useCallback(async (newStatus: BackendStatus | null) => {
     if (!hero) return
     
     try {
-      if (newStatus === 'none') {
+      if (newStatus === null) {
+        // 清除状态
         await api.clearStatus(hero.id)
+        setStatusMap(prev => ({ ...prev, [hero.id]: '' }))
+        setHeroStatus('none')
       } else {
+        // 设置状态
         await api.setStatus({ content_id: hero.id, status: newStatus })
+        setStatusMap(prev => ({ ...prev, [hero.id]: newStatus }))
+        setHeroStatus(newStatus as DisplayStatus)
+        
+        // 如果标记为已看或弃坑，自动换下一个
+        if (newStatus === 'watched' || newStatus === 'dropped') {
+          handleRefreshHero()
+        }
       }
-      
-      // 更新状态映射
-      setStatusMap(prev => ({
-        ...prev,
-        [hero.id]: newStatus === 'none' ? '' : newStatus,
-      }))
-      setHeroStatus(newStatus)
-      
-      // 如果标记为已看或弃坑，自动换下一个
-      if (newStatus === 'done' || newStatus === 'dropped') {
-        handleRefreshHero()
-      }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('Status change failed:', err)
     }
   }, [hero, handleRefreshHero])
 
@@ -140,7 +139,7 @@ export function HomePage() {
 
       {/* 内容区域 */}
       <div className="pb-20 sm:pb-24">
-        {/* 精选推荐 — 随机选取，显示状态按钮 */}
+        {/* 精选推荐 */}
         {hero && (
           <div className="relative">
             <HeroSection
@@ -179,7 +178,6 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {/* 番剧区域 */}
             {animeItems.length > 0 && (
               <section className="mt-8">
                 {(activeType === 'all') && (
@@ -203,7 +201,6 @@ export function HomePage() {
               </section>
             )}
 
-            {/* 其他类型 */}
             {otherItems.length > 0 && (
               <section className="mt-10">
                 {(activeType === 'all') && animeItems.length > 0 && (
