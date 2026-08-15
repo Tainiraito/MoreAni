@@ -27,7 +27,7 @@ export function HeroBrand() {
   const animFrameRef = useRef<number>(0)
   const scrollPosRef = useRef(0)
   const lastPromptProgress = useRef(0)
-  const cardWidth = 260
+  const cardWidth = 160
   const gap = 16
 
   // 加载推荐内容
@@ -56,12 +56,9 @@ export function HeroBrand() {
       if (!isPaused) {
         scrollPosRef.current += speed * delta
         const singleSetWidth = items.length * (cardWidth + gap)
-        
-        // 无缝循环：当滚动完一组时，重置到起始位置
         if (scrollPosRef.current >= singleSetWidth) {
           scrollPosRef.current -= singleSetWidth
         }
-        
         container.style.transform = `translateX(-${scrollPosRef.current}px)`
       }
 
@@ -107,7 +104,7 @@ export function HeroBrand() {
     }
   }, [user])
 
-  // 生成足够多的卡片用于无缝循环（3组）
+  // 3组卡片用于无缝循环
   const displayItems = [...items, ...items, ...items]
 
   return (
@@ -122,7 +119,7 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 — 靠上定位 */}
+      {/* 主内容区 */}
       <div
         className="absolute left-0 right-0 flex flex-col items-center text-center px-6"
         style={{ top: '18%' }}
@@ -174,73 +171,62 @@ export function HeroBrand() {
         </div>
       </div>
 
-      {/* 滚动推荐卡片 — 按钮下方，撑满窗口 */}
+      {/* 滚动推荐卡片 — 竖版卡片 */}
       {items.length > 0 && (
         <div
           className="absolute left-0 right-0 overflow-hidden"
-          style={{ top: '55%', bottom: '48px' }}
+          style={{ top: '58%', bottom: '48px' }}
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => { setIsPaused(false); setHoveredId(null) }}
         >
           <div
             ref={scrollContainerRef}
             className="flex will-change-transform"
-            style={{ 
-              gap: `${gap}px`,
-              width: 'max-content',
-              paddingLeft: '0px', // 从最左边开始
-            }}
+            style={{ gap: `${gap}px`, width: 'max-content' }}
           >
             {displayItems.map((item, index) => (
               <div
                 key={`${item.id}-${index}`}
-                className="flex-shrink-0 flex transition-all duration-300 cursor-pointer"
+                className="flex-shrink-0 transition-all duration-300 cursor-pointer"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border-line)',
                   borderRadius: '12px',
-                  width: `${hoveredId === item.id ? cardWidth + 40 : cardWidth}px`,
+                  width: `${hoveredId === item.id ? cardWidth + 16 : cardWidth}px`,
                   transform: hoveredId === item.id ? 'scale(1.05)' : 'scale(1)',
                   boxShadow: hoveredId === item.id
                     ? '0 8px 30px rgba(0,0,0,0.15)'
                     : 'none',
                   zIndex: hoveredId === item.id ? 10 : 1,
-                  transformOrigin: 'center center',
+                  transformOrigin: 'center bottom',
                   overflow: 'hidden',
                 }}
                 onMouseEnter={() => setHoveredId(item.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
-                {/* 封面 — 左侧圆角 */}
+                {/* 封面 */}
                 <div
-                  className="w-20 flex-shrink-0"
+                  className="w-full"
                   style={{ 
                     background: 'var(--bg-card-warm)',
-                    borderRadius: '12px 0 0 12px',
+                    aspectRatio: '3/4',
+                    borderRadius: '12px 12px 0 0',
+                    overflow: 'hidden',
                   }}
                 >
                   <img
                     src={secureUrl(item.cover_url)}
                     alt={item.title}
                     className="w-full h-full object-cover"
-                    style={{ 
-                      aspectRatio: '3/4',
-                      borderRadius: '12px 0 0 12px',
-                    }}
                   />
                 </div>
 
                 {/* 信息 */}
-                <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                  <h3 className="text-sm font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                <div className="p-2.5">
+                  <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
                     {item.title}
                   </h3>
-                  {item.title_alt && (
-                    <p className="text-xs truncate mb-2" style={{ color: 'var(--text-muted)' }}>
-                      {item.title_alt}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {item.avg_score && item.avg_score > 0 && (
                       <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
                         ★ {(item.avg_score / 10).toFixed(1)}
