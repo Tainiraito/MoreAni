@@ -170,7 +170,8 @@ export function HeroBrand() {
         {/* 滚动推荐卡片 */}
         {items.length > 0 && (
           <div
-            className="w-screen overflow-hidden py-12"
+            className="w-screen overflow-hidden"
+            style={{ padding: '48px 0 80px' }}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
           >
