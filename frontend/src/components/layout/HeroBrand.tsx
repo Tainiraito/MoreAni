@@ -108,7 +108,7 @@ export function HeroBrand() {
   const displayItems = [...items, ...items, ...items]
 
   return (
-    <div className="relative" style={{ height: '100vh', background: 'var(--bg-page)' }}>
+    <div className="relative min-h-screen" style={{ background: 'var(--bg-page)' }}>
       {/* 背景装饰 */}
       <div
         className="absolute inset-0 -z-10"
@@ -119,10 +119,9 @@ export function HeroBrand() {
         }}
       />
 
-      {/* 主内容区 */}
+      {/* 主内容区 — 整体居中偏上 */}
       <div
-        className="absolute left-0 right-0 flex flex-col items-center text-center px-6"
-        style={{ top: '18%' }}
+        className="flex flex-col items-center text-center px-6 pt-[18vh]"
       >
         {/* 大 icon */}
         <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden mb-6">
@@ -143,7 +142,7 @@ export function HeroBrand() {
         </p>
 
         {/* 按钮区 */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-12">
           {!user && (
             <button
               onClick={openAuth}
@@ -169,84 +168,83 @@ export function HeroBrand() {
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
         </div>
-      </div>
 
-      {/* 滚动推荐卡片 */}
-      {items.length > 0 && (
-        <div
-          className="absolute left-0 right-0"
-          style={{ top: '58%', bottom: '48px', overflow: 'hidden', padding: '48px 0' }}
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
-        >
+        {/* 滚动推荐卡片 — 跟随按钮下方 */}
+        {items.length > 0 && (
           <div
-            ref={scrollContainerRef}
-            className="flex will-change-transform"
-            style={{ gap: `${gap}px`, width: 'max-content' }}
+            className="w-screen overflow-hidden py-12"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => { setIsPaused(false); setHoveredIndex(null) }}
           >
-            {displayItems.map((item, index) => (
-              <div
-                key={index}
-                className="flex-shrink-0 transition-all duration-300 cursor-pointer"
-                style={{
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-line)',
-                  borderRadius: '12px',
-                  width: `${cardWidth}px`,
-                  transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
-                  boxShadow: hoveredIndex === index
-                    ? '0 12px 40px rgba(0,0,0,0.2)'
-                    : 'none',
-                  zIndex: hoveredIndex === index ? 10 : 1,
-                  transformOrigin: 'center center',
-                  overflow: 'hidden',
-                }}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {/* 封面 */}
+            <div
+              ref={scrollContainerRef}
+              className="flex will-change-transform"
+              style={{ gap: `${gap}px`, width: 'max-content' }}
+            >
+              {displayItems.map((item, index) => (
                 <div
-                  className="w-full"
-                  style={{ 
-                    background: 'var(--bg-card-warm)',
-                    aspectRatio: '3/4',
-                    borderRadius: '12px 12px 0 0',
+                  key={index}
+                  className="flex-shrink-0 transition-all duration-300 cursor-pointer"
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-line)',
+                    borderRadius: '12px',
+                    width: `${cardWidth}px`,
+                    transform: hoveredIndex === index ? 'scale(1.08)' : 'scale(1)',
+                    boxShadow: hoveredIndex === index
+                      ? '0 12px 40px rgba(0,0,0,0.2)'
+                      : 'none',
+                    zIndex: hoveredIndex === index ? 10 : 1,
+                    transformOrigin: 'center center',
                     overflow: 'hidden',
                   }}
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  <img
-                    src={secureUrl(item.cover_url)}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                  {/* 封面 */}
+                  <div
+                    className="w-full"
+                    style={{ 
+                      background: 'var(--bg-card-warm)',
+                      aspectRatio: '3/4',
+                      borderRadius: '12px 12px 0 0',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <img
+                      src={secureUrl(item.cover_url)}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
-                {/* 信息 */}
-                <div className="p-2.5">
-                  <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
-                    {item.title}
-                  </h3>
-                  <div className="flex items-center gap-1.5">
-                    {item.avg_score && item.avg_score > 0 && (
-                      <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
-                        ★ {(item.avg_score / 10).toFixed(1)}
-                      </span>
-                    )}
-                    {item.episodes > 0 && (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {item.episodes}集
-                      </span>
-                    )}
+                  {/* 信息 */}
+                  <div className="p-2.5">
+                    <h3 className="text-xs font-semibold truncate mb-1" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      {item.avg_score && item.avg_score > 0 && (
+                        <span className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+                          ★ {(item.avg_score / 10).toFixed(1)}
+                        </span>
+                      )}
+                      {item.episodes > 0 && (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {item.episodes}集
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 底部进度条 */}
-      <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+      <div className="fixed bottom-3 left-0 right-0 flex justify-center">
         {!user ? (
           <div className="flex flex-col items-center gap-1">
             <div
@@ -281,7 +279,7 @@ export function HeroBrand() {
       {/* 进度条满时的遮罩 */}
       {!user && scrollProgress >= 0.95 && (
         <div
-          className="absolute inset-0 flex items-center justify-center"
+          className="fixed inset-0 flex items-center justify-center"
           style={{
             background: 'rgba(0,0,0,0.3)',
             animation: 'fade-in 300ms ease-out',
