@@ -91,7 +91,7 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                   <Star size={12} style={{ color: item.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={item.my_score ? '#FB71A7' : 'none'} />
                   <span className="text-xs font-bold" style={{ color: item.my_score ? '#FB71A7' : 'var(--text-muted)' }}>{avg}</span>
                   {ratingCount > 0 && (
-                    <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
+                    <span className="text-[10px] flex items-center gap-0.5" style={{ color: item.my_has_review ? '#FB71A7' : 'var(--text-muted)' }}>
                       <Users size={10} /> {ratingCount}
                     </span>
                   )}
