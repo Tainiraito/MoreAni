@@ -99,6 +99,7 @@
 - SECRET_KEY 固定：`auth.py` 支持 `backend/.env` 加载（此前 `uvicorn --reload` 每次重启随机密钥，所有登录 token 失效踢人）
 - 后台管理 UI 规范化：邀请码去 font-mono、编辑/删除按钮加边框 + hover 粉/红描边、日期选择换 DatePicker 组件
 - `--accent-coral` / `--accent-purple` 简写变量补齐（Tailwind v4 `@theme` 只生成 `--color-*` 前缀，`var(--accent-coral)` 此前解析为 undefined，删除按钮红色从未生效）
+- 详情弹窗监听 `refreshKey`：编辑保存后回到详情弹窗自动重新加载（此前依赖数组漏了 refreshKey，内容不更新）；评分保存改为统一走 triggerRefresh 加载（去掉手动重复请求）
 
 ---
 

@@ -53,6 +53,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
   const [editing, setEditing] = useState(false)
+  // 监听全局刷新信号：编辑保存/删除/评分变化后详情弹窗内容保持最新
+  const refreshKey = useRefreshStore(s => s.refreshKey)
 
   useEffect(() => {
     if (detailOpen && detailContentId) {
@@ -85,7 +87,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId, user?.username])
+  }, [detailOpen, detailContentId, user?.username, refreshKey])
 
   // Lock body scroll when dialog is open
   useEffect(() => {
@@ -119,21 +121,12 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
         score: score * 10,
         review: reviewText,
       })
-      const [updated, ratingsRes] = await Promise.all([
-        api.getContent(content.id) as Promise<ContentItem>,
-        api.getContentRatings(content.id, { size: '50' }),
-      ])
-      setContent(updated)
-      const ratings = (ratingsRes.items || []) as Review[]
-      setAllReviews(ratings)
-      const mine = ratings.find((r: Review) => r.username === user.username)
-      if (mine) setMyRatingId(mine.id)
       setEditing(false)
-      // 通知列表刷新（评分/评论变化影响 my_score / my_has_review）
+      // 触发全局刷新：详情弹窗本组件监听 refreshKey 会自动重新加载（含我的评分提取）
       useRefreshStore.getState().triggerRefresh()
       toast.addToast('success', '评分已保存')
-    } catch {
-      toast.addToast('error', '评分失败')
+    } catch (err: any) {
+      toast.addToast('error', err.message || '保存失败')
     }
   }
 
