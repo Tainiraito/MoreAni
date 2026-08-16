@@ -108,6 +108,8 @@
 - 精选推荐区（HeroBrand）全量随机 + 自己评分/评论过的优先展示（最多 6 张）；列表 size 上限放宽至 1000
 - 标粉修复：CommentListView / HeroSection 平均分星标原来硬编码粉色，改为按 my_score 判定（评过粉/没评灰，与卡片规则一致）
 - 搜索防抖统一 500ms（首页搜索 + 编辑弹窗 Bangumi 搜索），首页支持 Enter 立即搜索
+- 背景纹理：透明底 PNG 平铺（100px，线条 10% 不透明度，body 多层背景）
+- 部署（2026-08-16）：feat/v2-redesign push + 镜像重建 + 本地库（806KB，5 用户/234 番剧/324 评分，含 201 条 Bangumi 校对 + 数据清理）覆盖 NAS 旧库（已备份 backups/moreani.db.20260816_190443）；线上 moreani.lovelysia.top 验证通过
 - Bangumi 校对 title_similar 组合匹配（title/title_alt 任一相似即通过）+ 短子串防误配，救回 5 条译名差异误判（赛博朋克边缘行者/GIRLS BAND CRY/Charlotte/网购技能/咒术回战第三季）
 
 ---
