@@ -367,7 +367,12 @@ export function HomePage() {
             {animeItems.length > 0 && (
               <section className="mt-8">
                 {viewMode === 'list' ? (
-                  <CommentListView items={animeItems} onSelect={openDetail} />
+                  <CommentListView
+                    items={animeItems}
+                    onSelect={openDetail}
+                    isFavorited={isFavorited}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                     {animeItems.map(item => (

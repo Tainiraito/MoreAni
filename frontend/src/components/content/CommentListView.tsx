@@ -1,4 +1,4 @@
-import { Star, Users, MessageCircle } from 'lucide-react'
+import { Star, Users, MessageCircle, Heart } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { secureUrl } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
@@ -6,6 +6,8 @@ import type { ContentItem } from '@/types'
 interface CommentListViewProps {
   items: ContentItem[]
   onSelect: (id: number) => void
+  isFavorited?: (id: number) => boolean
+  onToggleFavorite?: (id: number) => void
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -17,7 +19,7 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 /** 评论列表视图：每行左侧番剧信息，右侧朋友们的评分评论集合（气泡样式） */
-export function CommentListView({ items, onSelect }: CommentListViewProps) {
+export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite }: CommentListViewProps) {
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center py-32">
@@ -43,12 +45,34 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
           >
             {/* 封面：最左侧，占满行高，适配常见 2:3~3:4 封面比例 */}
             <div
-              className="w-[150px] shrink-0 self-stretch"
+              className="w-[150px] shrink-0 self-stretch relative"
               style={{ background: 'var(--bg-card-warm)' }}
             >
               {item.cover_url ? (
                 <img src={secureUrl(item.cover_url)} alt="" className="w-full h-full object-cover" />
               ) : null}
+              {/* 收藏按钮（右上角，与网格视图风格一致） */}
+              {onToggleFavorite && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    onToggleFavorite(item.id)
+                  }}
+                  className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150 hover:scale-110"
+                  style={{
+                    background: isFavorited?.(item.id) ? '#FB71A7' : 'rgba(255, 255, 255, 0.9)',
+                    border: 'none',
+                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
+                  }}
+                  title={isFavorited?.(item.id) ? '取消收藏' : '收藏'}
+                >
+                  <Heart
+                    size={13}
+                    fill={isFavorited?.(item.id) ? 'white' : 'none'}
+                    color={isFavorited?.(item.id) ? 'white' : 'var(--text-muted)'}
+                  />
+                </button>
+              )}
             </div>
 
             {/* 中间：番剧信息集合 */}
