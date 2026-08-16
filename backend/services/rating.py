@@ -88,10 +88,22 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
     avg_recommend = round(float(stats[1]), 1) if stats[1] else None
     rating_count = stats[2] or 0
 
+    # 评论数（review 非空，含 score=0 的只评论）
+    review_count = (
+        db.query(func.count(Rating.id))
+        .filter(
+            Rating.content_id == content_id,
+            Rating.review.isnot(None),
+            Rating.review != '',
+        )
+        .scalar()
+    ) or 0
+
     return {
         'avg_score': avg_score,
         'avg_recommend': avg_recommend,
         'rating_count': rating_count,
+        'review_count': review_count,
     }
 
 

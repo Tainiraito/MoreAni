@@ -319,16 +319,19 @@ export function HomePage() {
           >
             + 添加番剧
           </button>
-          {/* 视图切换：评论列表 / 卡片网格 */}
-          <div className="flex items-center gap-1.5 ml-1">
+          {/* 视图切换（组合式：评论列表 / 卡片网格） */}
+          <div
+            className="flex items-center ml-1 rounded-lg overflow-hidden"
+            style={{ border: '1px solid var(--border-line)' }}
+          >
             <button
               onClick={() => switchView('list')}
               title="评论列表视图"
-              className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-150"
+              className="w-9 h-9 flex items-center justify-center transition-all duration-150"
               style={{
-                background: viewMode === 'list' ? '#FB71A7' : 'transparent',
-                color: viewMode === 'list' ? 'white' : 'var(--text-muted)',
-                border: '1px solid var(--border-line)',
+                background: viewMode === 'list' ? 'var(--bg-card)' : 'transparent',
+                color: viewMode === 'list' ? '#FB71A7' : 'var(--text-muted)',
+                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
               }}
             >
               <List size={14} />
@@ -336,11 +339,12 @@ export function HomePage() {
             <button
               onClick={() => switchView('grid')}
               title="卡片网格视图"
-              className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-150"
+              className="w-9 h-9 flex items-center justify-center transition-all duration-150"
               style={{
-                background: viewMode === 'grid' ? '#FB71A7' : 'transparent',
-                color: viewMode === 'grid' ? 'white' : 'var(--text-muted)',
-                border: '1px solid var(--border-line)',
+                background: viewMode === 'grid' ? 'var(--bg-card)' : 'transparent',
+                color: viewMode === 'grid' ? '#FB71A7' : 'var(--text-muted)',
+                borderLeft: '1px solid var(--border-line)',
+                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
               }}
             >
               <LayoutGrid size={14} />

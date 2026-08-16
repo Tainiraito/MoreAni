@@ -25,6 +25,7 @@ export interface ContentItem {
   avg_score?: number
   avg_recommend?: number
   rating_count?: number
+  review_count?: number
   my_rating?: Rating | null
   my_status?: WatchStatus | null
   my_score?: number | null

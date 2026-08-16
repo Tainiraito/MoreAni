@@ -35,6 +35,7 @@ def _to_response(
     resp.avg_score = stats['avg_score']
     resp.avg_recommend = stats['avg_recommend']
     resp.rating_count = stats['rating_count']
+    resp.review_count = stats['review_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
     # Recent reviews（列表场景传 recent_map 批量填充，单条场景单独查询）
     if recent_map is not None:

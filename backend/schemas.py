@@ -180,6 +180,7 @@ class ContentItemResponse(BaseModel):
     avg_score: float | None = None
     avg_recommend: float | None = None
     rating_count: int | None = None
+    review_count: int | None = None
     tags: list[TagResponse] = []
     recent_reviews: list[RecentReview] = []
     # User-specific fields (only in list endpoint when authenticated)
