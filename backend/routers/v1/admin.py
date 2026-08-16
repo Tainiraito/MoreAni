@@ -25,6 +25,7 @@ def _to_admin_user(u: User) -> dict:
         'nickname': u.nickname,
         'role': u.role,
         'avatar_id': u.avatar_id,
+        'avatar_url': u.avatar_url,
         'created_at': u.created_at.isoformat() if u.created_at else None,
     }
 
