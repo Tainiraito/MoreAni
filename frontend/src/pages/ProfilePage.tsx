@@ -62,7 +62,7 @@ export function ProfilePage() {
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.nickname}</h1>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              @{user.username} · {user.role === 'admin' ? '管理员' : '成员'} · 加入于 {new Date(user.created_at).toLocaleDateString('zh-CN')}
+              @{user.username} · {user.role === 'super_admin' ? '超级管理员' : user.role === 'admin' ? '管理员' : '成员'} · 加入于 {new Date(user.created_at).toLocaleDateString('zh-CN')}
             </p>
           </div>
         </div>

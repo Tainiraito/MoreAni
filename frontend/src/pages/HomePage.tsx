@@ -306,8 +306,8 @@ export function HomePage() {
               { value: 'title', label: '标题排序' },
             ]}
           />
-          {/* 仅管理员显示新增按钮（普通用户无权限，避免操作后报错） */}
-          {user?.role === 'admin' && (
+          {/* 仅管理员显示新增按钮（普通用户无权限，避免操作后报错）；super_admin 同样有权限 */}
+          {(user?.role === 'admin' || user?.role === 'super_admin') && (
             <button
               onClick={openAddAnime}
               className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"

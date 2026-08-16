@@ -189,7 +189,7 @@ export function SettingsDialog() {
             )}
             <div className="flex items-center gap-2 mt-1">
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                @{user?.username} · {user?.role === 'admin' ? '管理员' : '成员'}
+                @{user?.username} · {user?.role === 'super_admin' ? '超级管理员' : user?.role === 'admin' ? '管理员' : '成员'}
               </p>
               <button
                 onClick={() => setPasswordOpen(true)}
