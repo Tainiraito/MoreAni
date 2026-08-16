@@ -82,7 +82,8 @@ function toForm(item: ContentItem & { tags?: TagResponse[] }): ContentFormData {
     platform: item.platform ?? '',
     release_date: item.release_date ?? '',
     tags: tagNames.join(', '),
-    bgm_id: null,
+    // 编辑已有 Bangumi 条目时回填来源 ID（重新获取后提交可更新 Bangumi 关联）
+    bgm_id: item.source_type === 'bangumi' && item.source_id ? Number(item.source_id) || null : null,
   }
 }
 
@@ -219,11 +220,15 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
     setQuery('')
     toast.addToast('success', `已填入「${item.name_cn || item.name}」的信息`)
 
-    // Fetch full details to get tags (search API doesn't return tags)
+    // Fetch full details to get tags + summary (search API doesn't return them)
     try {
-      const detail = await api.getBangumiDetail(item.bgm_id) as { tags?: string[] }
-      if (detail.tags && detail.tags.length > 0) {
-        setForm(prev => ({ ...prev, tags: detail.tags!.join(', ') }))
+      const detail = await api.getBangumiDetail(item.bgm_id) as { tags?: string[]; summary?: string }
+      if ((detail.tags && detail.tags.length > 0) || detail.summary) {
+        setForm(prev => ({
+          ...prev,
+          tags: detail.tags && detail.tags.length > 0 ? detail.tags!.join(', ') : prev.tags,
+          description: detail.summary || prev.description,
+        }))
       }
     } catch {
       // Tags fetch failed — not critical
@@ -255,17 +260,27 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       }
 
       if (items.length > 0) {
-        const detail = await api.getBangumiDetail(items[0].bgm_id) as { tags?: string[] }
+        const detail = await api.getBangumiDetail(items[0].bgm_id) as { tags?: string[]; summary?: string }
         const bangumiItem = items[0]
-        setForm(prev => ({
-          ...prev,
-          cover_url: bangumiItem.cover_url || prev.cover_url,
-          description: bangumiItem.summary || prev.description,
-          episodes: bangumiItem.eps || prev.episodes,
-          platform: bangumiItem.platform || prev.platform,
-          release_date: bangumiItem.air_date || prev.release_date,
-          tags: detail.tags?.length ? detail.tags.join(', ') : prev.tags,
-        }))
+        // 与 handleBangumiSelect 的 bangumiToForm 对齐：更新 Bangumi 全字段
+        // （title/title_alt/cover_url/description/episodes/platform/release_date/bgm_id）
+        // 有值才覆盖（空值保留原表单），content_type 不覆盖（保留用户设置）
+        const bf = bangumiToForm(bangumiItem)
+        setForm(prev => {
+          const next: ContentFormData = {
+            ...prev,
+            title: bf.title || prev.title,
+            title_alt: bf.title_alt || prev.title_alt,
+            cover_url: bf.cover_url || prev.cover_url,
+            episodes: bf.episodes || prev.episodes,
+            platform: bf.platform || prev.platform,
+            release_date: bf.release_date || prev.release_date,
+            bgm_id: bf.bgm_id || prev.bgm_id,
+            description: detail.summary || bf.description || prev.description,
+            tags: detail.tags?.length ? detail.tags.join(', ') : (bf.tags || prev.tags),
+          }
+          return next
+        })
         toast.addToast('success', `已从 Bangumi 更新「${bangumiItem.name_cn || bangumiItem.name}」`)
       } else {
         toast.addToast('error', '未在 Bangumi 找到匹配条目')
@@ -325,7 +340,14 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       }
 
       if (isEditMode) {
-        await api.updateContent(contentId!, payload)
+        const updatePayload: Record<string, unknown> = { ...payload }
+        // 有 bgm_id（重新获取过/原本关联 Bangumi）→ 更新来源关联；无 → 不传 source 字段保留原值
+        if (form.bgm_id) {
+          updatePayload.source_type = 'bangumi'
+          updatePayload.source_id = String(form.bgm_id)
+          updatePayload.source_url = `https://bangumi.tv/subject/${form.bgm_id}`
+        }
+        await api.updateContent(contentId!, updatePayload)
         toast.addToast('success', '更新成功')
       } else {
         const isFromBangumi = !!form.bgm_id
