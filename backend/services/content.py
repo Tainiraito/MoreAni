@@ -7,7 +7,7 @@ from typing import Literal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import ContentItem, ContentTag, Rating, Tag
+from models import ContentItem, ContentTag, Rating, Tag, UserContentStatus
 
 
 def get_content_by_id(db: Session, content_id: int) -> ContentItem | None:
@@ -37,6 +37,7 @@ def list_content(
     ] = 'updated_desc',
     rated: str | None = None,
     reviewed: str | None = None,
+    favorited: str | None = None,
     user_id: int | None = None,
     page: int = 1,
     size: int = 20,
@@ -100,6 +101,21 @@ def list_content(
             query = query.filter(ContentItem.id.in_(db.query(reviewed_sub.c.content_id)))
         elif reviewed == 'unreviewed':
             query = query.filter(~ContentItem.id.in_(db.query(reviewed_sub.c.content_id)))
+
+    # Favorited/unfavorited filter (watch status = want)
+    if favorited and user_id is not None:
+        fav_sub = (
+            db.query(UserContentStatus.content_id)
+            .filter(
+                UserContentStatus.user_id == user_id,
+                UserContentStatus.status == 'want',
+            )
+            .subquery()
+        )
+        if favorited == 'favorited':
+            query = query.filter(ContentItem.id.in_(db.query(fav_sub.c.content_id)))
+        elif favorited == 'unfavorited':
+            query = query.filter(~ContentItem.id.in_(db.query(fav_sub.c.content_id)))
 
     # Count before pagination
     total = query.count()

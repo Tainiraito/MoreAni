@@ -3,7 +3,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import ContentItem, Rating, User
+from models import ContentItem, Rating, User, UserContentStatus
 
 
 def get_user_by_id(db: Session, user_id: int) -> User | None:
@@ -106,10 +106,38 @@ def update_nickname(db: Session, user: User, nickname: str) -> User:
 
 
 def get_user_stats(db: Session, user_id: int) -> dict:
-    """Get user stats: rating_count, content_count."""
+    """Get user stats: rating_count, review_count, favorite_count, avg_score, content_count."""
     rating_count = (
-        db.query(func.count(Rating.id)).filter(Rating.user_id == user_id).scalar()
+        db.query(func.count(Rating.id))
+        .filter(Rating.user_id == user_id, Rating.score > 0)
+        .scalar()
     ) or 0
+
+    review_count = (
+        db.query(func.count(Rating.id))
+        .filter(
+            Rating.user_id == user_id,
+            Rating.review.isnot(None),
+            Rating.review != '',
+        )
+        .scalar()
+    ) or 0
+
+    favorite_count = (
+        db.query(func.count(UserContentStatus.id))
+        .filter(
+            UserContentStatus.user_id == user_id,
+            UserContentStatus.status == 'want',
+        )
+        .scalar()
+    ) or 0
+
+    avg_score = (
+        db.query(func.avg(Rating.score))
+        .filter(Rating.user_id == user_id, Rating.score > 0)
+        .scalar()
+    )
+    avg_score = round(float(avg_score), 1) if avg_score else None
 
     content_count = (
         db.query(func.count(ContentItem.id))
@@ -119,5 +147,8 @@ def get_user_stats(db: Session, user_id: int) -> dict:
 
     return {
         'rating_count': rating_count,
+        'review_count': review_count,
+        'favorite_count': favorite_count,
+        'avg_score': avg_score,
         'content_count': content_count,
     }

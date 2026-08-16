@@ -29,7 +29,7 @@ export function HomePage() {
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed'>('')
+  const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
 
   // Infinite scroll pagination state
@@ -80,6 +80,7 @@ export function HomePage() {
     if (searchQuery) params.q = searchQuery
     if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
     if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
+    if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     api.listContent(params)
@@ -104,6 +105,7 @@ export function HomePage() {
     if (searchQuery) params.q = searchQuery
     if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
     if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
+    if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     try {
@@ -262,7 +264,7 @@ export function HomePage() {
           </div>
           <Select
             value={myFilter}
-            onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed')}
+            onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited')}
             className="w-[130px]"
             groups={[
               {
@@ -273,6 +275,8 @@ export function HomePage() {
                   { value: 'unrated', label: '未评分' },
                   { value: 'reviewed', label: '已评论' },
                   { value: 'unreviewed', label: '未评论' },
+                  { value: 'favorited', label: '已收藏' },
+                  { value: 'unfavorited', label: '未收藏' },
                 ],
               },
             ]}

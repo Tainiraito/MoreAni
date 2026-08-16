@@ -285,10 +285,14 @@ class UserPublicProfile(BaseModel):
 
     id: int
     username: str
+    nickname: str = ''
     avatar_id: int = 0
     role: str = 'user'
     created_at: datetime
     rating_count: int = 0
+    review_count: int = 0
+    favorite_count: int = 0
+    avg_score: float | None = None
     content_count: int = 0
 
     model_config = {'from_attributes': True}

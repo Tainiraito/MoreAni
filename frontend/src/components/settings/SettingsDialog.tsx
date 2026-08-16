@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
@@ -10,6 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { X, Pencil } from 'lucide-react'
 
+interface UserStats {
+  rating_count: number
+  review_count: number
+  favorite_count: number
+  avg_score: number | null
+  content_count: number
+}
+
 export function SettingsDialog() {
   const { settingsOpen, closeSettings, openAuth } = useUIStore()
   const { user, setUser, logout } = useAuthStore()
@@ -17,6 +25,24 @@ export function SettingsDialog() {
   const [nickname, setNickname] = useState('')
   const [nicknameError, setNicknameError] = useState('')
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [stats, setStats] = useState<UserStats | null>(null)
+
+  // 打开弹窗时加载用户统计
+  useEffect(() => {
+    if (!settingsOpen || !user) return
+    api.getUser(user.id)
+      .then(res => {
+        const s = res as UserStats
+        setStats({
+          rating_count: s.rating_count ?? 0,
+          review_count: s.review_count ?? 0,
+          favorite_count: s.favorite_count ?? 0,
+          avg_score: s.avg_score ?? null,
+          content_count: s.content_count ?? 0,
+        })
+      })
+      .catch(() => {})
+  }, [settingsOpen, user?.id])
 
   if (!settingsOpen) return null
 
@@ -142,6 +168,35 @@ export function SettingsDialog() {
             </div>
             {nicknameError && (
               <p className="text-xs mt-1" style={{ color: 'var(--accent-coral)' }}>{nicknameError}</p>
+            )}
+            {/* 统计信息 */}
+            {stats && (
+              <div className="flex items-center gap-4 mt-3">
+                {stats.avg_score != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-bold" style={{ color: '#FB71A7' }}>
+                      {(stats.avg_score / 10).toFixed(1)}
+                    </span>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>均分</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.rating_count}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>评分</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.favorite_count}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>收藏</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.review_count}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>评论</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.content_count}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>添加番剧</span>
+                </div>
+              </div>
             )}
           </div>
         </div>

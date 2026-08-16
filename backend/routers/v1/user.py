@@ -27,10 +27,14 @@ def get_user_profile(
     return UserPublicProfile(
         id=target.id,
         username=target.username,
+        nickname=target.nickname,
         avatar_id=target.avatar_id,
         role=target.role,
         created_at=target.created_at,
         rating_count=stats['rating_count'],
+        review_count=stats['review_count'],
+        favorite_count=stats['favorite_count'],
+        avg_score=stats['avg_score'],
         content_count=stats['content_count'],
     )
 
