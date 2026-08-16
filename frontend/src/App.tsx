@@ -84,17 +84,6 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthValidator>
-          {/* 背景纹理层：隐约可见，避免纯色背景单调（不挡交互） */}
-          <div
-            className="pointer-events-none fixed inset-0"
-            style={{
-              backgroundImage: 'url(/textures/bg-texture.jpg)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              opacity: 0.12,
-              zIndex: -10,
-            }}
-          />
           <div className="min-h-screen">
             <AppHeader />
             <Routes>

@@ -112,7 +112,7 @@ export function HeroBrand() {
   const displayItems = Array(4).fill(items).flat()
 
   return (
-    <div className="relative min-h-screen" style={{ background: 'var(--bg-page)' }}>
+    <div className="relative min-h-screen" style={{ background: 'transparent' }}>
       {/* 背景装饰 */}
       <div
         className="absolute inset-0 -z-10"
