@@ -1,4 +1,5 @@
 import { useToastStore } from '@/stores/toast-store'
+import type { User } from '@/types'
 
 const API_BASE = '/api/v1'
 
@@ -100,10 +101,16 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`)
   },
-  getMyRatings: (params?: Record<string, string>) => {
+  adminListUsers: (params?: Record<string, string>) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<{ items: unknown[]; total: number }>(`/rating/history${q}`)
+    return request<{ items: User[]; total: number; page: number; size: number }>(`/admin/users${q}`)
   },
+  adminCreateUser: (data: { username: string; nickname: string; password: string; role: string }) =>
+    request<User>('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
+  adminUpdateUser: (id: number, data: Record<string, string>) =>
+    request<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  adminDeleteUser: (id: number) =>
+    request<undefined>(`/admin/users/${id}`, { method: 'DELETE' }),
   getUserActivity: (id: number, params?: Record<string, string>) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/user/${id}/activity${q}`)

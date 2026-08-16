@@ -140,7 +140,7 @@ def create_content(
 
     Only admins can add new content (friends review & rate, admins curate).
     """
-    if user.role != 'admin':
+    if user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail='No permission to add content')
     try:
         item = content_svc.create_content(
@@ -181,7 +181,7 @@ def update_content(
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
-    if item.created_by != user.id and user.role != 'admin':
+    if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
         raise HTTPException(
             status_code=403, detail='No permission to edit this content'
         )
@@ -204,7 +204,7 @@ def delete_content(
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
-    if item.created_by != user.id and user.role != 'admin':
+    if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
         raise HTTPException(
             status_code=403, detail='No permission to delete this content'
         )
@@ -227,7 +227,7 @@ def create_share_link(
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
     # 仅创建者或 admin 可创建分享链接
-    if item.created_by != user.id and user.role != 'admin':
+    if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
         raise HTTPException(
             status_code=403, detail='No permission to share this content'
         )

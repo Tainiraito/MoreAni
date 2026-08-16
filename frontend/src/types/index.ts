@@ -59,7 +59,7 @@ export interface User {
   username: string
   nickname: string
   avatar_id: number
-  role: string
+  role: 'user' | 'admin' | 'super_admin'
   created_at: string
 }
 

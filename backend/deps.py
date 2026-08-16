@@ -73,12 +73,17 @@ def get_current_user_optional(
 def require_role(*roles: str) -> Callable:
     """Dependency factory that checks user has one of the given roles.
 
+    'super_admin' 隐式拥有 'admin' 权限（require_role('admin') 也会放行 super_admin）。
     Usage:
         @router.get("/admin-only", dependencies=[Depends(require_role("admin"))])
     """
 
     def _check(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles:
+        effective = {'super_admin'}
+        if user.role in ('admin', 'super_admin'):
+            effective.add('admin')
+        effective.add(user.role)
+        if not effective.intersection(roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='Insufficient permissions',

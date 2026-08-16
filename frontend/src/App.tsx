@@ -8,6 +8,7 @@ import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
 import { ContentFormDialog } from '@/components/content/ContentFormDialog'
 import { AuthDialog } from '@/components/auth/AuthDialog'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { AdminDialog } from '@/components/admin/AdminDialog'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
@@ -32,7 +33,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
             username: userData.username,
             nickname: userData.nickname,
             avatar_id: userData.avatar_id,
-            role: userData.role as 'user' | 'admin',
+            role: userData.role as 'user' | 'admin' | 'super_admin',
             created_at: new Date().toISOString(),
           })
           loadFavorites()
@@ -95,6 +96,7 @@ export default function App() {
           <GlobalDialogs />
           <AuthDialog />
           <SettingsDialog />
+          <AdminDialog />
           <ToastContainer />
         </AuthValidator>
       </BrowserRouter>

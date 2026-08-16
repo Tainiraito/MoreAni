@@ -62,6 +62,9 @@ app.include_router(tag_router, prefix='/api/v1')
 app.include_router(user_router, prefix='/api/v1')
 app.include_router(bangumi_router, prefix='/api/v1')
 app.include_router(proxy_router, prefix='/api/v1')
+from routers.v1.admin import router as admin_router
+
+app.include_router(admin_router, prefix='/api/v1')
 
 
 @app.get('/api/health')

@@ -114,7 +114,7 @@ export function SettingsDialog() {
     }
     try {
       const updated = await api.updateNickname(value)
-      setUser({ ...user!, ...updated })
+      setUser({ ...user!, ...updated, role: updated.role as 'user' | 'admin' | 'super_admin' })
       useToastStore.getState().addToast('success', '昵称已更新')
       cancelEditNickname()
     } catch (err: any) {

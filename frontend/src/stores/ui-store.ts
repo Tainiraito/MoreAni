@@ -13,6 +13,9 @@ interface UIState {
   closeAuth: () => void
   openSettings: () => void
   closeSettings: () => void
+  adminOpen: boolean
+  openAdmin: () => void
+  closeAdmin: () => void
   openAddAnime: () => void
   closeAddAnime: () => void
   openEditContent: (id: number) => void
@@ -33,6 +36,9 @@ export const useUIStore = create<UIState>((set) => ({
   closeAuth: () => set({ authOpen: false }),
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  adminOpen: false,
+  openAdmin: () => set({ adminOpen: true }),
+  closeAdmin: () => set({ adminOpen: false }),
   openAddAnime: () => set({ addAnimeOpen: true }),
   closeAddAnime: () => set({ addAnimeOpen: false }),
   openEditContent: (id) => set({ editContentId: id }),

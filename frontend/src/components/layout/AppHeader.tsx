@@ -6,11 +6,11 @@ import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { Avatar } from '@/components/ui/Avatar'
-import { User, Sun, Moon, Settings, LogOut } from 'lucide-react'
+import { User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
 
 export function AppHeader() {
   const { user, logout } = useAuthStore()
-  const { openAuth, openSettings } = useUIStore()
+  const { openAuth, openSettings, openAdmin } = useUIStore()
   const { theme, toggleTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -115,7 +115,7 @@ export function AppHeader() {
                           {user.nickname}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {user.role === 'admin' ? '管理员' : '成员'}
+                          {user.role === 'super_admin' ? '超级管理员' : user.role === 'admin' ? '管理员' : '成员'}
                         </p>
                       </div>
                     </div>
@@ -143,6 +143,19 @@ export function AppHeader() {
                   >
                     <Settings size={16} />
                     用户信息
+                  </button>
+                )}
+
+                {user?.role === 'super_admin' && (
+                  <button
+                    onClick={() => { openAdmin(); setMenuOpen(false) }}
+                    className={menuItemStyle}
+                    style={{ color: 'var(--brand)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <Shield size={16} />
+                    后台管理
                   </button>
                 )}
 
