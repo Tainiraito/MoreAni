@@ -37,23 +37,25 @@ export function HomePage() {
   const [seasonFilter, setSeasonFilter] = useState('')
   const [userFilter, setUserFilter] = useState('')
   const [userOptions, setUserOptions] = useState<{ id: number; nickname: string }[]>([])
+  // 季度选项数据驱动：后端按 release_date 聚合出有数据的季度（跨年/新增番自动更新）
+  const [seasonOptions, setSeasonOptions] = useState<{ value: string; label: string }[]>([])
   // 视图模式：评论列表（默认）/ 卡片网格；localStorage 记忆用户选择
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     localStorage.getItem('moreani-view') === 'grid' ? 'grid' : 'list',
   )
 
-  // 放送季度选项：一般口径「XXXX年X月番」（1/4/7/10 月），当前年往前 12 年
-  const seasonOptions = (() => {
-    const year = new Date().getFullYear()
-    const opts: { value: string; label: string }[] = []
-    for (let y = year; y >= year - 11; y--) {
-      opts.push({ value: `${y}-01`, label: `${y}年1月番` })
-      opts.push({ value: `${y}-04`, label: `${y}年4月番` })
-      opts.push({ value: `${y}-07`, label: `${y}年7月番` })
-      opts.push({ value: `${y}-10`, label: `${y}年10月番` })
-    }
-    return opts
-  })()
+  // 加载放送季度分布（有数据的季度才显示，带数量）
+  useEffect(() => {
+    if (!user) return
+    api.getSeasons()
+      .then(res => {
+        setSeasonOptions((res.items || []).map(s => ({
+          value: s.value,
+          label: `${s.value.slice(0, 4)}年${parseInt(s.value.slice(5), 10)}月番 (${s.count})`,
+        })))
+      })
+      .catch(() => {})
+  }, [user])
 
   // 加载注册用户列表（排除 super_admin 爱莉希雅），供按用户筛选
   useEffect(() => {
@@ -79,11 +81,18 @@ export function HomePage() {
   // hero 的收藏状态直接从 store 派生
   const heroFavorited = hero ? isFavorited(hero.id) : false
 
-  // Debounce search input (300ms)
+  // Debounce search input：停顿 500ms 才触发搜索（避免每敲一个字符都调接口）；
+  // 按 Enter 立即触发
   useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput), 300)
+    const timer = setTimeout(() => setSearchQuery(searchInput), 500)
     return () => clearTimeout(timer)
   }, [searchInput])
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setSearchQuery(searchInput)
+    }
+  }
 
   // 加载所有番剧（refreshKey 变化时重新加载，评分后精选区数据保持最新）
   useEffect(() => {
@@ -303,6 +312,7 @@ export function HomePage() {
               placeholder="搜索番剧、标签..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               className="pl-9 text-sm"
             />
           </div>

@@ -88,8 +88,8 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
               </div>
               {avg && (
                 <div className="flex items-center gap-1.5">
-                  <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                  <span className="text-xs font-bold" style={{ color: '#FB71A7' }}>{avg}</span>
+                  <Star size={12} style={{ color: item.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={item.my_score ? '#FB71A7' : 'none'} />
+                  <span className="text-xs font-bold" style={{ color: item.my_score ? '#FB71A7' : 'var(--text-muted)' }}>{avg}</span>
                   {ratingCount > 0 && (
                     <span className="text-[10px] flex items-center gap-0.5" style={{ color: 'var(--text-muted)' }}>
                       <Users size={10} /> {ratingCount}

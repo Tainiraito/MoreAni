@@ -175,7 +175,7 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       setSearched(false)
       return
     }
-    debounceRef.current = setTimeout(() => doSearch(query), 300)
+    debounceRef.current = setTimeout(() => doSearch(query), 500)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }

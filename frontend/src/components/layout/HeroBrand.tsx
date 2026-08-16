@@ -35,12 +35,15 @@ export function HeroBrand() {
   // 加载番剧内容并随机选取（refreshKey 变化时重新加载，评分/收藏后数据保持最新）
   const refreshKey = useRefreshStore(s => s.refreshKey)
   useEffect(() => {
-    api.listContent({ type: 'anime' })
+    // 全量拉取后随机：推荐区从所有番剧里选（不限制数量）
+    api.listContent({ type: 'anime', size: '1000' })
       .then(res => {
         const list = (res.items || []) as ContentItem[]
         const withCover = list.filter(i => i.cover_url)
-        const shuffled = shuffleArray(withCover)
-        const selected = shuffled.slice(0, Math.max(12, shuffled.length))
+        // 自己评分/评论过的优先展示（最多一半），其余随机——推荐区能看出自己的评分评论状态
+        const mine = shuffleArray(withCover.filter(i => i.my_score || i.my_has_review))
+        const others = shuffleArray(withCover.filter(i => !(i.my_score || i.my_has_review)))
+        const selected = [...mine.slice(0, 6), ...others].slice(0, 12)
         setItems(selected)
       })
       .catch(() => {})

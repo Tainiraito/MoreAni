@@ -79,6 +79,7 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number; page: number; size: number }>(`/content${q}`)
   },
+  getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getContent: (id: number) => request<unknown>(`/content/${id}`),
   createContent: (data: unknown) =>
     request<{ id: number }>('/content', { method: 'POST', body: JSON.stringify(data) }),

@@ -30,22 +30,34 @@ def clean_summary(text: str) -> str:
     return text.strip()
 
 
-def title_similar(a: str, b: str) -> bool:
-    """标题一致性检查：防止 source_id 关联错片时硬覆盖用户数据。
-
-    相同 / 互相包含 / 去标点后共同字符占比 ≥ 60% 视为同一条目。
-    """
+def _pair_similar(a: str, b: str) -> bool:
+    """两个标题是否相似（相等 / 互相包含(≥4字) / 去标点后共同字符占比 ≥60%）。"""
     if not a or not b:
         return False
     if a == b:
         return True
     if a in b or b in a:
-        return True
+        # 太短的子串（如「赛马娘」3 字）不算有效匹配，防角色名误配动画本体
+        return min(len(a), len(b)) >= 4
     pa = set(re.sub(r'[\s\-—–:：.。·~～・]', '', a.lower()))
     pb = set(re.sub(r'[\s\-—–:：.。·~～・]', '', b.lower()))
     if not pa or not pb:
         return False
     return len(pa & pb) / min(len(pa), len(pb)) >= 0.6
+
+
+def title_similar(our_titles: list[str], bgm_titles: list[str]) -> bool:
+    """组合匹配：库里 title/title_alt 与 Bangumi name_cn/name 任一组合相似即通过。
+
+    救回译名差异大的同番（如 GIRLS BAND CRY ↔ 少女乐队的呐喊）。
+    """
+    return any(_pair_similar(a, b) for a in our_titles for b in bgm_titles)
+
+
+# 真错配黑名单：角色条目 vs 动画本体，保持无来源（用户确认跳过）
+SKIP_IDS = {75, 76}
+# 已人工确认为同一番但译名差异过大（相似度不足）→ 强制按详情更新
+FORCE_IDS = {202}
 
 
 def _year_diff(a: str, b: str) -> int:
@@ -59,8 +71,10 @@ def _year_diff(a: str, b: str) -> int:
 async def refresh_one(db, item: ContentItem, apply: bool) -> dict | None:
     """获取详情并计算字段差异；apply=True 时写入。
 
-    返回: {'id', 'title', 'changes'} 或 {'id', 'title', 'mismatch': True} 或 None(获取失败)。
+    返回: {'id', 'title', 'changes'} 或 {'id', 'title', 'mismatch'/'skipped': True} 或 None(获取失败)。
     """
+    if item.id in SKIP_IDS:
+        return {'id': item.id, 'title': item.title, 'skipped': True}
     try:
         detail = await get_subject_detail(int(item.source_id))
     except (TypeError, ValueError):
@@ -73,8 +87,10 @@ async def refresh_one(db, item: ContentItem, apply: bool) -> dict | None:
     new_title = name_cn or name
 
     # ⚠️ 标题对不上 = 疑似 source_id 关联错片 → 不硬校对，整条跳过（只记录，不动库）
-    if not title_similar(new_title, item.title):
-        return {'id': item.id, 'title': item.title, 'mismatch': True}
+    # 组合匹配：title/title_alt 与 name_cn/name 任一相似即通过（译名差异大的同番也能救回）
+    if not title_similar([item.title, item.title_alt or ''], [name_cn, name]):
+        if item.id not in FORCE_IDS:
+            return {'id': item.id, 'title': item.title, 'mismatch': True}
 
     summary = clean_summary(detail.get('summary') or '')
     eps = detail.get('eps') or 0
@@ -151,6 +167,9 @@ async def run(apply: bool) -> None:
         elif result.get('mismatch'):
             skipped += 1
             print(f'[{i}/{len(items)}] ⚠️ {result["title"]} (id={result["id"]}) — 标题对不上，疑似错配，跳过')
+        elif result.get('skipped'):
+            skipped += 1
+            print(f'[{i}/{len(items)}] ⛔ {result["title"]} (id={result["id"]}) — 黑名单跳过（真错配，保持无来源）')
         else:
             ok += 1
             if result['changes']:

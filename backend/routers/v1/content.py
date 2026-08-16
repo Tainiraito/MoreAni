@@ -81,7 +81,7 @@ def list_content(
     rated_by: int | None = Query(None, description='只看该用户评分/评论过的内容'),
     user: User | None = Depends(get_current_user_optional),
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
+    size: int = Query(20, ge=1, le=1000),
 ) -> ContentListResponse:
     """List content items with filters, search, and pagination."""
     items, total = content_svc.list_content(
@@ -120,6 +120,43 @@ def random_content(db: Session = Depends(get_db)) -> ContentItemResponse:
     if not item:
         raise HTTPException(status_code=404, detail='No content available')
     return _to_response(item, db)
+
+
+@router.get('/seasons')
+def list_seasons(db: Session = Depends(get_db)) -> dict:
+    """放送季度分布：按 release_date 聚合出有数据的季度（1/4/7/10 月番口径）。
+
+    返回 [{value: '2026-01', count: N}]，供前端筛选下拉动态生成选项。
+    """
+    from sqlalchemy import func
+    rows = (
+        db.query(
+            func.substr(ContentItem.release_date, 1, 4).label('y'),
+            func.substr(ContentItem.release_date, 6, 2).label('m'),
+            func.count(ContentItem.id).label('cnt'),
+        )
+        .filter(
+            ContentItem.release_date.isnot(None),
+            ContentItem.release_date != '',
+            ContentItem.deleted_at.is_(None),
+            ContentItem.is_public == True,  # noqa: E712
+        )
+        .group_by('y', 'm')
+        .all()
+    )
+    month_to_quarter = {
+        '01': '01', '02': '01', '03': '01',
+        '04': '04', '05': '04', '06': '04',
+        '07': '07', '08': '07', '09': '07',
+        '10': '10', '11': '10', '12': '10',
+    }
+    season_map: dict[str, int] = {}
+    for y, m, cnt in rows:
+        q = month_to_quarter.get(m, m)
+        key = f'{y}-{q}'
+        season_map[key] = season_map.get(key, 0) + cnt
+    items = [{'value': k, 'count': v} for k, v in sorted(season_map.items(), reverse=True)]
+    return {'items': items}
 
 
 @router.get('/{content_id}', response_model=ContentItemResponse)
