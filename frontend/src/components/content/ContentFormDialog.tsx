@@ -115,6 +115,14 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
   useLockBodyScroll(open)
   const toast = useToastStore.getState()
   const isEditMode = contentId != null
+  // 必须放在 if (!open) return null 之前（hook 无条件调用）
+  const maskProps = useMaskClose(() => {
+    if (confirmDelete) {
+      setConfirmDelete(false)
+      return
+    }
+    onClose()
+  })
 
   // ── Form state ──
   const [form, setForm] = useState<ContentFormData>(emptyForm)
@@ -382,7 +390,6 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
     }
     onClose()
   }
-  const maskProps = useMaskClose(handleClose)
 
   return (
     <div

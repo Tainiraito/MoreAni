@@ -36,6 +36,11 @@ interface ActivityItem {
 export function SettingsDialog() {
   const { settingsOpen, closeSettings, openAuth, openDetail } = useUIStore()
   useLockBodyScroll(settingsOpen)
+  // 必须放在 if (!settingsOpen) return null 之前（hook 无条件调用）
+  const maskProps = useMaskClose(() => {
+    resetForm()
+    closeSettings()
+  })
   const { user, setUser, logout } = useAuthStore()
   const [editingNickname, setEditingNickname] = useState(false)
   const [nickname, setNickname] = useState('')
@@ -96,7 +101,6 @@ export function SettingsDialog() {
     resetForm()
     closeSettings()
   }
-  const maskProps = useMaskClose(handleClose)
 
   const startEditNickname = () => {
     setNickname(user?.nickname || '')
