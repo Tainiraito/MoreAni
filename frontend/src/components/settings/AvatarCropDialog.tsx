@@ -22,13 +22,23 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
   const onCancelRef = useRef(onCancel)
   onCancelRef.current = onCancel
 
-  // 加载图片 —— 依赖只含 file：图片 URL 只在换文件时重建，不被 onCancel 引用变化打断
+  // 加载图片 —— 依赖只含 file；cancelled 标志隔离 StrictMode 双执行时旧 img 的 onerror
+  // （开发模式 effect 跑两遍：第一次的 blob URL 被 cleanup revoke → 旧 img 加载失败触发
+  //   onerror → 若直接 onCancel 会把弹窗关掉，表现为「闪一下消失」）
   useEffect(() => {
+    let cancelled = false
     const el = new Image()
-    el.onload = () => setImg(el)
-    el.onerror = () => onCancelRef.current()
+    el.onload = () => {
+      if (!cancelled) setImg(el)
+    }
+    el.onerror = () => {
+      if (!cancelled) onCancelRef.current()
+    }
     el.src = URL.createObjectURL(file)
-    return () => URL.revokeObjectURL(el.src)
+    return () => {
+      cancelled = true
+      URL.revokeObjectURL(el.src)
+    }
   }, [file])
 
   const baseScale = img ? VIEW_SIZE / Math.min(img.naturalWidth, img.naturalHeight) : 1
