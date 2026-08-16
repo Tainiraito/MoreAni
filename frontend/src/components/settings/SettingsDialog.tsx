@@ -10,6 +10,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog'
 import { X, Pencil } from 'lucide-react'
 
 interface UserStats {
@@ -39,6 +40,7 @@ export function SettingsDialog() {
   const [nicknameError, setNicknameError] = useState('')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
@@ -127,14 +129,20 @@ export function SettingsDialog() {
     }
   }
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setAvatarError('')
+    setCropFile(file) // 打开裁切弹窗，由用户手动裁切后再上传
+    e.target.value = '' // 允许重复选择同一文件
+  }
+
+  // 裁切确认 → 上传
+  const handleCropConfirm = async (processed: File) => {
+    setCropFile(null)
     setAvatarUploading(true)
     setAvatarError('')
     try {
-      // 1:1 居中裁切 + 缩放 256px（确保头像比例正确）
-      const processed = await processAvatarImage(file)
       const res = await api.uploadAvatar(processed)
       setUser({ ...user!, avatar_url: res.avatar_url })
       useToastStore.getState().addToast('success', '头像已更新')
@@ -142,7 +150,6 @@ export function SettingsDialog() {
       setAvatarError(err.message || '头像上传失败')
     } finally {
       setAvatarUploading(false)
-      e.target.value = '' // 允许重复选择同一文件
     }
   }
 
@@ -158,31 +165,6 @@ export function SettingsDialog() {
     } finally {
       setAvatarUploading(false)
     }
-  }
-
-  /** 图片处理：居中裁切为 1:1 并缩放到 256×256，输出 JPEG */
-  const processAvatarImage = async (file: File): Promise<File> => {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image()
-      el.onload = () => resolve(el)
-      el.onerror = () => reject(new Error('无法读取图片文件'))
-      el.src = URL.createObjectURL(file)
-    })
-    const size = Math.min(img.naturalWidth, img.naturalHeight)
-    if (size <= 0) throw new Error('图片尺寸无效')
-    const sx = Math.floor((img.naturalWidth - size) / 2)
-    const sy = Math.floor((img.naturalHeight - size) / 2)
-    const canvas = document.createElement('canvas')
-    canvas.width = 256
-    canvas.height = 256
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('浏览器不支持图片处理')
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256)
-    URL.revokeObjectURL(img.src)
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
-    if (!blob) throw new Error('图片处理失败')
-    return new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
   }
 
   return (
@@ -222,7 +204,7 @@ export function SettingsDialog() {
               <Avatar name={user?.nickname || '?'} src={user?.avatar_url} size={64}
                 style={{ border: '2px solid var(--brand)' }} />
               {user?.avatar_url && (
-                <div className="absolute inset-0 rounded-full flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                <div className="absolute inset-0 rounded-full flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.55)' }}>
                   <button
                     type="button"
                     onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
@@ -417,6 +399,14 @@ export function SettingsDialog() {
           openAuth()
         }}
       />
+      {/* 头像裁切弹窗（选中文件后打开，用户手动裁切） */}
+      {cropFile && (
+        <AvatarCropDialog
+          file={cropFile}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropFile(null)}
+        />
+      )}
     </div>
   )
 }
