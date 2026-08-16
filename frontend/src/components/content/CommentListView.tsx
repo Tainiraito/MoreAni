@@ -90,14 +90,15 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
                   <MessageCircle size={12} /> 暂无评论
                 </p>
               ) : (
-                <div className="columns-2 gap-1.5">
+                <div className={reviews.length <= 2 ? 'flex flex-col gap-1.5' : 'columns-2 gap-1.5'}>
                   {reviews.map((r, i) => (
                     <div
                       key={i}
-                      className="rounded-xl px-3 py-1.5 mb-1.5 break-inside-avoid"
+                      className="rounded-xl px-3 py-1.5 break-inside-avoid"
                       style={{
                         background: 'var(--bg-card-warm)',
                         border: '1px solid var(--border-line)',
+                        marginBottom: reviews.length <= 2 ? 0 : 6,
                       }}
                     >
                       <div className="flex items-center gap-1.5">
@@ -112,29 +113,41 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
                         )}
                       </div>
                       {r.review && (
-                        <p className="text-xs mt-0.5 leading-relaxed line-clamp-3 break-words" style={{ color: 'var(--text-secondary)' }}>
+                        <p
+                          className="text-xs mt-0.5 leading-relaxed break-words"
+                          style={{
+                            color: 'var(--text-secondary)',
+                            // 评论少时完整显示，瀑布流时最多 3 行
+                            display: reviews.length <= 2 ? 'block' : '-webkit-box',
+                            WebkitLineClamp: reviews.length <= 2 ? undefined : 3,
+                            WebkitBoxOrient: reviews.length <= 2 ? undefined : 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
                           {r.review}
                         </p>
                       )}
                     </div>
                   ))}
+                  {/* +N 条评论：作为最后一块跟在后面，不独占一行 */}
+                  {(item.review_count ?? 0) > reviews.length && (
+                    <button
+                      className="inline-flex items-center rounded-xl px-3 py-1.5 text-[11px] font-medium transition-all duration-150 hover:opacity-80 break-inside-avoid"
+                      style={{
+                        color: '#FB71A7',
+                        background: 'rgba(251, 113, 167, 0.08)',
+                        border: '1px dashed rgba(251, 113, 167, 0.4)',
+                        alignSelf: reviews.length <= 2 ? 'flex-start' : undefined,
+                      }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        onSelect(item.id)
+                      }}
+                    >
+                      +{item.review_count! - reviews.length} 条 ›
+                    </button>
+                  )}
                 </div>
-              )}
-              {(item.review_count ?? 0) > reviews.length && (
-                <button
-                  className="self-start text-[11px] px-2 py-1 rounded-md transition-all duration-150 hover:opacity-80"
-                  style={{
-                    color: '#FB71A7',
-                    background: 'rgba(251, 113, 167, 0.08)',
-                    border: '1px solid rgba(251, 113, 167, 0.25)',
-                  }}
-                  onClick={e => {
-                    e.stopPropagation()
-                    onSelect(item.id)
-                  }}
-                >
-                  +{item.review_count! - reviews.length} 条评论 ›
-                </button>
               )}
             </div>
           </div>
