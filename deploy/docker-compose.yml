@@ -10,6 +10,9 @@ services:
       - SECRET_KEY=${SECRET_KEY:?请在 deploy/.env 中设置 SECRET_KEY}
       # 可选：CORS 白名单（默认 localhost + moreani.lovelysia.top）
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top,http://moreani.lovelysia.top}
+      # 图片代理：NAS 直连国外 CDN（lain.bgm.tv）超时，走 Windows Clash 7890
+      - http_proxy=http://192.168.31.45:7890
+      - https_proxy=http://192.168.31.45:7890
     volumes:
       - ../data:/app/data
       - ../logs/nginx:/var/log/nginx
