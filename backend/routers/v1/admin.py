@@ -1,7 +1,10 @@
 """Admin user management (super_admin only).
 
 Provides user CRUD: list/search/create/update/delete.
+Also invite-code CRUD: list/create/update/delete.
 """
+import secrets
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_password_hash
 from deps import get_current_user, get_db, require_role
-from models import Rating, ShareLink, User, UserContentStatus
+from models import InviteCode, Rating, ShareLink, User, UserContentStatus
 
 router = APIRouter(prefix='/admin', tags=['admin'])
 
@@ -159,4 +162,135 @@ def delete_user_admin(
     db.query(UserContentStatus).filter(UserContentStatus.user_id == user_id).delete()
     db.query(ShareLink).filter(ShareLink.created_by == user_id).delete()
     db.delete(user)
+    db.commit()
+
+
+# ── 邀请码管理 ──────────────────────────────────────────────────────────
+
+
+def _to_invite(i: InviteCode) -> dict:
+    # SQLite DATETIME 存的是 naive UTC，用 naive now 比较
+    now = datetime.now(UTC).replace(tzinfo=None)
+    used_up = i.use_count >= i.max_uses
+    expired = bool(i.expires_at and i.expires_at < now)
+    return {
+        'id': i.id,
+        'code': i.code,
+        'max_uses': i.max_uses,
+        'use_count': i.use_count,
+        'expires_at': i.expires_at.isoformat() if i.expires_at else None,
+        'created_at': i.created_at.isoformat() if i.created_at else None,
+        'status': 'expired' if expired else ('used_up' if used_up else 'active'),
+    }
+
+
+@router.get('/invites')
+def list_invites(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+    q: str | None = Query(None, description='Search by code'),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """List invite codes."""
+    query = db.query(InviteCode)
+    if q:
+        query = query.filter(InviteCode.code.ilike(f'%{q}%'))
+    total = query.count()
+    codes = query.order_by(InviteCode.id.desc()).offset((page - 1) * size).limit(size).all()
+    return {
+        'items': [_to_invite(i) for i in codes],
+        'total': total,
+        'page': page,
+        'size': size,
+    }
+
+
+@router.post('/invites', status_code=201)
+def create_invite(
+    body: dict,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+) -> dict:
+    """Create an invite code (code empty => auto generate)."""
+    code = (body.get('code') or '').strip() or secrets.token_urlsafe(5)
+    try:
+        max_uses = int(body.get('max_uses') or 1)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail='可用次数不合法')  # noqa: B904
+    if max_uses < 1:
+        raise HTTPException(status_code=422, detail='可用次数至少 1 次')
+    expires_raw = (body.get('expires_at') or '').strip()
+    expires_at = None
+    if expires_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_raw.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=422, detail='有效时间格式不合法（YYYY-MM-DD）')  # noqa: B904
+
+    exists = db.query(InviteCode).filter(InviteCode.code == code).first()
+    if exists:
+        raise HTTPException(status_code=409, detail='邀请码已存在')
+    invite = InviteCode(code=code, max_uses=max_uses, expires_at=expires_at)
+    db.add(invite)
+    db.commit()
+    db.refresh(invite)
+    return _to_invite(invite)
+
+
+@router.put('/invites/{invite_id}')
+def update_invite(
+    invite_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+) -> dict:
+    """Update an invite code (code / max_uses / expires_at)."""
+    invite = db.query(InviteCode).filter(InviteCode.id == invite_id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail='邀请码不存在')
+
+    code = (body.get('code') or '').strip() if 'code' in body else None
+    max_uses = body.get('max_uses') if 'max_uses' in body else None
+    expires_raw = body.get('expires_at') if 'expires_at' in body else None
+
+    if code:
+        clash = db.query(InviteCode).filter(InviteCode.code == code, InviteCode.id != invite_id).first()
+        if clash:
+            raise HTTPException(status_code=409, detail='邀请码已存在')
+        invite.code = code
+    if max_uses is not None:
+        try:
+            m = int(max_uses)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail='可用次数不合法')  # noqa: B904
+        if m < 1:
+            raise HTTPException(status_code=422, detail='可用次数至少 1 次')
+        invite.max_uses = m
+    if expires_raw is not None:
+        raw = (expires_raw or '').strip()
+        if not raw:
+            invite.expires_at = None
+        else:
+            try:
+                invite.expires_at = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(status_code=422, detail='有效时间格式不合法')  # noqa: B904
+
+    db.commit()
+    db.refresh(invite)
+    return _to_invite(invite)
+
+
+@router.delete('/invites/{invite_id}', status_code=204)
+def delete_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+) -> None:
+    """Delete an invite code."""
+    invite = db.query(InviteCode).filter(InviteCode.id == invite_id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail='邀请码不存在')
+    db.delete(invite)
     db.commit()

@@ -6,6 +6,7 @@ rate limit middleware, and creates tables on startup.
 
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,9 +25,25 @@ from routers.v1.user import router as user_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup."""
+    """Create database tables on startup + lightweight migrations."""
     Base.metadata.create_all(bind=engine)
+    _migrate_invite_codes_expires()
     yield
+
+
+def _migrate_invite_codes_expires() -> None:
+    """SQLite 轻量迁移：invite_codes 表补 expires_at 列（幂等）。"""
+    try:
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            cols = [r[1] for r in conn.execute(text('PRAGMA table_info(invite_codes)'))]
+            if cols and 'expires_at' not in cols:
+                conn.execute(text('ALTER TABLE invite_codes ADD COLUMN expires_at DATETIME'))
+                conn.commit()
+                print('[migrate] invite_codes.expires_at 已添加')
+    except Exception as e:  # noqa: BLE001
+        print(f'[migrate] invite_codes 迁移跳过: {e}')
 
 
 app = FastAPI(

@@ -1,5 +1,7 @@
 """Auth router — login, register, me, avatar, password."""
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -77,6 +79,12 @@ def register(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail='邀请码已用完',
+        )
+    # SQLite DATETIME 存的是 naive UTC，用 naive now 比较
+    if invite.expires_at and invite.expires_at < datetime.now(UTC).replace(tzinfo=None):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='邀请码已过期',
         )
 
     # Check username & nickname uniqueness — both must not collide with ANY

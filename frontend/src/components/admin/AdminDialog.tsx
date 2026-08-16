@@ -8,11 +8,17 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { X, Search, Plus, Pencil, Trash2, Shield } from 'lucide-react'
-import type { User } from '@/types'
+import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound } from 'lucide-react'
+import type { InviteCode, User } from '@/types'
 
 const ROLE_LABEL: Record<string, string> = { user: '成员', admin: '管理员', super_admin: '超级管理员' }
 const ROLE_COLOR: Record<string, string> = { user: '#4DA6FF', admin: '#FB71A7', super_admin: '#C77DFF' }
+
+const INVITE_STATUS: Record<string, { label: string; color: string }> = {
+  active: { label: '有效', color: '#00B894' },
+  used_up: { label: '已用完', color: '#E17055' },
+  expired: { label: '已过期', color: '#999' },
+}
 
 interface AdminUserForm {
   username: string
@@ -21,9 +27,75 @@ interface AdminUserForm {
   role: string
 }
 
+interface InviteForm {
+  code: string
+  max_uses: string
+  expires_at: string
+}
+
 export function AdminDialog() {
   const { adminOpen, closeAdmin } = useUIStore()
   useLockBodyScroll(adminOpen)
+  const [tab, setTab] = useState<'users' | 'invites'>('users')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={closeAdmin}>
+      <div
+        className="rounded-2xl w-[720px] max-w-[95vw] max-h-[85vh] flex flex-col"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4" style={{ borderBottom: '1px solid var(--border-line)' }}>
+          <div className="flex items-center gap-4">
+            <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Shield size={16} style={{ color: '#FB71A7' }} /> 后台管理
+            </h2>
+            {/* Tab 切换 */}
+            <div className="flex items-center rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-line)' }}>
+              <button
+                onClick={() => setTab('users')}
+                className="h-8 px-3.5 text-xs font-medium flex items-center gap-1.5 transition-all duration-150"
+                style={{
+                  background: tab === 'users' ? 'var(--bg-card-warm)' : 'transparent',
+                  color: tab === 'users' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  boxShadow: tab === 'users' ? 'inset 0 -2px 0 #FB71A7' : 'none',
+                }}
+              >
+                <Users size={12} /> 用户管理
+              </button>
+              <button
+                onClick={() => setTab('invites')}
+                className="h-8 px-3.5 text-xs font-medium flex items-center gap-1.5 transition-all duration-150"
+                style={{
+                  background: tab === 'invites' ? 'var(--bg-card-warm)' : 'transparent',
+                  color: tab === 'invites' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderLeft: '1px solid var(--border-line)',
+                  boxShadow: tab === 'invites' ? 'inset 0 -2px 0 #FB71A7' : 'none',
+                }}
+              >
+                <KeyRound size={12} /> 邀请码
+              </button>
+            </div>
+          </div>
+          <button onClick={closeAdmin} className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
+            <X size={14} />
+          </button>
+        </div>
+
+        {tab === 'users' ? (
+          <UserManageTab />
+        ) : (
+          <InviteManageTab />
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── 用户管理 ─────────────────────────────────────────────── */
+
+function UserManageTab() {
   const [users, setUsers] = useState<User[]>([])
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState('')
@@ -52,16 +124,12 @@ export function AdminDialog() {
   }
 
   useEffect(() => {
-    if (adminOpen) {
-      setUsers([])
-      setPage(1)
-      setQ('')
-      loadUsers(1, '')
-    }
+    setUsers([])
+    setPage(1)
+    setQ('')
+    loadUsers(1, '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminOpen])
-
-  if (!adminOpen) return null
+  }, [])
 
   const openAdd = () => {
     setEditing(null)
@@ -121,70 +189,280 @@ export function AdminDialog() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={closeAdmin}>
-      <div
-        className="rounded-2xl w-[720px] max-w-[95vw] max-h-[85vh] flex flex-col"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* 头部 */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4" style={{ borderBottom: '1px solid var(--border-line)' }}>
-          <div>
-            <h2 className="text-base font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Shield size={16} style={{ color: '#FB71A7' }} /> 后台管理 · 用户
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>共 {total} 个用户（超级管理员专属）</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={openAdd} size="sm" style={{ background: '#FB71A7', color: 'white' }}>
-              <Plus size={13} /> 新增用户
-            </Button>
-            <button onClick={closeAdmin} className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
-              <X size={14} />
-            </button>
+    <>
+      <div className="px-6 pt-3 flex items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+          <Input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, q) }}
+            placeholder="搜索账号 / 昵称…"
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+        <Button onClick={openAdd} size="sm" style={{ background: '#FB71A7', color: 'white' }}>
+          <Plus size={13} /> 新增用户
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-3 space-y-1.5">
+        <p className="text-[11px] pb-1" style={{ color: 'var(--text-muted)' }}>共 {total} 个用户</p>
+        {loading && users.length === 0 ? (
+          <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+        ) : users.length === 0 ? (
+          <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>没有找到用户</p>
+        ) : (
+          users.map(u => (
+            <div
+              key={u.id}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl"
+              style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
+            >
+              <Avatar name={u.nickname} size={32} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.nickname}</p>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: `${ROLE_COLOR[u.role] || '#999'}1a`, color: ROLE_COLOR[u.role] || '#999' }}>
+                    {ROLE_LABEL[u.role] || u.role}
+                  </span>
+                </div>
+                <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>@{u.username} · 加入于 {u.created_at ? u.created_at.slice(0, 10) : '?'}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => openEdit(u)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
+                  style={{ color: 'var(--text-muted)', background: 'var(--bg-card)' }}
+                  title="编辑"
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(u)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
+                  style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)' }}
+                  title="删除"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+        {users.length < total && (
+          <button
+            onClick={() => loadUsers(page + 1, q)}
+            className="w-full py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+            style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
+          >
+            {loading ? '加载中...' : `加载更多（${users.length}/${total}）`}
+          </button>
+        )}
+      </div>
+
+      {/* 表单弹窗 */}
+      {formOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setFormOpen(false)}>
+          <div className="rounded-2xl w-[400px] max-w-[90vw] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑用户' : '新增用户'}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">账号</Label>
+                <Input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="登录账号" className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">昵称</Label>
+                <Input value={form.nickname} onChange={e => setForm({ ...form, nickname: e.target.value })} placeholder="显示昵称（留空用账号）" className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{editing ? '密码（留空不修改）' : '密码'}</Label>
+                <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={editing ? '留空则保持原密码' : '至少 6 位'} className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">角色</Label>
+                <Select
+                  value={form.role}
+                  onChange={v => setForm({ ...form, role: v })}
+                  options={[
+                    { value: 'user', label: '成员' },
+                    { value: 'admin', label: '管理员' },
+                    { value: 'super_admin', label: '超级管理员' },
+                  ]}
+                  className="w-full h-9 text-sm"
+                />
+              </div>
+              {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" loading={saving} className="flex-1" style={{ background: '#FB71A7', color: 'white' }}>
+                  {editing ? '保存修改' : '创建用户'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>取消</Button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
 
-        {/* 搜索 */}
-        <div className="px-6 pt-3">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <Input
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, q) }}
-              placeholder="搜索账号 / 昵称…"
-              className="pl-9 h-9 text-sm"
-            />
+      {/* 删除确认 */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setConfirmDelete(null)}>
+          <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              确定删除用户「{confirmDelete.nickname}」吗？
+            </p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              将同时删除其全部评分、评论和收藏，且不可恢复
+            </p>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
+              <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
+            </div>
           </div>
         </div>
+      )}
+    </>
+  )
+}
 
-        {/* 用户列表 */}
-        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-1.5">
-          {loading && users.length === 0 ? (
-            <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
-          ) : users.length === 0 ? (
-            <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>没有找到用户</p>
-          ) : (
-            users.map(u => (
+/* ── 邀请码管理 ───────────────────────────────────────────── */
+
+function InviteManageTab() {
+  const [invites, setInvites] = useState<InviteCode[]>([])
+  const [total, setTotal] = useState(0)
+  const [q, setQ] = useState('')
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<InviteCode | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<InviteCode | null>(null)
+  const [form, setForm] = useState<InviteForm>({ code: '', max_uses: '1', expires_at: '' })
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const PAGE_SIZE = 20
+
+  const loadInvites = async (p = 1, search = q) => {
+    setLoading(true)
+    try {
+      const data = await api.adminListInvites({ page: String(p), size: String(PAGE_SIZE), ...(search ? { q: search } : {}) })
+      setInvites(p === 1 ? data.items : prev => [...prev, ...data.items])
+      setTotal(data.total)
+      setPage(p)
+    } catch (err: any) {
+      useToastStore.getState().addToast('error', err.message || '加载邀请码失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    setInvites([])
+    setPage(1)
+    setQ('')
+    loadInvites(1, '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ code: '', max_uses: '1', expires_at: '' })
+    setFormError('')
+    setFormOpen(true)
+  }
+
+  const openEdit = (i: InviteCode) => {
+    setEditing(i)
+    setForm({ code: i.code, max_uses: String(i.max_uses), expires_at: i.expires_at ? i.expires_at.slice(0, 10) : '' })
+    setFormError('')
+    setFormOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    if (!form.code.trim() && !editing) { /* 留空自动生成 */ }
+    const payload: Record<string, string> = { code: form.code.trim(), max_uses: form.max_uses || '1' }
+    if (form.expires_at) payload.expires_at = form.expires_at
+    setSaving(true)
+    try {
+      if (editing) {
+        await api.adminUpdateInvite(editing.id, payload)
+        useToastStore.getState().addToast('success', '邀请码已更新')
+      } else {
+        await api.adminCreateInvite(payload)
+        useToastStore.getState().addToast('success', '邀请码已创建')
+      }
+      setFormOpen(false)
+      loadInvites(1, q)
+    } catch (err: any) {
+      setFormError(err.message || '保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (i: InviteCode) => {
+    try {
+      await api.adminDeleteInvite(i.id)
+      useToastStore.getState().addToast('success', `已删除邀请码 ${i.code}`)
+      setConfirmDelete(null)
+      loadInvites(1, q)
+    } catch (err: any) {
+      setConfirmDelete(null)
+      useToastStore.getState().addToast('error', err.message || '删除失败')
+    }
+  }
+
+  return (
+    <>
+      <div className="px-6 pt-3 flex items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+          <Input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') loadInvites(1, q) }}
+            placeholder="搜索邀请码…"
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+        <Button onClick={openAdd} size="sm" style={{ background: '#FB71A7', color: 'white' }}>
+          <Plus size={13} /> 生成邀请码
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-3 space-y-1.5">
+        <p className="text-[11px] pb-1" style={{ color: 'var(--text-muted)' }}>共 {total} 个邀请码</p>
+        {loading && invites.length === 0 ? (
+          <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+        ) : invites.length === 0 ? (
+          <p className="text-center py-10 text-sm" style={{ color: 'var(--text-muted)' }}>还没有邀请码</p>
+        ) : (
+          invites.map(i => {
+            const st = INVITE_STATUS[i.status] || INVITE_STATUS.active
+            return (
               <div
-                key={u.id}
+                key={i.id}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl"
                 style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
               >
-                <Avatar name={u.nickname} size={32} />
+                <div className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0" style={{ background: 'rgba(251,113,167,0.1)', color: '#FB71A7' }}>
+                  <KeyRound size={14} />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.nickname}</p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: `${ROLE_COLOR[u.role] || '#999'}1a`, color: ROLE_COLOR[u.role] || '#999' }}>
-                      {ROLE_LABEL[u.role] || u.role}
+                    <p className="text-sm font-mono font-medium truncate" style={{ color: 'var(--text-primary)' }}>{i.code}</p>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: `${st.color}1a`, color: st.color }}>
+                      {st.label}
                     </span>
                   </div>
-                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>@{u.username} · 加入于 {u.created_at ? u.created_at.slice(0, 10) : '?'}</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                    已用 {i.use_count}/{i.max_uses} 次{i.expires_at ? ` · 有效期至 ${i.expires_at.slice(0, 10)}` : ' · 永不过期'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
-                    onClick={() => openEdit(u)}
+                    onClick={() => openEdit(i)}
                     className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
                     style={{ color: 'var(--text-muted)', background: 'var(--bg-card)' }}
                     title="编辑"
@@ -192,7 +470,7 @@ export function AdminDialog() {
                     <Pencil size={13} />
                   </button>
                   <button
-                    onClick={() => setConfirmDelete(u)}
+                    onClick={() => setConfirmDelete(i)}
                     className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
                     style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)' }}
                     title="删除"
@@ -201,80 +479,67 @@ export function AdminDialog() {
                   </button>
                 </div>
               </div>
-            ))
-          )}
-          {users.length < total && (
-            <button
-              onClick={() => loadUsers(page + 1, q)}
-              className="w-full py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
-              style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
-            >
-              {loading ? '加载中...' : `加载更多（${users.length}/${total}）`}
-            </button>
-          )}
-        </div>
-
-        {/* 新增/编辑表单弹窗 */}
-        {formOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setFormOpen(false)}>
-            <div className="rounded-2xl w-[400px] max-w-[90vw] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
-              <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑用户' : '新增用户'}</h3>
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">账号</Label>
-                  <Input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="登录账号" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">昵称</Label>
-                  <Input value={form.nickname} onChange={e => setForm({ ...form, nickname: e.target.value })} placeholder="显示昵称（留空用账号）" className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">{editing ? '密码（留空不修改）' : '密码'}</Label>
-                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder={editing ? '留空则保持原密码' : '至少 6 位'} className="h-9 text-sm" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">角色</Label>
-                  <Select
-                    value={form.role}
-                    onChange={v => setForm({ ...form, role: v })}
-                    options={[
-                      { value: 'user', label: '成员' },
-                      { value: 'admin', label: '管理员' },
-                      { value: 'super_admin', label: '超级管理员' },
-                    ]}
-                    className="w-full h-9 text-sm"
-                  />
-                </div>
-                {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
-                <div className="flex gap-2 pt-1">
-                  <Button type="submit" loading={saving} className="flex-1" style={{ background: '#FB71A7', color: 'white' }}>
-                    {editing ? '保存修改' : '创建用户'}
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>取消</Button>
-                </div>
-              </form>
-            </div>
-          </div>
+            )
+          })
         )}
-
-        {/* 删除确认 */}
-        {confirmDelete && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setConfirmDelete(null)}>
-            <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                确定删除用户「{confirmDelete.nickname}」吗？
-              </p>
-              <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                将同时删除其全部评分、评论和收藏，且不可恢复
-              </p>
-              <div className="flex gap-2 mt-4">
-                <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
-                <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
-              </div>
-            </div>
-          </div>
+        {invites.length < total && (
+          <button
+            onClick={() => loadInvites(page + 1, q)}
+            className="w-full py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+            style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
+          >
+            {loading ? '加载中...' : `加载更多（${invites.length}/${total}）`}
+          </button>
         )}
       </div>
-    </div>
+
+      {/* 表单弹窗 */}
+      {formOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setFormOpen(false)}>
+          <div className="rounded-2xl w-[400px] max-w-[90vw] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑邀请码' : '生成邀请码'}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">邀请码（留空自动生成）</Label>
+                <Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="如：welcome2026" className="h-9 text-sm font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">可用次数</Label>
+                <Input type="number" min={1} value={form.max_uses} onChange={e => setForm({ ...form, max_uses: e.target.value })} placeholder="1" className="h-9 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">有效时间（留空永不过期）</Label>
+                <Input type="date" value={form.expires_at} onChange={e => setForm({ ...form, expires_at: e.target.value })} className="h-9 text-sm" />
+              </div>
+              {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" loading={saving} className="flex-1" style={{ background: '#FB71A7', color: 'white' }}>
+                  {editing ? '保存修改' : '创建邀请码'}
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>取消</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认 */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setConfirmDelete(null)}>
+          <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              确定删除邀请码「{confirmDelete.code}」吗？
+            </p>
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              删除后该邀请码无法再用于注册
+            </p>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
+              <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

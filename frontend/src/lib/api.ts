@@ -1,5 +1,5 @@
 import { useToastStore } from '@/stores/toast-store'
-import type { User } from '@/types'
+import type { InviteCode, User } from '@/types'
 
 const API_BASE = '/api/v1'
 
@@ -111,6 +111,16 @@ export const api = {
     request<User>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   adminDeleteUser: (id: number) =>
     request<undefined>(`/admin/users/${id}`, { method: 'DELETE' }),
+  adminListInvites: (params?: Record<string, string>) => {
+    const q = params ? '?' + new URLSearchParams(params).toString() : ''
+    return request<{ items: InviteCode[]; total: number; page: number; size: number }>(`/admin/invites${q}`)
+  },
+  adminCreateInvite: (data: Record<string, string>) =>
+    request<InviteCode>('/admin/invites', { method: 'POST', body: JSON.stringify(data) }),
+  adminUpdateInvite: (id: number, data: Record<string, string>) =>
+    request<InviteCode>(`/admin/invites/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  adminDeleteInvite: (id: number) =>
+    request<undefined>(`/admin/invites/${id}`, { method: 'DELETE' }),
   getUserActivity: (id: number, params?: Record<string, string>) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/user/${id}/activity${q}`)

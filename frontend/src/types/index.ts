@@ -63,6 +63,16 @@ export interface User {
   created_at: string
 }
 
+export interface InviteCode {
+  id: number
+  code: string
+  max_uses: number
+  use_count: number
+  expires_at: string | null
+  created_at: string | null
+  status: 'active' | 'used_up' | 'expired'
+}
+
 export interface Tag {
   id: number
   name: string

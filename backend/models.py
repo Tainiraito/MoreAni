@@ -60,6 +60,7 @@ class InviteCode(Base):
     used_by = Column(Integer, ForeignKey('users.id'), nullable=True)
     max_uses = Column(Integer, default=1)  # 可重复使用次数
     use_count = Column(Integer, default=0)  # 已使用次数
+    expires_at = Column(DateTime, nullable=True)  # 有效截止时间（None=永不过期）
     created_at = Column(DateTime, default=_utcnow)
 
 
