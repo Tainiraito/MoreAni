@@ -136,6 +136,7 @@ class RecentReview(BaseModel):
 
     nickname: str = ''
     avatar_id: int = 0
+    avatar_url: str | None = None
     score: int = 0
     review: str = ''
     created_at: datetime | None = None

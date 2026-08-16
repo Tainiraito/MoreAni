@@ -223,7 +223,7 @@ function UserManageTab() {
               className="flex items-center gap-3 px-3 py-2 rounded-xl"
               style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
             >
-              <Avatar name={u.nickname} size={32} />
+              <Avatar name={u.nickname} src={u.avatar_url} size={32} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.nickname}</p>
