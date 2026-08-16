@@ -573,16 +573,14 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                       style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}
                     />
 
-                    {/* 保存 */}
-                    {score > 0 && (
-                      <button
-                        onClick={handleSave}
-                        className="mt-2 w-full py-2 text-sm font-semibold rounded-lg transition-all duration-200 hover:opacity-80"
-                        style={{ background: '#FB71A7', color: 'white', border: 'none' }}
-                      >
-                        保存
-                      </button>
-                    )}
+                    {/* 保存（score=0 也可保存：只写评论不打分） */}
+                    <button
+                      onClick={handleSave}
+                      className="mt-2 w-full py-2 text-sm font-semibold rounded-lg transition-all duration-200 hover:opacity-80"
+                      style={{ background: '#FB71A7', color: 'white', border: 'none' }}
+                    >
+                      保存
+                    </button>
                   </div>
                 )
               )}
