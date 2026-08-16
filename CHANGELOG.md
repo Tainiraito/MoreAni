@@ -110,6 +110,9 @@
 - 搜索防抖统一 500ms（首页搜索 + 编辑弹窗 Bangumi 搜索），首页支持 Enter 立即搜索
 - 背景纹理：透明底 PNG 平铺（100px，线条 10% 不透明度，body 多层背景）
 - 部署（2026-08-16）：feat/v2-redesign push + 镜像重建 + 本地库（806KB，5 用户/234 番剧/324 评分，含 201 条 Bangumi 校对 + 数据清理）覆盖 NAS 旧库（已备份 backups/moreani.db.20260816_190443）；线上 moreani.lovelysia.top 验证通过
+- 封面本地化：204 张外链封面下载到本地 covers/，DB cover_url 改 /api/covers/{id}.jpg（静态服务，不依赖代理）；添加/编辑番剧时自动下载（失败降级外链）
+- 头像上传：users.avatar_url + POST /user/avatar（≤2MB）+ /api/avatars 静态服务 + SettingsDialog「更换头像」UI；Avatar 组件支持图片
+- 部署（第二次）：镜像重建含封面本地化+头像；线上 502 排查——tunnel 容器长连接断开需 `docker compose up -d --force-recreate cloudflared`；容器内 curl 走 proxy env（测试用 --noproxy）
 - Bangumi 校对 title_similar 组合匹配（title/title_alt 任一相似即通过）+ 短子串防误配，救回 5 条译名差异误判（赛博朋克边缘行者/GIRLS BAND CRY/Charlotte/网购技能/咒术回战第三季）
 
 ---
