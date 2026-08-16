@@ -100,6 +100,15 @@
 - 后台管理 UI 规范化：邀请码去 font-mono、编辑/删除按钮加边框 + hover 粉/红描边、日期选择换 DatePicker 组件
 - `--accent-coral` / `--accent-purple` 简写变量补齐（Tailwind v4 `@theme` 只生成 `--color-*` 前缀，`var(--accent-coral)` 此前解析为 undefined，删除按钮红色从未生效）
 - 详情弹窗监听 `refreshKey`：编辑保存后回到详情弹窗自动重新加载（此前依赖数组漏了 refreshKey，内容不更新）；评分保存改为统一走 triggerRefresh 加载（去掉手动重复请求）
+- 新增筛选：放送季度（season 参数，1/4/7/10 月番口径换算时间段）+ 按用户（rated_by，看指定用户评分/评论过的番；GET /user/list 排除 super_admin）
+- Bangumi 全量校对脚本 `scripts/bangumi_refresh_all.py`：按 source_id 重新获取 201 条全字段（标题一致性校验防错配、集数只增不减、日期年份差≤1 才更新）
+- Bangumi 搜索/详情接口加代理回退（WSL 直连超时→7890），修复编辑弹窗「重新获取」偶发失败
+- 列表排序加 id tie-breaker：相同排序值（批量导入的 updated_at 相同）翻页重叠导致 React 重复 key 警告
+- `_attach_tags` 去重：Bangumi 标签重名导致 UNIQUE 约束崩溃
+- 精选推荐区（HeroBrand）全量随机 + 自己评分/评论过的优先展示（最多 6 张）；列表 size 上限放宽至 1000
+- 标粉修复：CommentListView / HeroSection 平均分星标原来硬编码粉色，改为按 my_score 判定（评过粉/没评灰，与卡片规则一致）
+- 搜索防抖统一 500ms（首页搜索 + 编辑弹窗 Bangumi 搜索），首页支持 Enter 立即搜索
+- Bangumi 校对 title_similar 组合匹配（title/title_alt 任一相似即通过）+ 短子串防误配，救回 5 条译名差异误判（赛博朋克边缘行者/GIRLS BAND CRY/Charlotte/网购技能/咒术回战第三季）
 
 ---
 
