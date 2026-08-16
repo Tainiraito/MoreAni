@@ -346,15 +346,15 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
               <div className="flex flex-wrap items-center gap-4 mb-4">
                 {avgScore && (
                   <div className="flex items-center gap-1.5">
-                    <Star size={18} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                    <span className="text-lg font-bold" style={{ color: '#FB71A7' }}>
+                    <Star size={18} style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={content.my_score ? '#FB71A7' : 'none'} />
+                    <span className="text-lg font-bold" style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }}>
                       {avgScore}
                     </span>
                   </div>
                 )}
 
                 {(content.rating_count ?? 0) > 0 && (
-                  <div className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                  <div className="flex items-center gap-1" style={{ color: content.my_has_review ? '#FB71A7' : 'var(--text-muted)' }}>
                     <Users size={14} />
                     <span className="text-sm">{content.rating_count}</span>
                   </div>
