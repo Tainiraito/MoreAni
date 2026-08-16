@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from database import Base, engine
 from middleware import RateLimitMiddleware
@@ -82,6 +83,11 @@ app.include_router(proxy_router, prefix='/api/v1')
 from routers.v1.admin import router as admin_router
 
 app.include_router(admin_router, prefix='/api/v1')
+
+# --- 封面本地化：/api/covers/{id}.jpg 静态服务（图片下载到本地，不依赖外链 CDN） ---
+COVERS_DIR = os.getenv('COVERS_DIR', 'covers')
+os.makedirs(COVERS_DIR, exist_ok=True)
+app.mount('/api/covers', StaticFiles(directory=COVERS_DIR), name='covers')
 
 
 @app.get('/api/health')

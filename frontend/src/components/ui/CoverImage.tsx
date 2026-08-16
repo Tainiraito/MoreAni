@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 /** Force HTTPS for external image URLs, proxy Bangumi CDN */
 export function secureUrl(url: string): string {
   if (!url) return ''
+  // 本地化封面（/api/covers/...）直接使用，不走代理
+  if (url.startsWith('/api/covers/')) return url
   if (url.includes('lain.bgm.tv') || url.includes('bgm.tv') || url.includes('bangumi.tv')) {
     return `/api/v1/proxy/image?url=${encodeURIComponent(url)}`
   }
