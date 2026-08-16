@@ -31,7 +31,6 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
       {items.map(item => {
         const avg = item.avg_score && item.avg_score > 0 ? (item.avg_score / 10).toFixed(1) : null
         const reviews = item.recent_reviews || []
-        const reviewCount = item.review_count ?? reviews.length
         const typeColor = TYPE_COLOR[item.content_type] || '#FB71A7'
         const ratingCount = item.rating_count ?? 0
 
@@ -42,10 +41,10 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
             onClick={() => onSelect(item.id)}
           >
-            {/* 封面：最左侧，占满行高，比例固定 3:4 */}
+            {/* 封面：最左侧，占满行高，适配常见 2:3~3:4 封面比例 */}
             <div
-              className="w-[108px] shrink-0 self-stretch"
-              style={{ background: 'var(--bg-card-warm)', aspectRatio: '3/4' }}
+              className="w-[150px] shrink-0 self-stretch"
+              style={{ background: 'var(--bg-card-warm)' }}
             >
               {item.cover_url ? (
                 <img src={secureUrl(item.cover_url)} alt="" className="w-full h-full object-cover" />
@@ -81,43 +80,62 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
               )}
             </div>
 
-            {/* 右侧：朋友们的气泡评论集合 */}
-            <div className="flex-1 min-w-0 border-l flex flex-col justify-center gap-1.5 py-3 pr-3 pl-4"
-              style={{ borderColor: 'var(--border-line)' }}>
+            {/* 右侧：朋友们的气泡评论集合（左右块状排列） */}
+            <div
+              className="flex-1 min-w-0 border-l flex flex-col justify-center gap-1.5 py-3 pr-3 pl-4"
+              style={{ borderColor: 'var(--border-line)' }}
+            >
               {reviews.length === 0 ? (
                 <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
                   <MessageCircle size={12} /> 暂无评论
                 </p>
               ) : (
-                reviews.map((r, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl px-3 py-1.5"
-                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Avatar name={r.nickname || '?'} size={16} />
-                      <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                        {r.nickname}
-                      </span>
-                      {r.score > 0 && (
-                        <span className="text-[11px] font-semibold shrink-0" style={{ color: '#FB71A7' }}>
-                          ★{(r.score / 10).toFixed(1)}
+                <div className="flex flex-wrap gap-1.5">
+                  {reviews.map((r, i) => (
+                    <div
+                      key={i}
+                      className="rounded-xl px-3 py-1.5"
+                      style={{
+                        background: 'var(--bg-card-warm)',
+                        border: '1px solid var(--border-line)',
+                        maxWidth: '48%',
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Avatar name={r.nickname || '?'} size={16} />
+                        <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {r.nickname}
                         </span>
+                        {r.score > 0 && (
+                          <span className="text-[11px] font-semibold shrink-0" style={{ color: '#FB71A7' }}>
+                            ★{(r.score / 10).toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                      {r.review && (
+                        <p className="text-xs mt-0.5 leading-relaxed line-clamp-2 break-words" style={{ color: 'var(--text-secondary)' }}>
+                          {r.review}
+                        </p>
                       )}
                     </div>
-                    {r.review && (
-                      <p className="text-xs mt-0.5 leading-relaxed line-clamp-2 break-words" style={{ color: 'var(--text-secondary)' }}>
-                        {r.review}
-                      </p>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
-              {reviewCount > reviews.length && (
-                <p className="text-[11px] pt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  +{reviewCount - reviews.length} 条评论
-                </p>
+              {(item.review_count ?? 0) > reviews.length && (
+                <button
+                  className="self-start text-[11px] px-2 py-1 rounded-md transition-all duration-150 hover:opacity-80"
+                  style={{
+                    color: '#FB71A7',
+                    background: 'rgba(251, 113, 167, 0.08)',
+                    border: '1px solid rgba(251, 113, 167, 0.25)',
+                  }}
+                  onClick={e => {
+                    e.stopPropagation()
+                    onSelect(item.id)
+                  }}
+                >
+                  +{item.review_count! - reviews.length} 条评论 ›
+                </button>
               )}
             </div>
           </div>
