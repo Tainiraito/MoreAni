@@ -18,6 +18,7 @@ from schemas import (
     TagResponse,
 )
 from services import content as content_svc
+from services import covers as covers_svc
 from services import rating as rating_svc
 
 router = APIRouter(prefix='/content', tags=['content'])
@@ -205,6 +206,9 @@ def create_content(
         )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
+    # 确认添加后才下载封面到本地（搜索仅预览不下载；失败降级外链）
+    covers_svc.localize_cover(item, body.cover_url)
+    db.commit()
     return _to_response(item, db)
 
 
@@ -229,6 +233,10 @@ def update_content(
 
     update_data = body.model_dump(exclude_unset=True)
     updated = content_svc.update_content(db, item, **update_data)
+    # 更新时若换了外链封面 → 下载到本地（失败降级）
+    if 'cover_url' in update_data:
+        covers_svc.localize_cover(updated, updated.cover_url)
+        db.commit()
     return _to_response(updated, db)
 
 
