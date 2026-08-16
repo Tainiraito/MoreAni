@@ -30,7 +30,7 @@ interface ActivityItem {
 }
 
 export function SettingsDialog() {
-  const { settingsOpen, closeSettings, openAuth } = useUIStore()
+  const { settingsOpen, closeSettings, openAuth, openDetail } = useUIStore()
   const { user, setUser, logout } = useAuthStore()
   const [editingNickname, setEditingNickname] = useState(false)
   const [nickname, setNickname] = useState('')
@@ -249,7 +249,15 @@ export function SettingsDialog() {
                       ? (item.review || (item.score ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}` : '写了评论'))
                       : '收藏了'
                 return (
-                  <div key={idx} className="flex items-center gap-3">
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 cursor-pointer rounded-lg transition-all duration-150 hover:opacity-80"
+                    onClick={() => {
+                      // 关闭用户信息弹窗，打开该番剧详情
+                      closeSettings()
+                      openDetail(item.content_id)
+                    }}
+                  >
                     <div
                       className="w-10 h-14 rounded-md overflow-hidden shrink-0"
                       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
