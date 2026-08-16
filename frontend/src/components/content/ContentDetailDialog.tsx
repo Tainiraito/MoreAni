@@ -3,6 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useRefreshStore } from '@/stores/refresh-store'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { api } from '@/lib/api'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
@@ -39,6 +40,7 @@ interface ContentDetailDialogProps {
 
 export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
   const { detailOpen, detailContentId, closeDetail, openEditContent } = useUIStore()
+  useLockBodyScroll(detailOpen)
   const { user } = useAuthStore()
   const toast = useToastStore.getState()
   const [content, setContent] = useState<ContentItem | null>(null)

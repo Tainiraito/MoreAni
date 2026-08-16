@@ -3,6 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { Avatar } from '@/components/ui/Avatar'
 import { secureUrl } from '@/components/ui/CoverImage'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -31,6 +32,7 @@ interface ActivityItem {
 
 export function SettingsDialog() {
   const { settingsOpen, closeSettings, openAuth, openDetail } = useUIStore()
+  useLockBodyScroll(settingsOpen)
   const { user, setUser, logout } = useAuthStore()
   const [editingNickname, setEditingNickname] = useState(false)
   const [nickname, setNickname] = useState('')

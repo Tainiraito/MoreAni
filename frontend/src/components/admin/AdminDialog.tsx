@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { api } from '@/lib/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { Input } from '@/components/ui/input'
@@ -22,6 +23,7 @@ interface AdminUserForm {
 
 export function AdminDialog() {
   const { adminOpen, closeAdmin } = useUIStore()
+  useLockBodyScroll(adminOpen)
   const [users, setUsers] = useState<User[]>([])
   const [total, setTotal] = useState(0)
   const [q, setQ] = useState('')

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label'
 
 export function AuthDialog() {
   const { authOpen, closeAuth } = useUIStore()
+  useLockBodyScroll(authOpen)
   const { setUser, setToken } = useAuthStore()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')

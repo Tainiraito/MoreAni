@@ -3,6 +3,7 @@ import { X, Search, Star, Tv, Save, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { secureUrl } from '@/components/ui/CoverImage'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
@@ -109,6 +110,7 @@ interface ContentFormDialogProps {
 }
 
 export function ContentFormDialog({ contentId, open, onClose, onSaved }: ContentFormDialogProps) {
+  useLockBodyScroll(open)
   const toast = useToastStore.getState()
   const isEditMode = contentId != null
 
