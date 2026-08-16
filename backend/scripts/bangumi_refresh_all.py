@@ -5,6 +5,7 @@
     python3 scripts/bangumi_refresh_all.py --dry-run    # 只打印差异，不写库
     python3 scripts/bangumi_refresh_all.py              # 写入数据库
 """
+
 import argparse
 import asyncio
 import os
@@ -23,9 +24,9 @@ def clean_summary(text: str) -> str:
     """清理 Bangumi 简介脏格式。"""
     if not text:
         return ''
-    text = text.replace('\u3000', ' ')        # 全角空格
+    text = text.replace('\u3000', ' ')  # 全角空格
     text = text.replace('\r\n', '\n').replace('\r', '\n')  # 统一换行
-    text = re.sub(r'=+', '', text)            # 分隔线
+    text = re.sub(r'=+', '', text)  # 分隔线
     text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)  # 多余空行
     return text.strip()
 
@@ -89,9 +90,8 @@ async def refresh_one(db, item: ContentItem, apply: bool) -> dict | None:
 
     # ⚠️ 标题对不上 = 疑似 source_id 关联错片 → 不硬校对，整条跳过（只记录，不动库）
     # 组合匹配：title/title_alt 与 name_cn/name 任一相似即通过（译名差异大的同番也能救回）
-    if not title_similar([item.title, item.title_alt or ''], [name_cn, name]):
-        if item.id not in FORCE_IDS:
-            return {'id': item.id, 'title': item.title, 'mismatch': True}
+    if not title_similar([item.title, item.title_alt or ''], [name_cn, name]) and item.id not in FORCE_IDS:
+        return {'id': item.id, 'title': item.title, 'mismatch': True}
 
     summary = clean_summary(detail.get('summary') or '')
     eps = detail.get('eps') or 0
@@ -118,10 +118,7 @@ async def refresh_one(db, item: ContentItem, apply: bool) -> dict | None:
     date_ok = bool(
         air_date
         and air_date != item.release_date
-        and (
-            not item.release_date
-            or _year_diff(air_date, item.release_date) <= 1
-        )
+        and (not item.release_date or _year_diff(air_date, item.release_date) <= 1)
     )
     if date_ok:
         changes.append(('日期', item.release_date, air_date))
@@ -153,11 +150,7 @@ async def refresh_one(db, item: ContentItem, apply: bool) -> dict | None:
 
 async def run(apply: bool) -> None:
     db = SessionLocal()
-    items = (
-        db.query(ContentItem)
-        .filter(ContentItem.source_type == 'bangumi', ContentItem.deleted_at.is_(None))
-        .all()
-    )
+    items = db.query(ContentItem).filter(ContentItem.source_type == 'bangumi', ContentItem.deleted_at.is_(None)).all()
     print(f'=== 共 {len(items)} 条 Bangumi 条目，开始校对（{"写入" if apply else "dry-run"}）===\n')
     ok = failed = skipped = changed = 0
     for i, item in enumerate(items, 1):

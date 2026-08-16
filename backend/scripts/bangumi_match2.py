@@ -3,6 +3,7 @@
 
 映射表: {库内 title: (搜索关键词, content_type)}
 """
+
 import asyncio
 import os
 import sys
@@ -10,7 +11,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from bangumi_match import search_bgm, TYPE_MAP  # noqa: E402
+from bangumi_match import TYPE_MAP, search_bgm  # noqa: E402
+
 from database import SessionLocal  # noqa: E402
 from models import ContentItem  # noqa: E402
 
@@ -37,9 +39,15 @@ MAP = {
     '86 -不存在的战区- 第2部分': ('86 不存在的战区 第2部分', '86'),
     '86不存在的战区': ('86 不存在的战区', '86'),
     'Fate/stay night[UBW]': ('Fate/stay night UBW', 'Unlimited Blade Works'),
-    'Fate stay night Heaven\'s Feel Ⅰ/Ⅱ/Ⅲ': ('Fate stay night Heaven\'s Feel', 'Heaven\'s Feel'),
+    "Fate stay night Heaven's Feel Ⅰ/Ⅱ/Ⅲ": (
+        "Fate stay night Heaven's Feel",
+        "Heaven's Feel",
+    ),
     '命运石之门:负荷领域的既视感': ('命运石之门 负荷领域的既视感', '负荷领域的既视感'),
-    '我们不可能成为恋人！绝对不行。（似乎可行？）': ('我们不可能成为恋人', '我们不可能成为恋人'),
+    '我们不可能成为恋人！绝对不行。（似乎可行？）': (
+        '我们不可能成为恋人',
+        '我们不可能成为恋人',
+    ),
     '赛马娘特别周': ('赛马娘 Pretty Derby', '赛马娘'),
     '赛马娘东海帝皇': ('赛马娘 Pretty Derby', '赛马娘'),
     '药屋少女的呢喃S1': ('药屋少女的呢喃 第一季', '药屋少女的呢喃'),
@@ -54,7 +62,10 @@ MAP = {
     '斩赤红之瞳': ('斩赤红之瞳', '斩赤红之瞳'),
     'Fate/stay night': ('Fate/stay night', 'Fate/stay night'),
     '请问您今天要点兔子吗': ('请问您今天要来点兔子吗', '兔子'),
-    '在地下城寻找邂逅是否搞错了什么': ('在地下城寻找邂逅是否搞错了什么', '在地下城寻找邂逅'),
+    '在地下城寻找邂逅是否搞错了什么': (
+        '在地下城寻找邂逅是否搞错了什么',
+        '在地下城寻找邂逅',
+    ),
     'Love Live！！！水团！': ('Love Live! Sunshine', 'Sunshine'),
     '钢之炼金术师03版': ('钢之炼金术师 2003', '钢之炼金术师'),
     '钢之炼金术师09版': ('钢之炼金术师 FULLMETAL', 'FULLMETAL'),
@@ -71,7 +82,7 @@ MAP = {
     '明日酱的水手服': ('明日同学的水手服', '明日同学'),
     '魔法师的新娘': ('魔法使的新娘 第一季', '魔法使的新娘'),
     'BangDream S1/S2/S3': ('BanG Dream!', 'BanG Dream'),
-    'It\'s Mygo!!!!!': ('BanG Dream! It\'s MyGO', 'MyGO'),
+    "It's Mygo!!!!!": ("BanG Dream! It's MyGO", 'MyGO'),
     '我推的孩子S1': ('我推的孩子 第一季', '我推的孩子'),
     '我推的孩子S2': ('我推的孩子 第二季', '我推的孩子'),
     '电锯人：蕾塞篇': ('剧场版 链锯人 蕾塞篇', '蕾塞'),
@@ -110,11 +121,9 @@ async def run():
                 break
         if not best:
             # 宽容：第一个结果若名称高度相关也接受
-            if results:
-                first = results[0]
-                fn = (first.get('name') or '') + (first.get('name_cn') or '')
-                if keyword.split()[0] in fn or fn.split()[0] in keyword:
-                    best = first
+            fn = (results[0].get('name') or '') + (results[0].get('name_cn') or '') if results else ''
+            if fn and verify in fn and (keyword.split()[0] in fn or fn.split()[0] in keyword):
+                best = results[0]
         if best:
             image = (best.get('images') or {}).get('large', '') or (best.get('images') or {}).get('medium', '')
             summary = (best.get('summary') or '').strip()

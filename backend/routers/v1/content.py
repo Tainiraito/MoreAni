@@ -71,14 +71,15 @@ def list_content(
     q: str | None = Query(None, description='Search keyword'),
     sort: str = Query(
         'updated_desc',
-        description=(
-            'Sort: updated_desc/newest/oldest/rating/title/air_date_desc/air_date_asc'
-        ),
+        description=('Sort: updated_desc/newest/oldest/rating/title/air_date_desc/air_date_asc'),
     ),
     rated: str | None = Query(None, description='rated/unrated filter'),
     reviewed: str | None = Query(None, description='reviewed/unreviewed filter'),
     favorited: str | None = Query(None, description='favorited/unfavorited filter'),
-    season: str | None = Query(None, description='放送季度，如 2026-01=2026年1月番（自动换算 01/04/07/10 对应季度时间段）'),
+    season: str | None = Query(
+        None,
+        description='放送季度，如 2026-01=2026年1月番（自动换算 01/04/07/10 对应季度时间段）',
+    ),
     rated_by: int | None = Query(None, description='只看该用户评分/评论过的内容'),
     user: User | None = Depends(get_current_user_optional),
     page: int = Query(1, ge=1),
@@ -104,10 +105,7 @@ def list_content(
     # 批量取最近评论（避免逐 item 查询的 N+1）；瀑布流视图需要更多条
     recent_map = rating_svc.get_recent_reviews_map(db, [i.id for i in items], limit=6)
     return ContentListResponse(
-        items=[
-            _to_response(i, db, user.id if user else None, recent_map)
-            for i in items
-        ],
+        items=[_to_response(i, db, user.id if user else None, recent_map) for i in items],
         total=total,
         page=page,
         size=size,
@@ -130,6 +128,7 @@ def list_seasons(db: Session = Depends(get_db)) -> dict:
     返回 [{value: '2026-01', count: N}]，供前端筛选下拉动态生成选项。
     """
     from sqlalchemy import func
+
     rows = (
         db.query(
             func.substr(ContentItem.release_date, 1, 4).label('y'),
@@ -146,10 +145,18 @@ def list_seasons(db: Session = Depends(get_db)) -> dict:
         .all()
     )
     month_to_quarter = {
-        '01': '01', '02': '01', '03': '01',
-        '04': '04', '05': '04', '06': '04',
-        '07': '07', '08': '07', '09': '07',
-        '10': '10', '11': '10', '12': '10',
+        '01': '01',
+        '02': '01',
+        '03': '01',
+        '04': '04',
+        '05': '04',
+        '06': '04',
+        '07': '07',
+        '08': '07',
+        '09': '07',
+        '10': '10',
+        '11': '10',
+        '12': '10',
     }
     season_map: dict[str, int] = {}
     for y, m, cnt in rows:
@@ -227,9 +234,7 @@ def update_content(
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
     if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
-        raise HTTPException(
-            status_code=403, detail='No permission to edit this content'
-        )
+        raise HTTPException(status_code=403, detail='No permission to edit this content')
 
     update_data = body.model_dump(exclude_unset=True)
     updated = content_svc.update_content(db, item, **update_data)
@@ -254,9 +259,7 @@ def delete_content(
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
     if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
-        raise HTTPException(
-            status_code=403, detail='No permission to delete this content'
-        )
+        raise HTTPException(status_code=403, detail='No permission to delete this content')
 
     content_svc.delete_content(db, item)
 
@@ -277,9 +280,7 @@ def create_share_link(
         raise HTTPException(status_code=404, detail='Content not found')
     # 仅创建者或 admin 可创建分享链接
     if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
-        raise HTTPException(
-            status_code=403, detail='No permission to share this content'
-        )
+        raise HTTPException(status_code=403, detail='No permission to share this content')
 
     token = secrets.token_urlsafe(24)[:32]
     link = ShareLink(

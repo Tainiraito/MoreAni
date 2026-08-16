@@ -3,16 +3,16 @@
 Provides user CRUD: list/search/create/update/delete.
 Also invite-code CRUD: list/create/update/delete.
 """
+
 import secrets
 from datetime import UTC, datetime
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from auth import get_password_hash
-from deps import get_current_user, get_db, require_role
+from deps import get_db, require_role
 from models import InviteCode, Rating, ShareLink, User, UserContentStatus
 
 router = APIRouter(prefix='/admin', tags=['admin'])
@@ -84,9 +84,7 @@ def create_user_admin(
     if role not in ('user', 'admin', 'super_admin'):
         raise HTTPException(status_code=422, detail='角色不合法')
     # 唯一性
-    exists = db.query(User).filter(
-        (User.username == username) | (User.nickname == nickname)
-    ).first()
+    exists = db.query(User).filter((User.username == username) | (User.nickname == nickname)).first()
     if exists:
         raise HTTPException(status_code=409, detail='账号或昵称已被使用')
     user = User(
@@ -226,7 +224,7 @@ def create_invite(
         try:
             expires_at = datetime.fromisoformat(expires_raw.replace('Z', '+00:00'))
         except ValueError:
-            raise HTTPException(status_code=422, detail='有效时间格式不合法（YYYY-MM-DD）')  # noqa: B904
+            raise HTTPException(status_code=422, detail='有效时间格式不合法（YYYY-MM-DD）') from None
 
     exists = db.query(InviteCode).filter(InviteCode.code == code).first()
     if exists:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
@@ -39,6 +39,7 @@ export function SettingsDialog() {
   const [nicknameError, setNicknameError] = useState('')
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -132,7 +133,9 @@ export function SettingsDialog() {
     setAvatarUploading(true)
     setAvatarError('')
     try {
-      const res = await api.uploadAvatar(file)
+      // 1:1 居中裁切 + 缩放 256px（确保头像比例正确）
+      const processed = await processAvatarImage(file)
+      const res = await api.uploadAvatar(processed)
       setUser({ ...user!, avatar_url: res.avatar_url })
       useToastStore.getState().addToast('success', '头像已更新')
     } catch (err: any) {
@@ -141,6 +144,45 @@ export function SettingsDialog() {
       setAvatarUploading(false)
       e.target.value = '' // 允许重复选择同一文件
     }
+  }
+
+  const handleAvatarDelete = async () => {
+    setAvatarUploading(true)
+    setAvatarError('')
+    try {
+      await api.deleteAvatar()
+      setUser({ ...user!, avatar_url: null })
+      useToastStore.getState().addToast('success', '头像已删除')
+    } catch (err: any) {
+      setAvatarError(err.message || '头像删除失败')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  /** 图片处理：居中裁切为 1:1 并缩放到 256×256，输出 JPEG */
+  const processAvatarImage = async (file: File): Promise<File> => {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('无法读取图片文件'))
+      el.src = URL.createObjectURL(file)
+    })
+    const size = Math.min(img.naturalWidth, img.naturalHeight)
+    if (size <= 0) throw new Error('图片尺寸无效')
+    const sx = Math.floor((img.naturalWidth - size) / 2)
+    const sy = Math.floor((img.naturalHeight - size) / 2)
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('浏览器不支持图片处理')
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256)
+    URL.revokeObjectURL(img.src)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    if (!blob) throw new Error('图片处理失败')
+    return new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
   }
 
   return (
@@ -171,26 +213,41 @@ export function SettingsDialog() {
         {/* 用户信息 */}
         <div className="flex items-start gap-4 mb-8">
           <div className="flex flex-col items-center gap-2">
-            <Avatar name={user?.nickname || '?'} src={user?.avatar_url} size={64}
-              style={{ border: '2px solid var(--brand)' }} />
-            {/* 头像上传 */}
-            <label
-              className="text-[11px] px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-              style={{
-                color: 'var(--brand)',
-                background: 'rgba(251, 113, 167, 0.08)',
-                border: '1px solid rgba(251, 113, 167, 0.35)',
-              }}
+            {/* 头像：点击触发更换；有头像时 hover 可更换/删除 */}
+            <div
+              className="relative group cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              title={user?.avatar_url ? '点击更换头像' : '点击上传头像'}
             >
-              {avatarUploading ? '上传中...' : '更换头像'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                disabled={avatarUploading}
-                onChange={handleAvatarChange}
-              />
-            </label>
+              <Avatar name={user?.nickname || '?'} src={user?.avatar_url} size={64}
+                style={{ border: '2px solid var(--brand)' }} />
+              {user?.avatar_url && (
+                <div className="absolute inset-0 rounded-full flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}
+                    className="text-[10px] text-white px-1.5 py-0.5 rounded hover:bg-white/25 transition-colors"
+                  >
+                    更换
+                  </button>
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); handleAvatarDelete() }}
+                    className="text-[10px] text-white px-1.5 py-0.5 rounded hover:bg-white/25 transition-colors"
+                  >
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              disabled={avatarUploading}
+              onChange={handleAvatarChange}
+            />
             {avatarError && (
               <p className="text-[11px]" style={{ color: 'var(--accent-coral, #FF6B6B)' }}>{avatarError}</p>
             )}

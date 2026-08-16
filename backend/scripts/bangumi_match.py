@@ -7,6 +7,7 @@
 
 匹配不上（模糊或未命中）不硬匹配，打印清单等待人工确认。
 """
+
 import asyncio
 import os
 import sys
@@ -37,6 +38,7 @@ async def search_bgm(keyword: str, subject_type: int, limit: int = 10) -> list[d
         except (httpx.HTTPError, httpx.TimeoutException) as e:
             print(f'    [bangumi {proxy or "direct"} fail] {type(e).__name__}')
     return []
+
 
 TYPE_MAP = {'anime': 2, 'movie': 2, 'game': 6}
 BGMI_TYPE_LABEL = {2: 'anime', 6: 'game'}
@@ -99,7 +101,7 @@ async def run(apply: bool):
     for i, item in enumerate(items):
         result = await match_one(item)
         status = result['status']
-        label = f'[{i+1}/{len(items)}] {item.title}'
+        label = f'[{i + 1}/{len(items)}] {item.title}'
         if status == 'skip':
             skipped.append(item)
             continue
@@ -114,8 +116,11 @@ async def run(apply: bool):
             print(f'{label} → ❌ 未匹配')
         await asyncio.sleep(0.8)  # Bangumi 限流保护
 
-    print(f'\n=== 报告 ===')
-    print(f'精确匹配: {len(exact)}  模糊候选: {len(fuzzy)}  未匹配: {len(none_)}  跳过(非anime/movie/game): {len(skipped)}')
+    print('\n=== 报告 ===')
+    print(
+        f'精确匹配: {len(exact)}  模糊候选: {len(fuzzy)}  未匹配: {len(none_)}  '
+        f'跳过(非anime/movie/game): {len(skipped)}'
+    )
 
     if not apply:
         print('\n[dry-run] 未更新数据库。确认后加 --apply 应用精确匹配。')
@@ -149,7 +154,7 @@ async def run(apply: bool):
 
     if fuzzy:
         print('\n=== 模糊候选（待确认）===')
-        for item, best, cands in fuzzy:
+        for item, _best, cands in fuzzy:
             print(f'\n{item.title} (type={item.content_type}):')
             for c in cands[:5]:
                 print(f'  - {c.get("name_cn") or c.get("name")} [{c.get("id")}]')

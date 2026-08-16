@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bangumi 第三轮：修正错误匹配 + 重试失败项（force 覆盖已有 bangumi 记录）。"""
+
 import asyncio
 import os
 import sys
@@ -7,7 +8,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from bangumi_match import search_bgm, TYPE_MAP  # noqa: E402
+from bangumi_match import TYPE_MAP, search_bgm  # noqa: E402
+
 from database import SessionLocal  # noqa: E402
 from models import ContentItem  # noqa: E402
 
@@ -26,11 +28,14 @@ MAP = {
     '笨蛋测验召唤兽': ('笨蛋 测验 召唤兽', '召唤兽'),
     '斩赤红之瞳': ('斩·赤红之瞳', '赤红之瞳'),
     'Fate/stay night': ('Fate stay night', 'Fate/stay night'),
-    '在地下城寻找邂逅是否搞错了什么': ('在地下城寻找邂逅是否搞错了什么 第一季', '在地下城'),
+    '在地下城寻找邂逅是否搞错了什么': (
+        '在地下城寻找邂逅是否搞错了什么 第一季',
+        '在地下城',
+    ),
     'megelo box': ('MEGALO BOX', 'MEGALO'),
     '没落要塞/DECA-DENCE': ('没落要塞', '没落要塞'),
     'BangDream S1/S2/S3': ('BanG Dream 第一季', 'BanG Dream'),
-    'It\'s Mygo!!!!!': ('MyGO', 'MyGO'),
+    "It's Mygo!!!!!": ('MyGO', 'MyGO'),
     'Fate Strange Fake': ('Fate Strange Fake', 'Strange Fake'),
 }
 
@@ -40,11 +45,7 @@ async def run():
     updated = 0
     failed = []
     for i, (title, (keyword, verify)) in enumerate(MAP.items(), 1):
-        items = (
-            db.query(ContentItem)
-            .filter(ContentItem.title == title, ContentItem.deleted_at.is_(None))
-            .all()
-        )
+        items = db.query(ContentItem).filter(ContentItem.title == title, ContentItem.deleted_at.is_(None)).all()
         if not items:
             print(f'[{i}/{len(MAP)}] {title}: 库中无此内容')
             continue

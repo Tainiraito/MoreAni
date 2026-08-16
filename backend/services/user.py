@@ -23,11 +23,7 @@ def get_user_by_nickname(db: Session, nickname: str) -> User | None:
 
 def get_user_by_login(db: Session, login: str) -> User | None:
     """Get a user by either username (account) or nickname — both are unique and can be used to log in."""
-    return (
-        db.query(User)
-        .filter((User.username == login) | (User.nickname == login))
-        .first()
-    )
+    return db.query(User).filter((User.username == login) | (User.nickname == login)).first()
 
 
 def create_user(
@@ -107,11 +103,7 @@ def update_nickname(db: Session, user: User, nickname: str) -> User:
 
 def get_user_stats(db: Session, user_id: int) -> dict:
     """Get user stats: rating_count, review_count, favorite_count, avg_score, content_count."""
-    rating_count = (
-        db.query(func.count(Rating.id))
-        .filter(Rating.user_id == user_id, Rating.score > 0)
-        .scalar()
-    ) or 0
+    rating_count = (db.query(func.count(Rating.id)).filter(Rating.user_id == user_id, Rating.score > 0).scalar()) or 0
 
     review_count = (
         db.query(func.count(Rating.id))
@@ -132,18 +124,10 @@ def get_user_stats(db: Session, user_id: int) -> dict:
         .scalar()
     ) or 0
 
-    avg_score = (
-        db.query(func.avg(Rating.score))
-        .filter(Rating.user_id == user_id, Rating.score > 0)
-        .scalar()
-    )
+    avg_score = db.query(func.avg(Rating.score)).filter(Rating.user_id == user_id, Rating.score > 0).scalar()
     avg_score = round(float(avg_score), 1) if avg_score else None
 
-    content_count = (
-        db.query(func.count(ContentItem.id))
-        .filter(ContentItem.created_by == user_id)
-        .scalar()
-    ) or 0
+    content_count = (db.query(func.count(ContentItem.id)).filter(ContentItem.created_by == user_id).scalar()) or 0
 
     return {
         'rating_count': rating_count,
@@ -216,4 +200,4 @@ def get_user_activity(
     entries.sort(key=lambda e: e['updated_at'], reverse=True)
     total = len(entries)
     start = (page - 1) * size
-    return entries[start:start + size], total
+    return entries[start : start + size], total

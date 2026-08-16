@@ -2,6 +2,7 @@
 
 搜索不下载（仅预览）；确认添加/保存时才下载，失败降级保留外链（走代理）。
 """
+
 import os
 import re
 
@@ -21,9 +22,13 @@ HEADERS = {'User-Agent': 'MoreAni/2.0 (https://moreani.lovelysia.top)'}
 def _pick_ext(url: str) -> str:
     """从 URL 推断扩展名；无法推断用 .jpg。"""
     m = re.search(r'\.(jpe?g|png|webp|gif)(?:\?|$)', url.lower())
-    return {'.jpeg': '.jpg', '.jpg': '.jpg', '.png': '.png', '.webp': '.webp', '.gif': '.gif'}.get(
-        m.group(1) if m else '', '.jpg'
-    )
+    return {
+        '.jpeg': '.jpg',
+        '.jpg': '.jpg',
+        '.png': '.png',
+        '.webp': '.webp',
+        '.gif': '.gif',
+    }.get(m.group(1) if m else '', '.jpg')
 
 
 def _download_sync(url: str, path: str) -> bool:

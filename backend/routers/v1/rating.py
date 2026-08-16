@@ -57,9 +57,7 @@ def delete_rating(
     if not rating:
         raise HTTPException(status_code=404, detail='Rating not found')
     if rating.user_id != user.id and user.role != 'admin':
-        raise HTTPException(
-            status_code=403, detail='No permission to delete this rating'
-        )
+        raise HTTPException(status_code=403, detail='No permission to delete this rating')
 
     rating_svc.delete_rating(db, rating)
 
@@ -74,9 +72,7 @@ def get_recent_activity(
 
     Anonymous for guests (no username).
     """
-    items, total = rating_svc.get_recent_activity(
-        db, page=page, size=size, guest_mode=False
-    )
+    items, total = rating_svc.get_recent_activity(db, page=page, size=size, guest_mode=False)
     return {'items': items, 'total': total}
 
 

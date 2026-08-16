@@ -40,15 +40,9 @@ class User(Base):
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    ratings = relationship(
-        'Rating', back_populates='user', cascade='all, delete-orphan'
-    )
-    content_items = relationship(
-        'ContentItem', back_populates='creator', cascade='all, delete-orphan'
-    )
-    statuses = relationship(
-        'UserContentStatus', back_populates='user', cascade='all, delete-orphan'
-    )
+    ratings = relationship('Rating', back_populates='user', cascade='all, delete-orphan')
+    content_items = relationship('ContentItem', back_populates='creator', cascade='all, delete-orphan')
+    statuses = relationship('UserContentStatus', back_populates='user', cascade='all, delete-orphan')
 
 
 class InviteCode(Base):
@@ -91,13 +85,9 @@ class ContentItem(Base):
     deleted_at = Column(DateTime, nullable=True, index=True)  # soft delete
 
     creator = relationship('User', back_populates='content_items')
-    ratings = relationship(
-        'Rating', back_populates='content', cascade='all, delete-orphan'
-    )
+    ratings = relationship('Rating', back_populates='content', cascade='all, delete-orphan')
     tags = relationship('Tag', secondary='content_tags', back_populates='contents')
-    statuses = relationship(
-        'UserContentStatus', back_populates='content', cascade='all, delete-orphan'
-    )
+    statuses = relationship('UserContentStatus', back_populates='content', cascade='all, delete-orphan')
 
     __table_args__ = ({'comment': 'Unified content table for all content types'},)
 
@@ -112,9 +102,7 @@ class Tag(Base):
     tag_type = Column(String(20), default='custom')  # bangumi / custom
     created_at = Column(DateTime, default=_utcnow)
 
-    contents = relationship(
-        'ContentItem', secondary='content_tags', back_populates='tags'
-    )
+    contents = relationship('ContentItem', secondary='content_tags', back_populates='tags')
 
 
 class ContentTag(Base):
@@ -191,9 +179,7 @@ class UserContentStatus(Base):
     user = relationship('User', back_populates='statuses')
     content = relationship('ContentItem', back_populates='statuses')
 
-    __table_args__ = (
-        UniqueConstraint('user_id', 'content_id', name='uq_user_content_status'),
-    )
+    __table_args__ = (UniqueConstraint('user_id', 'content_id', name='uq_user_content_status'),)
 
 
 class ShareLink(Base):

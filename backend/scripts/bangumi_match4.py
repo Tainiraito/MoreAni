@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bangumi 第四轮：修正季数错位/匹配错片（搜索基础名 + 精确验证季数）。"""
+
 import asyncio
 import os
 import sys
@@ -7,22 +8,47 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from bangumi_match import search_bgm, TYPE_MAP  # noqa: E402
+from bangumi_match import TYPE_MAP, search_bgm  # noqa: E402
+
 from database import SessionLocal  # noqa: E402
 from models import ContentItem  # noqa: E402
 
 # title -> (搜索关键词, [可接受验证子串列表], [排除子串列表])
 MAP = {
-    '药屋少女的呢喃S1': ('药屋少女的呢喃', ['第一季', '第1季', '第 1 季'], ['第二季', '第2季']),
-    '我推的孩子S1': ('我推的孩子', ['第一季', '第1季', '第 1 季'], ['第二季', '第2季', '第三季', '第3季']),
+    '药屋少女的呢喃S1': (
+        '药屋少女的呢喃',
+        ['第一季', '第1季', '第 1 季'],
+        ['第二季', '第2季'],
+    ),
+    '我推的孩子S1': (
+        '我推的孩子',
+        ['第一季', '第1季', '第 1 季'],
+        ['第二季', '第2季', '第三季', '第3季'],
+    ),
     'Love Live！！！水团！': ('Love Live', ['Sunshine'], ['电影', '虹咲', 'Superstar']),
     '钢之炼金术师03版': ('钢之炼金术师', ['2003'], ['FULLMETAL', '03版']),
-    '魔法师的新娘': ('魔法使的新娘', ['第一季', '第1季', '第 1 季'], ['第二季', '第2季']),
-    'Love Live！！！谬斯！': ('Love Live', ['学园偶像计划', 'Love Live!'], ['Sunshine', '电影', '虹咲', 'Superstar']),
-    'BangDream S1/S2/S3': ('BanG Dream', ['第一季', '第1季', '第 1 季'], ['第二季', '第2季', '第三季', '第3季', 'MyGO', 'Ave']),
-    'It\'s Mygo!!!!!': ('MyGO', ['It\'s MyGO', 'MyGO!!!!!'], ['日常生活', 'Ave']),
+    '魔法师的新娘': (
+        '魔法使的新娘',
+        ['第一季', '第1季', '第 1 季'],
+        ['第二季', '第2季'],
+    ),
+    'Love Live！！！谬斯！': (
+        'Love Live',
+        ['学园偶像计划', 'Love Live!'],
+        ['Sunshine', '电影', '虹咲', 'Superstar'],
+    ),
+    'BangDream S1/S2/S3': (
+        'BanG Dream',
+        ['第一季', '第1季', '第 1 季'],
+        ['第二季', '第2季', '第三季', '第3季', 'MyGO', 'Ave'],
+    ),
+    "It's Mygo!!!!!": ('MyGO', ["It's MyGO", 'MyGO!!!!!'], ['日常生活', 'Ave']),
     '在地下城寻找邂逅是否搞错了什么': ('在地下城寻找邂逅', ['在地下城'], []),
-    'Fate Strange Fake': ('Fate Strange Fake', ['strange Fake', 'Strange Fake'], ['TVCM']),
+    'Fate Strange Fake': (
+        'Fate Strange Fake',
+        ['strange Fake', 'Strange Fake'],
+        ['TVCM'],
+    ),
 }
 
 
@@ -31,11 +57,7 @@ async def run():
     updated = 0
     failed = []
     for i, (title, (keyword, accepts, rejects)) in enumerate(MAP.items(), 1):
-        items = (
-            db.query(ContentItem)
-            .filter(ContentItem.title == title, ContentItem.deleted_at.is_(None))
-            .all()
-        )
+        items = db.query(ContentItem).filter(ContentItem.title == title, ContentItem.deleted_at.is_(None)).all()
         if not items:
             print(f'[{i}/{len(MAP)}] {title}: 库中无此内容')
             continue

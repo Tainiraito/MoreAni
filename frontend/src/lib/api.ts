@@ -169,4 +169,16 @@ export const api = {
       return res.json() as Promise<{ avatar_url: string }>
     })
   },
+  // 删除头像
+  deleteAvatar: () =>
+    fetch(`${API_BASE}/user/avatar`, {
+      method: 'DELETE',
+      credentials: 'include',
+    }).then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.detail || `HTTP ${res.status}`)
+      }
+      return res.json() as Promise<{ avatar_url: null }>
+    }),
 }

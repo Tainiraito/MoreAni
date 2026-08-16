@@ -7,7 +7,7 @@
 
 数据来源: 人工维护的番剧/游戏/工具清单（4 位朋友：小明/嗒当/翔哥/俊俊）
 """
-import json
+
 import os
 import re
 import secrets
@@ -29,14 +29,21 @@ def parse_xlsx(path: str):
         wb = ET.fromstring(z.read('xl/workbook.xml'))
         sheets = []
         for s in wb.find('m:sheets', NS):
-            sheets.append((s.get('name'), s.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id')))
+            sheets.append(
+                (
+                    s.get('name'),
+                    s.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'),
+                )
+            )
 
         # sharedStrings
         shared = []
         if 'xl/sharedStrings.xml' in z.namelist():
             ss = ET.fromstring(z.read('xl/sharedStrings.xml'))
             for si in ss.findall('m:si', NS):
-                text = ''.join(t.text or '' for t in si.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t'))
+                text = ''.join(
+                    t.text or '' for t in si.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                )
                 shared.append(text)
 
         # rels: rId -> sheetN.xml
@@ -68,7 +75,10 @@ def parse_xlsx(path: str):
                 elif t == 'inlineStr':
                     is_el = c.find('m:is', NS)
                     if is_el is not None:
-                        val = ''.join(tt.text or '' for tt in is_el.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t'))
+                        val = ''.join(
+                            tt.text or ''
+                            for tt in is_el.iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                        )
                 if val:
                     rows.setdefault(int(row), {})[col] = val
             result.append((name, rows))
@@ -94,7 +104,11 @@ def parse_entries(sheet_rows: dict[int, dict[str, str]], kind: str):
         a = r.get('A', '').strip()
         if a:
             # 新条目
-            cur = {'_row': row_num, 'type_raw': a, 'cols': {k: [v.strip()] for k, v in r.items()}}
+            cur = {
+                '_row': row_num,
+                'type_raw': a,
+                'cols': {k: [v.strip()] for k, v in r.items()},
+            }
             entries.append(cur)
         elif cur is not None:
             # 延续行：合并各列
@@ -157,7 +171,10 @@ def build_content_entry(e: dict) -> dict | None:
     # 4 位朋友：评论 F/H/J/L，评分 G/I/K/M（content 表）
     friends = []
     for name, comment_col, score_col in [
-        ('小明', 'F', 'G'), ('嗒当', 'H', 'I'), ('翔哥', 'J', 'K'), ('俊俊', 'L', 'M'),
+        ('小明', 'F', 'G'),
+        ('嗒当', 'H', 'I'),
+        ('翔哥', 'J', 'K'),
+        ('俊俊', 'L', 'M'),
     ]:
         comment = '\n'.join(_cells(cols, comment_col)).strip()
         score_raw = ''.join(_cells(cols, score_col)).strip()
@@ -193,7 +210,10 @@ def build_tool_entry(e: dict) -> dict | None:
     # 工具表列：E=小明 F=评分 G=嗒当 H=评分 I=翔哥 J=评分 K=俊俊 L=评分 M=综合
     friends = []
     for name_, comment_col, score_col in [
-        ('小明', 'E', 'F'), ('嗒当', 'G', 'H'), ('翔哥', 'I', 'J'), ('俊俊', 'K', 'L'),
+        ('小明', 'E', 'F'),
+        ('嗒当', 'G', 'H'),
+        ('翔哥', 'I', 'J'),
+        ('俊俊', 'K', 'L'),
     ]:
         comment = '\n'.join(_cells(cols, comment_col)).strip()
         score_raw = ''.join(_cells(cols, score_col)).strip()
@@ -247,18 +267,21 @@ def main():
     from models import ContentItem, User
     from services import content as content_svc
     from services import rating as rating_svc
-    from services.user import create_user
 
     db = SessionLocal()
 
     # 1. 4 位朋友用户（幂等创建）
     from auth import get_password_hash
-    FRIENDS = [
-        ('xiaoming', '小明'), ('dadang', '嗒当'), ('xiangge', '翔哥'), ('junjun', '俊俊'),
+
+    friends = [
+        ('xiaoming', '小明'),
+        ('dadang', '嗒当'),
+        ('xiangge', '翔哥'),
+        ('junjun', '俊俊'),
     ]
     friend_users = {}
     print('\n[1/3] 朋友用户：')
-    for username, nickname in FRIENDS:
+    for username, nickname in friends:
         user = db.query(User).filter(User.username == username).first()
         if not user:
             # 密码：环境变量 IMPORT_FRIEND_PASSWORD，缺省随机生成并打印

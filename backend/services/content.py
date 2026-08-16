@@ -13,11 +13,7 @@ from models import ContentItem, ContentTag, Rating, Tag, UserContentStatus
 
 def get_content_by_id(db: Session, content_id: int) -> ContentItem | None:
     """Get a single content item by ID (excludes soft-deleted)."""
-    return (
-        db.query(ContentItem)
-        .filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None))
-        .first()
-    )
+    return db.query(ContentItem).filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None)).first()
 
 
 def list_content(
@@ -79,11 +75,7 @@ def list_content(
 
     # Rated/unrated filter
     if rated and user_id is not None:
-        rated_sub = (
-            db.query(Rating.content_id)
-            .filter(Rating.user_id == user_id, Rating.score > 0)
-            .subquery()
-        )
+        rated_sub = db.query(Rating.content_id).filter(Rating.user_id == user_id, Rating.score > 0).subquery()
         if rated == 'rated':
             query = query.filter(ContentItem.id.in_(db.query(rated_sub.c.content_id)))
         elif rated == 'unrated':
@@ -127,7 +119,7 @@ def list_content(
             season_year = int(season[:4])
             season_month = int(season[5:7])
         except (TypeError, ValueError):
-            raise HTTPException(status_code=422, detail='放送季度格式不正确（如 2026-01）')
+            raise HTTPException(status_code=422, detail='放送季度格式不正确（如 2026-01）') from None
         if season_month not in (1, 4, 7, 10):
             raise HTTPException(status_code=422, detail='放送季度只支持 1/4/7/10 月番')
         if season_month == 1:
@@ -307,9 +299,7 @@ def get_random_content(db: Session) -> ContentItem | None:
     )
 
 
-def check_source_duplicate(
-    db: Session, source_type: str, source_id: str
-) -> ContentItem | None:
+def check_source_duplicate(db: Session, source_type: str, source_id: str) -> ContentItem | None:
     """Check if content with this source already exists."""
     return (
         db.query(ContentItem)

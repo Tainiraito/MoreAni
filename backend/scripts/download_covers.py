@@ -8,6 +8,7 @@
 容器内（NAS）：docker exec moreani-app python3 /app/backend/scripts/download_covers.py
 （容器已配 COVERS_DIR=/app/data/covers + 代理 env）
 """
+
 import argparse
 import asyncio
 import os
@@ -31,7 +32,11 @@ PROXY = (
 )
 
 EXT_BY_URL = {
-    '.jpg': '.jpg', '.jpeg': '.jpg', '.png': '.png', '.webp': '.webp', '.gif': '.gif',
+    '.jpg': '.jpg',
+    '.jpeg': '.jpg',
+    '.png': '.png',
+    '.webp': '.webp',
+    '.gif': '.gif',
 }
 
 
@@ -46,7 +51,10 @@ async def download(url: str, path: str) -> bool:
     for proxy in (None, PROXY):
         try:
             async with httpx.AsyncClient(timeout=15.0, proxy=proxy, follow_redirects=True) as client:
-                resp = await client.get(url, headers={'User-Agent': 'MoreAni/2.0 (https://moreani.lovelysia.top)'})
+                resp = await client.get(
+                    url,
+                    headers={'User-Agent': 'MoreAni/2.0 (https://moreani.lovelysia.top)'},
+                )
                 resp.raise_for_status()
                 with open(path, 'wb') as f:
                     f.write(resp.content)
@@ -59,11 +67,7 @@ async def download(url: str, path: str) -> bool:
 async def run(dry_run: bool) -> None:
     os.makedirs(COVERS_DIR, exist_ok=True)
     db = SessionLocal()
-    items = (
-        db.query(ContentItem)
-        .filter(ContentItem.deleted_at.is_(None))
-        .all()
-    )
+    items = db.query(ContentItem).filter(ContentItem.deleted_at.is_(None)).all()
     todo = [i for i in items if (i.cover_url or '').strip() and not i.cover_url.startswith('/api/covers/')]
     print(f'=== 共 {len(items)} 条内容，需要本地化的封面 {len(todo)} 张（目标: {COVERS_DIR}）===\n')
     ok = failed = 0

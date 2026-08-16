@@ -6,7 +6,6 @@ rate limit middleware, and creates tables on startup.
 
 import os
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import Base, engine
 from middleware import RateLimitMiddleware
+from routers.v1.admin import router as admin_router
 from routers.v1.auth import router as auth_router
 from routers.v1.bangumi import router as bangumi_router
 from routers.v1.content import router as content_router
@@ -93,8 +93,6 @@ app.include_router(tag_router, prefix='/api/v1')
 app.include_router(user_router, prefix='/api/v1')
 app.include_router(bangumi_router, prefix='/api/v1')
 app.include_router(proxy_router, prefix='/api/v1')
-from routers.v1.admin import router as admin_router
-
 app.include_router(admin_router, prefix='/api/v1')
 
 # --- 封面本地化：/api/covers/{id}.jpg 静态服务（图片下载到本地，不依赖外链 CDN） ---

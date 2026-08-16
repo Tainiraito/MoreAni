@@ -118,9 +118,7 @@ class ContentItemUpdate(BaseModel):
     title_alt: str | None = None
     cover_url: str | None = None
     description: str | None = None
-    content_type: (
-        Literal['anime', 'movie', 'game', 'software', 'website', 'book'] | None
-    ) = None
+    content_type: Literal['anime', 'movie', 'game', 'software', 'website', 'book'] | None = None
     episodes: int | None = None
     status: str | None = None
     release_date: str | None = None

@@ -11,10 +11,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import text  # noqa: E402
+
+from auth import get_password_hash  # noqa: E402
 from database import SessionLocal  # noqa: E402
 from models import User  # noqa: E402
-from auth import get_password_hash  # noqa: E402
-from sqlalchemy import text  # noqa: E402
 
 # 固定管理员（需求指定）
 ADMIN_USERNAME = 'Elysia'
@@ -48,11 +49,7 @@ def init_admin() -> None:
     migrate_nickname()
     db = SessionLocal()
     try:
-        existing = (
-            db.query(User)
-            .filter((User.username == ADMIN_USERNAME) | (User.nickname == ADMIN_NICKNAME))
-            .first()
-        )
+        existing = db.query(User).filter((User.username == ADMIN_USERNAME) | (User.nickname == ADMIN_NICKNAME)).first()
         if existing:
             print(
                 f'[已存在] id={existing.id} username={existing.username} '

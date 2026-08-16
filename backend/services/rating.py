@@ -10,11 +10,7 @@ from models import ContentItem, Rating, User
 
 def get_user_rating(db: Session, user_id: int, content_id: int) -> Rating | None:
     """Get a specific user's rating for a content item."""
-    return (
-        db.query(Rating)
-        .filter(Rating.user_id == user_id, Rating.content_id == content_id)
-        .first()
-    )
+    return db.query(Rating).filter(Rating.user_id == user_id, Rating.content_id == content_id).first()
 
 
 def _bump_content_updated_at(db: Session, content_id: int) -> None:
@@ -243,8 +239,7 @@ def get_content_ratings(
         .filter(
             Rating.content_id == content_id,
             # 有评分或写了评论都展示（score=0 的只评论用户不被过滤掉）
-            (Rating.score > 0)
-            | (Rating.review.isnot(None) & (Rating.review != '')),
+            (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
         )
         .order_by(Rating.created_at.desc())
     )
