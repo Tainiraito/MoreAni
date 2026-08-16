@@ -102,7 +102,11 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
-      onClick={onCancel}
+      onClick={e => {
+        // 遮罩点击 = 取消裁切；stopPropagation 防止冒泡关闭下层设置弹窗
+        e.stopPropagation()
+        onCancel()
+      }}
     >
       <div
         className="rounded-2xl p-6 w-[400px]"
