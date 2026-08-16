@@ -1,5 +1,13 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* 字体本地化：Space Grotesk variable（英文/数字，latin 子集 6KB）；
+   中文用系统字体（全字集，评论 UGC 生僻字也能显示，无子集漏字问题） */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url('/fonts/space-grotesk-var.woff2') format('woff2-variations');
+  font-weight: 300 700;
+  font-display: swap;
+}
 
 /* ============================================
    MoreAni 配色规范 — 基于 icon 主色 #FB71A7
@@ -26,8 +34,8 @@
   --color-accent-coral: #FF6B6B;
 
   /* 字体 */
-  --font-sans: "Noto Sans SC", "Space Grotesk", system-ui, sans-serif;
-  --font-display: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+  --font-sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-display: "Space Grotesk", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
 }
 
 /* 浅色主题（默认） */
