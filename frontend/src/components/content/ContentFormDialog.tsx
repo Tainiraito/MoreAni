@@ -282,13 +282,15 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       await api.deleteContent(contentId)
       toast.addToast('success', '已删除')
       onClose()
-      onSaved?.()
-    } catch {
-      toast.addToast('error', '删除失败')
+    } catch (err: any) {
+      // 显示真实错误原因（403 无权限 / 429 限流等），避免「到底删没删」的困惑
+      toast.addToast('error', err.message || '删除失败')
     } finally {
       setDeleting(false)
       setConfirmDelete(false)
     }
+    // 删除成功后才刷新列表；不放进 try，避免刷新异常误报「删除失败」
+    onSaved?.()
   }
 
   // ── Submit ──

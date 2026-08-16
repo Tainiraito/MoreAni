@@ -189,7 +189,12 @@ def get_content_ratings(
     query = (
         db.query(Rating, User)
         .join(User, Rating.user_id == User.id)
-        .filter(Rating.content_id == content_id, Rating.score > 0)
+        .filter(
+            Rating.content_id == content_id,
+            # 有评分或写了评论都展示（score=0 的只评论用户不被过滤掉）
+            (Rating.score > 0)
+            | (Rating.review.isnot(None) & (Rating.review != '')),
+        )
         .order_by(Rating.created_at.desc())
     )
 

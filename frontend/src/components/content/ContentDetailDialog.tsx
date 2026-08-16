@@ -108,7 +108,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
 
   // Save button — actually submit to API
   const handleSave = async () => {
-    if (!content || !user || score <= 0) return
+    if (!content || !user) return
+    // 允许「只打分不评论」和「只评论不打分」；两者都空才阻止
+    if (score <= 0 && !reviewText.trim()) return
     try {
       await api.upsertRating({
         content_id: content.id,
@@ -453,10 +455,18 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                        <span className="text-xs" style={{ color: '#FB71A7' }}>
-                          {score.toFixed(1)}
-                        </span>
+                        {score > 0 ? (
+                          <>
+                            <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                            <span className="text-xs" style={{ color: '#FB71A7' }}>
+                              {score.toFixed(1)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            未打分
+                          </span>
+                        )}
                       </div>
                     </div>
                     {reviewText && (
@@ -602,10 +612,14 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                             </span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
-                            <span className="text-xs" style={{ color: '#FB71A7' }}>
-                              {(review.score / 10).toFixed(1)}
-                            </span>
+                            {review.score > 0 && (
+                              <>
+                                <Star size={12} style={{ color: '#FB71A7' }} fill="#FB71A7" />
+                                <span className="text-xs" style={{ color: '#FB71A7' }}>
+                                  {(review.score / 10).toFixed(1)}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                         {review.review && (
