@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { Input } from '@/components/ui/input'
@@ -36,6 +37,7 @@ interface InviteForm {
 
 export function AdminDialog() {
   const { adminOpen, closeAdmin } = useUIStore()
+  const maskProps = useMaskClose(closeAdmin)
   useLockBodyScroll(adminOpen)
   const [tab, setTab] = useState<'users' | 'invites'>('users')
 
@@ -43,7 +45,7 @@ export function AdminDialog() {
   if (!adminOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={closeAdmin}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} {...maskProps}>
       <div
         className="rounded-2xl w-[720px] max-w-[95vw] max-h-[85vh] flex flex-col"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}
@@ -108,6 +110,8 @@ function UserManageTab() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
+  const formMask = useMaskClose(() => setFormOpen(false))
+  const confirmMask = useMaskClose(() => setConfirmDelete(null))
   const [form, setForm] = useState<AdminUserForm>({ username: '', nickname: '', password: '', role: 'user' })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -271,7 +275,7 @@ function UserManageTab() {
 
       {/* 表单弹窗 */}
       {formOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setFormOpen(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} {...formMask}>
           <div className="rounded-2xl w-[400px] max-w-[90vw] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑用户' : '新增用户'}</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -314,7 +318,7 @@ function UserManageTab() {
 
       {/* 删除确认 */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setConfirmDelete(null)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} {...confirmMask}>
           <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               确定删除用户「{confirmDelete.nickname}」吗？
@@ -344,6 +348,8 @@ function InviteManageTab() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<InviteCode | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<InviteCode | null>(null)
+  const formMask = useMaskClose(() => setFormOpen(false))
+  const confirmMask = useMaskClose(() => setConfirmDelete(null))
   const [form, setForm] = useState<InviteForm>({ code: '', max_uses: '1', expires_at: '' })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -507,7 +513,7 @@ function InviteManageTab() {
 
       {/* 表单弹窗 */}
       {formOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setFormOpen(false)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} {...formMask}>
           <div className="rounded-2xl w-[400px] max-w-[90vw] p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑邀请码' : '生成邀请码'}</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -541,7 +547,7 @@ function InviteManageTab() {
 
       {/* 删除确认 */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setConfirmDelete(null)}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} {...confirmMask}>
           <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               确定删除邀请码「{confirmDelete.code}」吗？

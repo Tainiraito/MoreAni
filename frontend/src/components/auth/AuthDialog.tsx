@@ -3,6 +3,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +12,7 @@ import { Label } from '@/components/ui/label'
 
 export function AuthDialog() {
   const { authOpen, closeAuth } = useUIStore()
+  const maskProps = useMaskClose(closeAuth)
   useLockBodyScroll(authOpen)
   const { setUser, setToken } = useAuthStore()
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -60,7 +62,7 @@ export function AuthDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
-         onClick={closeAuth}>
+         {...maskProps}>
       <div
         className="rounded-2xl w-[420px] max-w-[90vw] p-8"
         style={{

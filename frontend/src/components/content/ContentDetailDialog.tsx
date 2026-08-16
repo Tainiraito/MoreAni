@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useRefreshStore } from '@/stores/refresh-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
@@ -41,6 +42,7 @@ interface ContentDetailDialogProps {
 
 export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
   const { detailOpen, detailContentId, closeDetail, openEditContent } = useUIStore()
+  const maskProps = useMaskClose(closeDetail)
   useLockBodyScroll(detailOpen)
   const { user } = useAuthStore()
   const toast = useToastStore.getState()
@@ -202,10 +204,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={closeDetail}
       style={{ animation: 'fade-in 200ms ease-out' }}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" {...maskProps} />
 
       <div
         className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl"

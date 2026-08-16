@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useMaskClose } from '@/hooks/use-mask-close'
 
 const VIEW_SIZE = 320 // 裁切框/预览容器（正方形）
 
@@ -18,6 +19,8 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
   const [scale, setScale] = useState(1) // 相对初始 fit 的缩放倍数（1-4）
   const [offset, setOffset] = useState({ x: 0, y: 0 }) // 图片左上角相对容器的偏移
   const dragRef = useRef<{ startX: number; startY: number; offX: number; offY: number } | null>(null)
+  // 遮罩点击 = 取消裁切；stopPropagation 防止冒泡关闭下层设置弹窗；选中文字拖出不误关
+  const maskProps = useMaskClose(onCancel, { stopPropagation: true })
   // onCancel 经 ref 引用：避免父组件重渲染传入新函数导致 effect 反复执行（revoke URL 打断图片加载）
   const onCancelRef = useRef(onCancel)
   onCancelRef.current = onCancel
@@ -102,11 +105,7 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
-      onClick={e => {
-        // 遮罩点击 = 取消裁切；stopPropagation 防止冒泡关闭下层设置弹窗
-        e.stopPropagation()
-        onCancel()
-      }}
+      {...maskProps}
     >
       <div
         className="rounded-2xl p-6 w-[400px]"

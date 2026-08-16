@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
-import { useTheme } from '@/hooks/use-theme'
 import { useRefreshStore } from '@/stores/refresh-store'
+import { useTheme } from '@/hooks/use-theme'
+import { Avatar } from '@/components/ui/Avatar'
 import { Sun, Moon } from 'lucide-react'
 import { api } from '@/lib/api'
 import { AnimeCard } from '@/components/content/AnimeCard'
@@ -19,7 +20,7 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export function HeroBrand() {
-  const { openAuth, authOpen, detailOpen } = useUIStore()
+  const { openAuth, authOpen, detailOpen, openSettings } = useUIStore()
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
   const { openDetail } = useUIStore()
@@ -154,19 +155,30 @@ export function HeroBrand() {
         {/* 按钮区 */}
         <div className="flex items-center gap-3 mb-12">
           {user ? (
-            <button
-              onClick={() => {
-                const scrollTarget = window.innerHeight - 120
-                window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
-              }}
-              className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
-              style={{
-                background: 'var(--btn-primary-bg)',
-                color: 'var(--btn-primary-text)',
-              }}
-            >
-              让我康康！
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  const scrollTarget = window.innerHeight - 120
+                  window.scrollTo({ top: scrollTarget, behavior: 'smooth' })
+                }}
+                className="px-8 py-3 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-90"
+                style={{
+                  background: 'var(--btn-primary-bg)',
+                  color: 'var(--btn-primary-text)',
+                }}
+              >
+                让我康康！
+              </button>
+              {/* 头像按钮：类似深浅切换的小圆钮，点击打开个人信息弹窗 */}
+              <button
+                onClick={openSettings}
+                title="个人信息"
+                className="w-9 h-9 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
+                style={{ border: '2px solid var(--border-line)' }}
+              >
+                <Avatar name={user.nickname} src={user.avatar_url} size={32} />
+              </button>
+            </>
           ) : (
             <button
               onClick={openAuth}

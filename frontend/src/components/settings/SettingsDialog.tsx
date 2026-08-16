@@ -5,6 +5,7 @@ import { useRefreshStore } from '@/stores/refresh-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useMaskClose } from '@/hooks/use-mask-close'
 import { Avatar } from '@/components/ui/Avatar'
 import { secureUrl } from '@/components/ui/CoverImage'
 import { PasswordInput } from '@/components/ui/password-input'
@@ -95,6 +96,7 @@ export function SettingsDialog() {
     resetForm()
     closeSettings()
   }
+  const maskProps = useMaskClose(handleClose)
 
   const startEditNickname = () => {
     setNickname(user?.nickname || '')
@@ -175,7 +177,7 @@ export function SettingsDialog() {
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
-      onClick={handleClose}
+      {...maskProps}
     >
       <div
         className="rounded-2xl w-[440px] max-w-[90vw] p-8"

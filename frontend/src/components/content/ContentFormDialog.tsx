@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
+import { useMaskClose } from '@/hooks/use-mask-close'
 import { secureUrl } from '@/components/ui/CoverImage'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
@@ -381,14 +382,14 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
     }
     onClose()
   }
+  const maskProps = useMaskClose(handleClose)
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={handleClose}
       style={{ animation: 'fade-in 200ms ease-out' }}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" {...maskProps} />
 
       <div
         className="relative w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl"
