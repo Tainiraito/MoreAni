@@ -112,6 +112,10 @@
 - 部署（2026-08-16）：feat/v2-redesign push + 镜像重建 + 本地库（806KB，5 用户/234 番剧/324 评分，含 201 条 Bangumi 校对 + 数据清理）覆盖 NAS 旧库（已备份 backups/moreani.db.20260816_190443）；线上 moreani.lovelysia.top 验证通过
 - 封面本地化：204 张外链封面下载到本地 covers/，DB cover_url 改 /api/covers/{id}.jpg（静态服务，不依赖代理）；添加/编辑番剧时自动下载（失败降级外链）
 - 头像上传：users.avatar_url + POST /user/avatar（≤2MB）+ /api/avatars 静态服务 + SettingsDialog「更换头像」UI；Avatar 组件支持图片
+- 头像交互完善（2026-08-16）：点击头像触发更换（无独立按钮）+ hover 上下排列「更换/删除」+ **手动裁切弹窗**（拖动/缩放/1:1 裁切框）+ 魔数校验（文件头匹配）+ 删除接口
+- 头像持久化修复（关键）：deps.get_db 改为 _get_db 直接别名——原 wrapper 与 get_current_user 的 Depends(_get_db) 被 FastAPI 视作不同依赖 → 同请求双 session → `user.avatar_url = ...; db.commit()` 写操作不生效（上传成功但 DB 不变，刷新后头像消失）；另修 AuthValidator setUser 漏 avatar_url
+- 裁切弹窗闪退修复：StrictMode 双 effect 竞态（旧 img blob URL 被 cleanup revoke → onerror 误关弹窗）→ cancelled 标志隔离
+- 上传/删除头像后 triggerRefresh 全局刷新（评论列表/详情头像同步）
 - 部署（第二次）：镜像重建含封面本地化+头像；线上 502 排查——tunnel 容器长连接断开需 `docker compose up -d --force-recreate cloudflared`；容器内 curl 走 proxy env（测试用 --noproxy）
 - Bangumi 校对 title_similar 组合匹配（title/title_alt 任一相似即通过）+ 短子串防误配，救回 5 条译名差异误判（赛博朋克边缘行者/GIRLS BAND CRY/Charlotte/网购技能/咒术回战第三季）
 
