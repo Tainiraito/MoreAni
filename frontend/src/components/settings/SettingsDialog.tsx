@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { useRefreshStore } from '@/stores/refresh-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
@@ -145,6 +146,8 @@ export function SettingsDialog() {
     try {
       const res = await api.uploadAvatar(processed)
       setUser({ ...user!, avatar_url: res.avatar_url })
+      // 全局刷新：评论列表/详情评论等处重新拉取，头像全面生效
+      useRefreshStore.getState().triggerRefresh()
       useToastStore.getState().addToast('success', '头像已更新')
     } catch (err: any) {
       setAvatarError(err.message || '头像上传失败')
@@ -159,6 +162,8 @@ export function SettingsDialog() {
     try {
       await api.deleteAvatar()
       setUser({ ...user!, avatar_url: null })
+      // 全局刷新：评论列表/详情评论等处头像同步清除
+      useRefreshStore.getState().triggerRefresh()
       useToastStore.getState().addToast('success', '头像已删除')
     } catch (err: any) {
       setAvatarError(err.message || '头像删除失败')
