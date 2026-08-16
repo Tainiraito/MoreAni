@@ -90,15 +90,14 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
                   <MessageCircle size={12} /> 暂无评论
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-1.5">
+                <div className="columns-2 gap-1.5">
                   {reviews.map((r, i) => (
                     <div
                       key={i}
-                      className="rounded-xl px-3 py-1.5"
+                      className="rounded-xl px-3 py-1.5 mb-1.5 break-inside-avoid"
                       style={{
                         background: 'var(--bg-card-warm)',
                         border: '1px solid var(--border-line)',
-                        maxWidth: '48%',
                       }}
                     >
                       <div className="flex items-center gap-1.5">
@@ -113,7 +112,7 @@ export function CommentListView({ items, onSelect }: CommentListViewProps) {
                         )}
                       </div>
                       {r.review && (
-                        <p className="text-xs mt-0.5 leading-relaxed line-clamp-2 break-words" style={{ color: 'var(--text-secondary)' }}>
+                        <p className="text-xs mt-0.5 leading-relaxed line-clamp-3 break-words" style={{ color: 'var(--text-secondary)' }}>
                           {r.review}
                         </p>
                       )}
