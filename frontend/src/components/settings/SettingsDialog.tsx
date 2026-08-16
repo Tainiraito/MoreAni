@@ -5,13 +5,16 @@ import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
 import { Avatar } from '@/components/ui/Avatar'
 import { PasswordInput } from '@/components/ui/password-input'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 
 export function SettingsDialog() {
   const { settingsOpen, closeSettings, openAuth } = useUIStore()
-  const { user, logout } = useAuthStore()
+  const { user, setUser, logout } = useAuthStore()
+  const [nickname, setNickname] = useState('')
+  const [nicknameError, setNicknameError] = useState('')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -21,6 +24,8 @@ export function SettingsDialog() {
   if (!settingsOpen) return null
 
   const resetForm = () => {
+    setNickname('')
+    setNicknameError('')
     setOldPassword('')
     setNewPassword('')
     setConfirmPassword('')
@@ -30,6 +35,28 @@ export function SettingsDialog() {
   const handleClose = () => {
     resetForm()
     closeSettings()
+  }
+
+  const handleUpdateNickname = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setNicknameError('')
+    const value = nickname.trim()
+    if (!value) {
+      setNicknameError('昵称不能为空')
+      return
+    }
+    if (value === user?.nickname) {
+      setNicknameError('昵称没有变化')
+      return
+    }
+    try {
+      const updated = await api.updateNickname(value)
+      setUser({ ...user!, ...updated })
+      useToastStore.getState().addToast('success', '昵称已更新')
+      setNickname('')
+    } catch (err: any) {
+      setNicknameError(err.message || '昵称修改失败')
+    }
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -96,6 +123,20 @@ export function SettingsDialog() {
               </p>
             </div>
           </div>
+
+          {/* 修改昵称 */}
+          <form onSubmit={handleUpdateNickname} className="mt-4 flex gap-2">
+            <Input
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              placeholder={`新昵称（当前：${user?.nickname}）`}
+              className="flex-1 text-sm"
+            />
+            <Button type="submit" className="h-9 px-4 text-xs">保存昵称</Button>
+          </form>
+          {nicknameError && (
+            <p className="text-xs mt-1.5" style={{ color: 'var(--accent-coral)' }}>{nicknameError}</p>
+          )}
         </div>
 
         {/* 修改密码 */}

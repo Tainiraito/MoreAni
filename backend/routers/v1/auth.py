@@ -10,6 +10,7 @@ from schemas import (
     AuthResponse,
     AvatarUpdateRequest,
     LoginRequest,
+    NicknameUpdateRequest,
     PasswordChangeRequest,
     RegisterRequest,
     UserResponse,
@@ -18,6 +19,7 @@ from services.user import (
     create_user,
     get_user_by_login,
     update_avatar,
+    update_nickname,
     update_password,
 )
 
@@ -47,6 +49,7 @@ def login(
         value=token,
         httponly=True,
         samesite='lax',
+        secure=True,  # HTTPS（生产 Cloudflare Tunnel）/localhost 均支持
         max_age=7 * 24 * 3600,  # 7 days
         path='/',
     )
@@ -111,6 +114,7 @@ def register(
         value=token,
         httponly=True,
         samesite='lax',
+        secure=True,  # HTTPS（生产 Cloudflare Tunnel）/localhost 均支持
         max_age=7 * 24 * 3600,
         path='/',
     )
@@ -149,6 +153,28 @@ def change_password(
     new_hash = get_password_hash(body.new_password)
     update_password(db, user, new_hash)
     return {'detail': '密码修改成功'}
+
+
+@router.put('/me/nickname', response_model=UserResponse)
+def update_my_nickname(
+    body: NicknameUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserResponse:
+    """Update current user's nickname.
+
+    Nickname must not collide with any existing username/nickname
+    (otherwise login lookup becomes ambiguous).
+    """
+    if body.nickname == user.nickname:
+        return UserResponse.model_validate(user)
+    if get_user_by_login(db, body.nickname):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='昵称已被使用',
+        )
+    updated = update_nickname(db, user, body.nickname)
+    return UserResponse.model_validate(updated)
 
 
 @router.post('/logout')

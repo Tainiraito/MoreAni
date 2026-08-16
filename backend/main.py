@@ -4,6 +4,7 @@ Includes all v1 routers under /api/v1, CORS middleware,
 rate limit middleware, and creates tables on startup.
 """
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -35,9 +36,15 @@ app = FastAPI(
 )
 
 # --- CORS ---
+# 白名单模式：cookie 认证下不允许通配符（allow_origins=['*'] + credentials=True
+# 等于任何网站都能携带 cookie 调用 API）。生产域名 + 本地开发域名显式列出。
+ALLOWED_ORIGINS = os.getenv(
+    'ALLOWED_ORIGINS',
+    'http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top,http://moreani.lovelysia.top',
+).split(',')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=[o.strip() for o in ALLOWED_ORIGINS if o.strip()],
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],

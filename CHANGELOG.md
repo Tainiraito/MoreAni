@@ -65,6 +65,18 @@
 ### 修复
 - 删除失败真正根因：浏览器残留的 COI Service Worker 拦截 fetch 后尝试重建 Response，DELETE 的 204（null body）无法构造带 body 的 Response 而抛错。main.tsx 增加 Service Worker 清理（unregister 残留注册），本项目不需要 SW
 
+### 用户体系
+- 支持修改昵称（设置弹窗表单；唯一性校验 + 防登录二义性，重复昵称 409）
+
+### 安全加固（审计）
+- [高危] CORS 白名单化：`allow_origins=['*'] + credentials` 改为显式白名单（localhost + moreani.lovelysia.top，ALLOWED_ORIGINS 环境变量可覆盖）
+- [高危] SECRET_KEY 强制配置：docker-compose 必填（`${SECRET_KEY:?}`），附 deploy/.env.example 模板
+- [中危] 登录/注册 cookie 加 Secure 标志（HTTPS 部署）
+- [中危] 图片代理手动跟随重定向并每跳重新校验域名（防 SSRF 经重定向逃逸）
+- [中危] 分享链接仅创建者/admin 可创建
+- [中危] SQLite 数据库文件权限收紧（chmod 600）
+- 已确认：bcrypt 哈希、JWT 显式 HS256、ORM 防注入、React 防 XSS、速率限制、npm audit 0 漏洞
+
 
 
 ### 重构

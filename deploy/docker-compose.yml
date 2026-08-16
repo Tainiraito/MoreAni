@@ -5,6 +5,11 @@ services:
       dockerfile: Dockerfile
     container_name: moreani-app
     restart: unless-stopped
+    environment:
+      # 必填：JWT 签名密钥（生产必须显式设置，否则重启后所有登录失效）
+      - SECRET_KEY=${SECRET_KEY:?请在 deploy/.env 中设置 SECRET_KEY}
+      # 可选：CORS 白名单（默认 localhost + moreani.lovelysia.top）
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top,http://moreani.lovelysia.top}
     volumes:
       - ../data:/app/data
       - ../logs/nginx:/var/log/nginx

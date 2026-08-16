@@ -91,6 +91,20 @@ def update_password(db: Session, user: User, new_hash: str) -> User:
     return fresh
 
 
+def update_nickname(db: Session, user: User, nickname: str) -> User:
+    """Update user's nickname (display name).
+
+    Re-fetches the user inside this session — see update_avatar note.
+    """
+    fresh = db.query(User).filter(User.id == user.id).first()
+    if fresh is None:
+        raise ValueError('User not found')
+    fresh.nickname = nickname
+    db.commit()
+    db.refresh(fresh)
+    return fresh
+
+
 def get_user_stats(db: Session, user_id: int) -> dict:
     """Get user stats: rating_count, content_count."""
     rating_count = (

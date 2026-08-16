@@ -64,6 +64,11 @@ export const api = {
   getMe: () => request<{ id: number; username: string; nickname: string; avatar_id: number; role: string }>('/auth/me'),
   changePassword: (data: { old_password: string; new_password: string }) =>
     request<{ detail: string }>('/auth/me/password', { method: 'PUT', body: JSON.stringify(data) }),
+  updateNickname: (nickname: string) =>
+    request<{ id: number; username: string; nickname: string; avatar_id: number; role: string }>(
+      '/auth/me/nickname',
+      { method: 'PUT', body: JSON.stringify({ nickname }) },
+    ),
   updateAvatar: (avatar_id: number) =>
     request<{ ok: boolean }>('/auth/me/avatar', { method: 'PUT', body: JSON.stringify({ avatar_id }) }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),

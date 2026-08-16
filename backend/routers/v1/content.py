@@ -203,6 +203,11 @@ def create_share_link(
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
+    # 仅创建者或 admin 可创建分享链接
+    if item.created_by != user.id and user.role != 'admin':
+        raise HTTPException(
+            status_code=403, detail='No permission to share this content'
+        )
 
     token = secrets.token_urlsafe(24)[:32]
     link = ShareLink(

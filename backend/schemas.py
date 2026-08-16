@@ -79,6 +79,12 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
+class NicknameUpdateRequest(BaseModel):
+    """Nickname update request body."""
+
+    nickname: str = Field(min_length=1, max_length=50)
+
+
 # =============================================================================
 # Content schemas
 # =============================================================================
