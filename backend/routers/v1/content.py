@@ -56,8 +56,10 @@ def _to_response(
             )
             .first()
         )
-        if my_rating and my_rating.score > 0:
-            resp.my_score = my_rating.score / 10.0
+        if my_rating:
+            # my_score 只在打过分时返回；my_has_review 独立判断（只评论不评分也要标粉）
+            if my_rating.score > 0:
+                resp.my_score = my_rating.score / 10.0
             resp.my_has_review = bool(my_rating.review and my_rating.review.strip())
     return resp
 
@@ -171,12 +173,13 @@ def list_seasons(db: Session = Depends(get_db)) -> dict:
 def get_content(
     content_id: int,
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
 ) -> ContentItemResponse:
     """Get content detail by ID."""
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
-    return _to_response(item, db)
+    return _to_response(item, db, user_id=user.id if user else None)
 
 
 @router.post('', response_model=ContentItemResponse, status_code=201)
