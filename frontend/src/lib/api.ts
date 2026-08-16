@@ -62,7 +62,8 @@ export const api = {
     request<{ user: unknown; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   register: (data: { invite_code: string; username: string; nickname: string; password: string }) =>
     request<{ user: unknown; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
-  getMe: () => request<{ id: number; username: string; nickname: string; avatar_id: number; role: string }>('/auth/me'),
+  getMe: () =>
+    request<{ id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; role: string }>('/auth/me'),
   changePassword: (data: { old_password: string; new_password: string }) =>
     request<{ detail: string }>('/auth/me/password', { method: 'PUT', body: JSON.stringify(data) }),
   updateNickname: (nickname: string) =>

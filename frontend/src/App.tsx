@@ -33,6 +33,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
             username: userData.username,
             nickname: userData.nickname,
             avatar_id: userData.avatar_id,
+            avatar_url: userData.avatar_url ?? null,
             role: userData.role as 'user' | 'admin' | 'super_admin',
             created_at: new Date().toISOString(),
           })

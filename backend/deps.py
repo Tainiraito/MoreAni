@@ -3,7 +3,7 @@
 Provides get_db, get_current_user, get_current_user_optional, and require_role.
 """
 
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, status
@@ -13,10 +13,12 @@ from auth import verify_token
 from database import get_db as _get_db
 from models import User
 
-
-def get_db() -> Generator[Session, None, None]:
-    """Yield a database session (re-export for convenience)."""
-    yield from _get_db()
+# get_db 直接复用 database.get_db（别名）：
+# 与 get_current_user 内部的 Depends(_get_db) 是同一函数 → FastAPI 同请求内
+# 依赖缓存共享同一 session。之前这里是 `def get_db(): yield from _get_db()`
+# 包装——FastAPI 视作不同依赖，导致 get_current_user 返回的 user 与接口的 db
+# 分属两个 session：`user.xxx = ...; db.commit()` 写操作不生效（头像/角色修改丢数据）。
+get_db = _get_db
 
 
 def get_current_user(
