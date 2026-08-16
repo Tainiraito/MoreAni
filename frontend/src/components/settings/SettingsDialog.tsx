@@ -124,7 +124,7 @@ export function SettingsDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
       onClick={handleClose}
     >
       <div
@@ -253,8 +253,7 @@ export function SettingsDialog() {
                     key={idx}
                     className="flex items-center gap-3 cursor-pointer rounded-lg transition-all duration-150 hover:opacity-80"
                     onClick={() => {
-                      // 关闭用户信息弹窗，打开该番剧详情
-                      closeSettings()
+                      // 打开该番剧详情（用户信息弹窗保持打开，详情弹窗层级更高盖在其上）
                       openDetail(item.content_id)
                     }}
                   >
