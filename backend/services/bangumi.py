@@ -5,6 +5,7 @@ Docs: https://bangumi.github.io/api/
 """
 
 import logging
+import os
 from typing import Any
 
 import httpx
@@ -13,6 +14,16 @@ logger = logging.getLogger('uvicorn')
 
 BANGUMI_API_BASE = 'https://api.bgm.tv'
 HEADERS = {'User-Agent': 'MoreAni/2.0 (https://moreani.lovelysia.top)'}
+
+# WSL2 直连 api.bgm.tv 经常超时 → 直连 6s 失败后回退 Windows 侧代理
+PROXY = (
+    os.environ.get('HTTPS_PROXY')
+    or os.environ.get('https_proxy')
+    or os.environ.get('HTTP_PROXY')
+    or os.environ.get('http_proxy')
+    or 'http://192.168.31.45:7890'
+)
+REQUEST_TIMEOUT = 6.0
 
 
 async def search_subjects(
@@ -32,14 +43,19 @@ async def search_subjects(
         'type': subject_type,
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    # 直连失败回退代理（WSL2 网络环境）
+    for proxy in (None, PROXY):
         try:
-            resp = await client.get(url, params=params, headers=HEADERS)
-            resp.raise_for_status()
-            data = resp.json()
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, proxy=proxy) as client:
+                resp = await client.get(url, params=params, headers=HEADERS)
+                resp.raise_for_status()
+                data = resp.json()
+            break
         except (httpx.HTTPError, httpx.TimeoutException) as e:
-            logger.error('Bangumi search failed: %s', e)
-            return {'total': 0, 'items': []}
+            logger.warning('Bangumi search failed via %s: %s', proxy or 'direct', e)
+            data = None
+    if not data:
+        return {'total': 0, 'items': []}
 
     # API returns {"results": N, "list": [...]}
     results = []
@@ -71,14 +87,19 @@ async def get_subject_detail(bgm_id: int) -> dict[str, Any] | None:
     """
     url = f'{BANGUMI_API_BASE}/v0/subjects/{bgm_id}'
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    # 直连失败回退代理（WSL2 网络环境）
+    for proxy in (None, PROXY):
         try:
-            resp = await client.get(url, headers=HEADERS)
-            resp.raise_for_status()
-            data = resp.json()
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, proxy=proxy) as client:
+                resp = await client.get(url, headers=HEADERS)
+                resp.raise_for_status()
+                data = resp.json()
+            break
         except (httpx.HTTPError, httpx.TimeoutException) as e:
-            logger.error('Bangumi detail failed for %d: %s', bgm_id, e)
-            return None
+            logger.warning('Bangumi detail failed for %d via %s: %s', bgm_id, proxy or 'direct', e)
+            data = None
+    if not data:
+        return None
 
     images = data.get('images', {}) or {}
     rating_info = data.get('rating', {}) or {}

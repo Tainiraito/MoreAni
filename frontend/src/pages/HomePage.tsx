@@ -33,10 +33,35 @@ export function HomePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
+  // 放送季度筛选（2026-01 = 2026年1月番）；用户筛选（看该用户评分/评论过的番）
+  const [seasonFilter, setSeasonFilter] = useState('')
+  const [userFilter, setUserFilter] = useState('')
+  const [userOptions, setUserOptions] = useState<{ id: number; nickname: string }[]>([])
   // 视图模式：评论列表（默认）/ 卡片网格；localStorage 记忆用户选择
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     localStorage.getItem('moreani-view') === 'grid' ? 'grid' : 'list',
   )
+
+  // 放送季度选项：一般口径「XXXX年X月番」（1/4/7/10 月），当前年往前 12 年
+  const seasonOptions = (() => {
+    const year = new Date().getFullYear()
+    const opts: { value: string; label: string }[] = []
+    for (let y = year; y >= year - 11; y--) {
+      opts.push({ value: `${y}-01`, label: `${y}年1月番` })
+      opts.push({ value: `${y}-04`, label: `${y}年4月番` })
+      opts.push({ value: `${y}-07`, label: `${y}年7月番` })
+      opts.push({ value: `${y}-10`, label: `${y}年10月番` })
+    }
+    return opts
+  })()
+
+  // 加载注册用户列表（排除 super_admin 爱莉希雅），供按用户筛选
+  useEffect(() => {
+    if (!user) return
+    api.listUsers()
+      .then(res => setUserOptions((res.items || []).map(u => ({ id: u.id, nickname: u.nickname || u.username }))))
+      .catch(() => {})
+  }, [user])
 
   const switchView = (mode: 'grid' | 'list') => {
     setViewMode(mode)
@@ -93,6 +118,8 @@ export function HomePage() {
     if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
     if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
+    if (seasonFilter) params.season = seasonFilter
+    if (userFilter) params.rated_by = userFilter
 
     api.listContent(params)
       .then(res => {
@@ -103,7 +130,7 @@ export function HomePage() {
       })
       .catch(() => { setItems([]); setHasMore(false) })
       .finally(() => setLoading(false))
-  }, [activeType, user, searchQuery, myFilter, refreshKey, sortBy])
+  }, [activeType, user, searchQuery, myFilter, refreshKey, sortBy, seasonFilter, userFilter])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
@@ -118,11 +145,17 @@ export function HomePage() {
     if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
     if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
+    if (seasonFilter) params.season = seasonFilter
+    if (userFilter) params.rated_by = userFilter
 
     try {
       const res = await api.listContent(params)
       const list = (res.items || []) as ContentItem[]
-      setItems(prev => [...prev, ...list])
+      // 防御：追加前去重（分页偶发重叠时避免重复 key）
+      setItems(prev => {
+        const seen = new Set(prev.map(i => i.id))
+        return [...prev, ...list.filter(i => !seen.has(i.id))]
+      })
       setPage(nextPage)
       setHasMore(list.length >= PAGE_SIZE)
     } catch {
@@ -273,6 +306,20 @@ export function HomePage() {
               className="pl-9 text-sm"
             />
           </div>
+          <Select
+            value={seasonFilter}
+            onChange={setSeasonFilter}
+            className="w-[128px]"
+            placeholder="放送季度"
+            options={[{ value: '', label: '全部季度' }, ...seasonOptions]}
+          />
+          <Select
+            value={userFilter}
+            onChange={setUserFilter}
+            className="w-[128px]"
+            placeholder="按用户"
+            options={[{ value: '', label: '全部用户' }, ...userOptions.map(u => ({ value: String(u.id), label: u.nickname }))]}
+          />
           <Select
             value={myFilter}
             onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited')}

@@ -4,6 +4,7 @@ import json
 from datetime import UTC
 from typing import Literal
 
+from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,8 @@ def list_content(
     rated: str | None = None,
     reviewed: str | None = None,
     favorited: str | None = None,
+    season: str | None = None,
+    rated_by: int | None = None,
     user_id: int | None = None,
     page: int = 1,
     size: int = 20,
@@ -117,14 +120,49 @@ def list_content(
         elif favorited == 'unfavorited':
             query = query.filter(~ContentItem.id.in_(db.query(fav_sub.c.content_id)))
 
+    # 放送季度筛选：2026-01=1月番(01~03月) 2026-04=4月番(04~06月) 2026-07=7月番(07~09月) 2026-10=10月番(10~12月)
+    # release_date 是 'YYYY-MM' 或 'YYYY-MM-DD' 字符串，季度范围用字符串区间 [start, end) 天然正确
+    if season:
+        try:
+            season_year = int(season[:4])
+            season_month = int(season[5:7])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail='放送季度格式不正确（如 2026-01）')
+        if season_month not in (1, 4, 7, 10):
+            raise HTTPException(status_code=422, detail='放送季度只支持 1/4/7/10 月番')
+        if season_month == 1:
+            season_start, season_end = f'{season_year}-01', f'{season_year}-04'
+        elif season_month == 4:
+            season_start, season_end = f'{season_year}-04', f'{season_year}-07'
+        elif season_month == 7:
+            season_start, season_end = f'{season_year}-07', f'{season_year}-10'
+        else:  # 10
+            season_start, season_end = f'{season_year}-10', f'{season_year + 1}-01'
+        query = query.filter(
+            ContentItem.release_date >= season_start,
+            ContentItem.release_date < season_end,
+        )
+
+    # 用户筛选：该用户评分(score>0)或评论(review 非空)过的内容
+    if rated_by is not None:
+        user_rated_sub = (
+            db.query(Rating.content_id)
+            .filter(
+                Rating.user_id == rated_by,
+                (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
+            )
+            .subquery()
+        )
+        query = query.filter(ContentItem.id.in_(db.query(user_rated_sub.c.content_id)))
+
     # Count before pagination
     total = query.count()
 
-    # Sorting
+    # Sorting — 每个排序都必须带 id tie-breaker，否则相同排序值的条目翻页会重叠重复
     if sort == 'oldest':
-        query = query.order_by(ContentItem.created_at.asc())
+        query = query.order_by(ContentItem.created_at.asc(), ContentItem.id.asc())
     elif sort == 'title':
-        query = query.order_by(ContentItem.title.asc())
+        query = query.order_by(ContentItem.title.asc(), ContentItem.id.asc())
     elif sort == 'rating':
         # Subquery for average score (score > 0 only)
         avg_sub = (
@@ -137,14 +175,14 @@ def list_content(
             .subquery()
         )
         query = query.outerjoin(avg_sub, ContentItem.id == avg_sub.c.content_id)
-        query = query.order_by(func.coalesce(avg_sub.c.avg_score, 0).desc())
+        query = query.order_by(func.coalesce(avg_sub.c.avg_score, 0).desc(), ContentItem.id.desc())
     elif sort == 'air_date_desc':
-        query = query.order_by(ContentItem.release_date.desc())
+        query = query.order_by(ContentItem.release_date.desc(), ContentItem.id.desc())
     elif sort == 'air_date_asc':
-        query = query.order_by(ContentItem.release_date.asc())
+        query = query.order_by(ContentItem.release_date.asc(), ContentItem.id.asc())
     else:
         # updated_desc (default) — most recently updated first
-        query = query.order_by(ContentItem.updated_at.desc())
+        query = query.order_by(ContentItem.updated_at.desc(), ContentItem.id.desc())
 
     items = query.offset((page - 1) * size).limit(size).all()
     return items, total
@@ -289,10 +327,12 @@ def _attach_tags(db: Session, content: ContentItem, tag_names: list[str]) -> Non
     db.query(ContentTag).filter(ContentTag.content_id == content.id).delete()
     db.flush()
 
+    seen: set[str] = set()
     for name in tag_names:
         name = name.strip()
-        if not name:
+        if not name or name in seen:
             continue
+        seen.add(name)
         tag = db.query(Tag).filter(Tag.name == name).first()
         if not tag:
             tag = Tag(name=name, tag_type='custom')

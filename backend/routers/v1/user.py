@@ -12,6 +12,34 @@ from services import user as user_svc
 router = APIRouter(prefix='/user', tags=['user'])
 
 
+@router.get('/list')
+def list_users(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """List registered users (excludes super_admin 爱莉希雅).
+
+    供前端「按用户筛选」使用：选择用户后查看其评分/评论过的番。
+    """
+    users = (
+        db.query(User)
+        .filter(User.role != 'super_admin')
+        .order_by(User.id)
+        .all()
+    )
+    return {
+        'items': [
+            {
+                'id': u.id,
+                'username': u.username,
+                'nickname': u.nickname,
+                'avatar_id': u.avatar_id,
+            }
+            for u in users
+        ]
+    }
+
+
 @router.get('/{user_id}', response_model=UserPublicProfile)
 def get_user_profile(
     user_id: int,

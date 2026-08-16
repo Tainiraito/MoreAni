@@ -150,4 +150,6 @@ export const api = {
   // User
   getUser: (id: number) => request<unknown>(`/user/${id}`),
   getUserRatings: (id: number) => request<{ items: unknown[] }>(`/user/${id}/ratings`),
+  listUsers: () =>
+    request<{ items: { id: number; username: string; nickname: string; avatar_id: number }[] }>('/user/list'),
 }
