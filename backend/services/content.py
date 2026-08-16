@@ -36,6 +36,7 @@ def list_content(
         'air_date_asc',
     ] = 'updated_desc',
     rated: str | None = None,
+    reviewed: str | None = None,
     user_id: int | None = None,
     page: int = 1,
     size: int = 20,
@@ -83,6 +84,22 @@ def list_content(
             query = query.filter(ContentItem.id.in_(db.query(rated_sub.c.content_id)))
         elif rated == 'unrated':
             query = query.filter(~ContentItem.id.in_(db.query(rated_sub.c.content_id)))
+
+    # Reviewed/unreviewed filter (non-empty review text)
+    if reviewed and user_id is not None:
+        reviewed_sub = (
+            db.query(Rating.content_id)
+            .filter(
+                Rating.user_id == user_id,
+                Rating.review.isnot(None),
+                Rating.review != '',
+            )
+            .subquery()
+        )
+        if reviewed == 'reviewed':
+            query = query.filter(ContentItem.id.in_(db.query(reviewed_sub.c.content_id)))
+        elif reviewed == 'unreviewed':
+            query = query.filter(~ContentItem.id.in_(db.query(reviewed_sub.c.content_id)))
 
     # Count before pagination
     total = query.count()

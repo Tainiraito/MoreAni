@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
+import { useRefreshStore } from '@/stores/refresh-store'
 import { api } from '@/lib/api'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
@@ -124,6 +125,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
       const mine = ratings.find((r: Review) => r.username === user.username)
       if (mine) setMyRatingId(mine.id)
       setEditing(false)
+      // 通知列表刷新（评分/评论变化影响 my_score / my_has_review）
+      useRefreshStore.getState().triggerRefresh()
       toast.addToast('success', '评分已保存')
     } catch {
       toast.addToast('error', '评分失败')
@@ -146,6 +149,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
         setContent(updated)
         setAllReviews((ratingsRes.items || []) as Review[])
       }
+      // 通知列表刷新（删除评分后 my_score 变化）
+      useRefreshStore.getState().triggerRefresh()
       toast.addToast('success', '评分已删除')
     } catch {
       toast.addToast('error', '删除失败')

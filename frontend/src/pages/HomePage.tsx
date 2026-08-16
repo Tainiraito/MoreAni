@@ -30,6 +30,7 @@ export function HomePage() {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [ratedFilter, setRatedFilter] = useState<'' | 'rated' | 'unrated'>('')
+  const [reviewedFilter, setReviewedFilter] = useState<'' | 'reviewed' | 'unreviewed'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
 
   // Infinite scroll pagination state
@@ -79,6 +80,7 @@ export function HomePage() {
     const params: Record<string, string> = { page: '1', size: String(PAGE_SIZE), type: activeType }
     if (searchQuery) params.q = searchQuery
     if (ratedFilter) params.rated = ratedFilter
+    if (reviewedFilter) params.reviewed = reviewedFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     api.listContent(params)
@@ -90,7 +92,7 @@ export function HomePage() {
       })
       .catch(() => { setItems([]); setHasMore(false) })
       .finally(() => setLoading(false))
-  }, [activeType, user, searchQuery, ratedFilter, refreshKey, sortBy])
+  }, [activeType, user, searchQuery, ratedFilter, reviewedFilter, refreshKey, sortBy])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
@@ -102,6 +104,7 @@ export function HomePage() {
     const params: Record<string, string> = { page: String(nextPage), size: String(PAGE_SIZE), type: activeType }
     if (searchQuery) params.q = searchQuery
     if (ratedFilter) params.rated = ratedFilter
+    if (reviewedFilter) params.reviewed = reviewedFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     try {
@@ -116,7 +119,7 @@ export function HomePage() {
       setLoadingMore(false)
       isLoadingMoreRef.current = false
     }
-  }, [page, hasMore, loading, activeType, searchQuery, ratedFilter])
+  }, [page, hasMore, loading, activeType, searchQuery, ratedFilter, reviewedFilter, sortBy])
 
   // 滚动监听：接近底部 300px 时触发 loadMore
   useEffect(() => {
@@ -227,7 +230,7 @@ export function HomePage() {
                 key={val}
                 onClick={() => !isDisabled && setActiveType(val)}
                 disabled={isDisabled}
-                className="relative min-h-[3.25rem] whitespace-nowrap pb-3 text-sm font-medium transition-colors duration-150"
+                className="relative min-h-[3.75rem] whitespace-nowrap pb-3 text-lg font-semibold transition-colors duration-150"
                 style={{
                   color: isActive ? '#FB71A7' : isDisabled ? 'var(--text-muted)' : 'var(--text-muted)',
                   borderBottom: isActive ? '2px solid #FB71A7' : '2px solid transparent',
@@ -269,6 +272,16 @@ export function HomePage() {
             ]}
           />
           <Select
+            value={reviewedFilter}
+            onChange={v => setReviewedFilter(v as '' | 'reviewed' | 'unreviewed')}
+            className="w-[110px]"
+            options={[
+              { value: '', label: '全部评论' },
+              { value: 'reviewed', label: '已评论' },
+              { value: 'unreviewed', label: '未评论' },
+            ]}
+          />
+          <Select
             value={sortBy}
             onChange={setSortBy}
             className="w-[130px]"
@@ -281,6 +294,19 @@ export function HomePage() {
               { value: 'title', label: '标题排序' },
             ]}
           />
+          <button
+            onClick={openAddAnime}
+            className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200"
+            style={{
+              background: '#FB71A7',
+              color: 'white',
+              border: 'none',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+          >
+            + 添加番剧
+          </button>
         </div>
 
         {loading ? (
@@ -297,27 +323,6 @@ export function HomePage() {
           <>
             {animeItems.length > 0 && (
               <section className="mt-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    番剧
-                  </h2>
-                  <button
-                    onClick={openAddAnime}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200"
-                    style={{
-                      background: '#FB71A7',
-                      color: 'white',
-                      border: 'none',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-                  >
-                    + 添加番剧
-                  </button>
-                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                   {animeItems.map(item => (
                     <AnimeCard

@@ -32,6 +32,11 @@
 
 /* 浅色主题（默认） */
 :root {
+  /* 品牌色（--brand 简写，供 var(--brand) 使用；亮暗主题同色） */
+  --brand: #FB71A7;
+  --brand-light: #FECDDA;
+  --brand-deep: #E85D93;
+
   --bg-page: #faf8f5;
   --bg-card: #ffffff;
   --bg-card-warm: #f5f2ee;
@@ -53,6 +58,11 @@
 
 /* 暗色主题 */
 :root.dark {
+  /* 品牌色简写（亮暗同色） */
+  --brand: #FB71A7;
+  --brand-light: #FECDDA;
+  --brand-deep: #E85D93;
+
   --bg-page: #0a0a0a;
   --bg-card: #141414;
   --bg-card-warm: #1a1a1a;
