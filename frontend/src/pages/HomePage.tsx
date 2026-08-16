@@ -7,9 +7,11 @@ import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
 import { AnimeCard } from '@/components/content/AnimeCard'
+import { CommentListView } from '@/components/content/CommentListView'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { HeroSection } from '@/components/content/HeroSection'
+import { LayoutGrid, List } from 'lucide-react'
 import type { ContentItem, ContentType } from '@/types'
 
 const PAGE_SIZE = 20
@@ -31,6 +33,15 @@ export function HomePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
+  // 视图模式：评论列表（默认）/ 卡片网格；localStorage 记忆用户选择
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
+    localStorage.getItem('moreani-view') === 'grid' ? 'grid' : 'list',
+  )
+
+  const switchView = (mode: 'grid' | 'list') => {
+    setViewMode(mode)
+    localStorage.setItem('moreani-view', mode)
+  }
 
   // Infinite scroll pagination state
   const [page, setPage] = useState(1)
@@ -297,7 +308,7 @@ export function HomePage() {
           />
           <button
             onClick={openAddAnime}
-            className="ml-auto flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
+            className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
             style={{
               background: '#FB71A7',
               color: 'white',
@@ -308,6 +319,33 @@ export function HomePage() {
           >
             + 添加番剧
           </button>
+          {/* 视图切换：评论列表 / 卡片网格 */}
+          <div className="flex items-center gap-1.5 ml-1">
+            <button
+              onClick={() => switchView('list')}
+              title="评论列表视图"
+              className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-150"
+              style={{
+                background: viewMode === 'list' ? '#FB71A7' : 'transparent',
+                color: viewMode === 'list' ? 'white' : 'var(--text-muted)',
+                border: '1px solid var(--border-line)',
+              }}
+            >
+              <List size={14} />
+            </button>
+            <button
+              onClick={() => switchView('grid')}
+              title="卡片网格视图"
+              className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-150"
+              style={{
+                background: viewMode === 'grid' ? '#FB71A7' : 'transparent',
+                color: viewMode === 'grid' ? 'white' : 'var(--text-muted)',
+                border: '1px solid var(--border-line)',
+              }}
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -324,18 +362,22 @@ export function HomePage() {
           <>
             {animeItems.length > 0 && (
               <section className="mt-8">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                  {animeItems.map(item => (
-                    <AnimeCard
-                      key={item.id}
-                      content={item}
-                      mode="grid"
-                      isFavorited={isFavorited(item.id)}
-                      onSelect={openDetail}
-                      onToggleFavorite={toggleFavorite}
-                    />
-                  ))}
-                </div>
+                {viewMode === 'list' ? (
+                  <CommentListView items={animeItems} onSelect={openDetail} />
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                    {animeItems.map(item => (
+                      <AnimeCard
+                        key={item.id}
+                        content={item}
+                        mode="grid"
+                        isFavorited={isFavorited(item.id)}
+                        onSelect={openDetail}
+                        onToggleFavorite={toggleFavorite}
+                      />
+                    ))}
+                  </div>
+                )}
                 {/* 无限滚动加载状态 */}
                 {loadingMore && (
                   <div className="flex items-center justify-center py-8">

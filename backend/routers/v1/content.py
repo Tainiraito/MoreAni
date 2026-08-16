@@ -12,6 +12,7 @@ from schemas import (
     ContentItemResponse,
     ContentItemUpdate,
     ContentListResponse,
+    RecentReview,
     ShareLinkCreate,
     ShareLinkResponse,
     TagResponse,
@@ -23,7 +24,10 @@ router = APIRouter(prefix='/content', tags=['content'])
 
 
 def _to_response(
-    item: ContentItem, db: Session, user_id: int | None = None
+    item: ContentItem,
+    db: Session,
+    user_id: int | None = None,
+    recent_map: dict[int, list[dict]] | None = None,
 ) -> ContentItemResponse:
     """Convert a ContentItem ORM to response schema with computed fields."""
     resp = ContentItemResponse.model_validate(item)
@@ -32,6 +36,12 @@ def _to_response(
     resp.avg_recommend = stats['avg_recommend']
     resp.rating_count = stats['rating_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
+    # Recent reviews（列表场景传 recent_map 批量填充，单条场景单独查询）
+    if recent_map is not None:
+        resp.recent_reviews = [RecentReview(**r) for r in recent_map.get(item.id, [])]
+    else:
+        single = rating_svc.get_recent_reviews_map(db, [item.id], limit=3)
+        resp.recent_reviews = [RecentReview(**r) for r in single.get(item.id, [])]
     # User-specific fields
     if user_id:
         from models import Rating
@@ -85,8 +95,13 @@ def list_content(
         page=page,
         size=size,
     )
+    # 批量取最近评论（避免逐 item 查询的 N+1）
+    recent_map = rating_svc.get_recent_reviews_map(db, [i.id for i in items], limit=3)
     return ContentListResponse(
-        items=[_to_response(i, db, user.id if user else None) for i in items],
+        items=[
+            _to_response(i, db, user.id if user else None, recent_map)
+            for i in items
+        ],
         total=total,
         page=page,
         size=size,

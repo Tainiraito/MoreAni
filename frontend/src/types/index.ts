@@ -30,6 +30,15 @@ export interface ContentItem {
   my_score?: number | null
   my_has_review?: boolean
   tags?: Tag[]
+  recent_reviews?: RecentReview[]
+}
+
+export interface RecentReview {
+  nickname: string
+  avatar_id: number
+  score: number
+  review: string
+  created_at: string | null
 }
 
 export interface Rating {

@@ -132,6 +132,16 @@ class ContentItemUpdate(BaseModel):
     tags: list[str] | None = None
 
 
+class RecentReview(BaseModel):
+    """A recent review snippet shown in list views."""
+
+    nickname: str = ''
+    avatar_id: int = 0
+    score: int = 0
+    review: str = ''
+    created_at: datetime | None = None
+
+
 class ContentItemResponse(BaseModel):
     """Content item response."""
 
@@ -171,6 +181,7 @@ class ContentItemResponse(BaseModel):
     avg_recommend: float | None = None
     rating_count: int | None = None
     tags: list[TagResponse] = []
+    recent_reviews: list[RecentReview] = []
     # User-specific fields (only in list endpoint when authenticated)
     my_score: float | None = None
     my_has_review: bool = False

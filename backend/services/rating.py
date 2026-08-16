@@ -95,6 +95,43 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
     }
 
 
+def get_recent_reviews_map(
+    db: Session,
+    content_ids: list[int],
+    limit: int = 3,
+) -> dict[int, list[dict]]:
+    """Get recent N reviews for each content id (batch query, avoids N+1).
+
+    Returns {content_id: [ {nickname, avatar_id, score, review, created_at}, ... ]}
+    """
+    if not content_ids:
+        return {}
+
+    rows = (
+        db.query(Rating, User)
+        .join(User, Rating.user_id == User.id)
+        .filter(Rating.content_id.in_(content_ids))
+        .order_by(Rating.updated_at.desc())
+        .all()
+    )
+
+    result: dict[int, list[dict]] = {}
+    for rating, user in rows:
+        lst = result.setdefault(rating.content_id, [])
+        if len(lst) >= limit:
+            continue
+        lst.append(
+            {
+                'nickname': user.nickname,
+                'avatar_id': user.avatar_id,
+                'score': rating.score,
+                'review': rating.review,
+                'created_at': rating.created_at,
+            }
+        )
+    return result
+
+
 def get_recent_activity(
     db: Session,
     *,
