@@ -67,8 +67,8 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
           <div className="flex items-center justify-center gap-3">
             {avgScore && (
               <div className="flex items-center gap-1">
-                <Star size={12} style={{ color: (content.my_score || content.my_has_review) ? '#FB71A7' : 'var(--text-muted)' }} fill={(content.my_score || content.my_has_review) ? '#FB71A7' : 'none'} />
-                <span className="text-xs font-semibold" style={{ color: (content.my_score || content.my_has_review) ? '#FB71A7' : 'var(--text-muted)' }}>
+                <Star size={12} style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={content.my_score ? '#FB71A7' : 'none'} />
+                <span className="text-xs font-semibold" style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }}>
                   {avgScore}
                 </span>
               </div>

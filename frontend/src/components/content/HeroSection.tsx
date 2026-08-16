@@ -80,8 +80,8 @@ export function HeroSection({
           <div className="mt-5 flex flex-wrap items-center gap-4">
             {avgScore && (
               <div className="flex items-center gap-1.5">
-                <Star size={18} style={{ color: (content.my_score || content.my_has_review) ? '#FB71A7' : 'var(--text-muted)' }} fill={(content.my_score || content.my_has_review) ? '#FB71A7' : 'none'} />
-                <span className="text-lg font-bold" style={{ color: (content.my_score || content.my_has_review) ? '#FB71A7' : 'var(--text-muted)' }}>
+                <Star size={18} style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }} fill={content.my_score ? '#FB71A7' : 'none'} />
+                <span className="text-lg font-bold" style={{ color: content.my_score ? '#FB71A7' : 'var(--text-muted)' }}>
                   {avgScore}
                 </span>
               </div>
