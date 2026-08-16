@@ -257,6 +257,7 @@ def get_content_ratings(
                 'username': user.username,
                 'nickname': user.nickname,
                 'avatar_id': user.avatar_id,
+                'avatar_url': user.avatar_url,
                 'score': rating.score,
                 'recommend': rating.recommend,
                 'review': rating.review,
