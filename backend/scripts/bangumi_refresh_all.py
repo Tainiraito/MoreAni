@@ -54,8 +54,9 @@ def title_similar(our_titles: list[str], bgm_titles: list[str]) -> bool:
     return any(_pair_similar(a, b) for a in our_titles for b in bgm_titles)
 
 
-# 真错配黑名单：角色条目 vs 动画本体，保持无来源（用户确认跳过）
-SKIP_IDS = {75, 76}
+# 真错配黑名单：保持无来源（当前为空；曾含赛马娘特别周/东海帝皇，已确认是
+# 用角色名作标题的第一季/第二季，2026-08-16 已正确关联 212003/315574 并移除）
+SKIP_IDS: set[int] = set()
 # 已人工确认为同一番但译名差异过大（相似度不足）→ 强制按详情更新
 FORCE_IDS = {202}
 
