@@ -27,6 +27,7 @@ export function HomePage() {
   const [allAnime, setAllAnime] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
+  const heroIdRef = useRef<number | null>(null)
 
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
@@ -98,15 +99,19 @@ export function HomePage() {
   useEffect(() => {
     if (!user) return
 
-    api.listContent({ type: 'anime' })
+    api.listContent({ type: 'anime', size: '1000' })
       .then(res => {
         const animeList = (res.items || []) as ContentItem[]
         const withCover = animeList.filter(i => i.cover_url)
         setAllAnime(withCover)
         
         if (withCover.length > 0) {
-          const randomIndex = Math.floor(Math.random() * withCover.length)
-          setHero(withCover[randomIndex])
+          // 随机选 hero，排除上一次展示过的（避免连续重复同一张）
+          const pool = withCover.filter(i => i.id !== heroIdRef.current)
+          const source = pool.length > 0 ? pool : withCover
+          const randomIndex = Math.floor(Math.random() * source.length)
+          heroIdRef.current = source[randomIndex].id
+          setHero(source[randomIndex])
         }
       })
       .catch(() => {})

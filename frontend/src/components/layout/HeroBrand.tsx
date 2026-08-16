@@ -29,6 +29,7 @@ export function HeroBrand() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(0)
   const hasTriggeredRef = useRef(false)
+  const lastShownRef = useRef<Set<number>>(new Set()) // 上次展示的卡片 id（随机推荐避免重复）
   const cardWidth = 160
   const gap = 20
 
@@ -43,7 +44,14 @@ export function HeroBrand() {
         // 自己评分/评论过的优先展示（最多一半），其余随机——推荐区能看出自己的评分评论状态
         const mine = shuffleArray(withCover.filter(i => i.my_score || i.my_has_review))
         const others = shuffleArray(withCover.filter(i => !(i.my_score || i.my_has_review)))
-        const selected = [...mine.slice(0, 6), ...others].slice(0, 12)
+        // 排除上一次展示过的卡片（避免「刚推荐过的又重复推荐」）
+        const prevIds = lastShownRef.current
+        const mineFresh = mine.filter(i => !prevIds.has(i.id))
+        const othersFresh = others.filter(i => !prevIds.has(i.id))
+        // mine 优先最多 6 张（上次的只在不够时补回），others 用没展示过的
+        const mineSelected = (mineFresh.length >= 6 ? mineFresh : [...mineFresh, ...mine.filter(i => prevIds.has(i.id))]).slice(0, 6)
+        const selected = [...mineSelected, ...othersFresh].slice(0, 12)
+        lastShownRef.current = new Set(selected.map(i => i.id))
         setItems(selected)
       })
       .catch(() => {})
