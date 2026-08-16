@@ -142,7 +142,7 @@ export function AppHeader() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
                     <Settings size={16} />
-                    设置
+                    用户信息
                   </button>
                 )}
 
