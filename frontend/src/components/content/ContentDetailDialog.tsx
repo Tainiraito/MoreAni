@@ -108,9 +108,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
 
   if (!detailOpen) return null
 
-  // Star click — only update local state, don't save
+  // Star click — only update local state, don't save；再点当前分数 = 清空评分
   const handleStarClick = (newScore: number) => {
-    setScore(newScore)
+    setScore(prev => (prev === newScore ? 0 : newScore))
   }
 
   // Save button — actually submit to API
@@ -537,6 +537,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                           <button
                             key={i}
                             className="relative transition-transform duration-150 hover:scale-125"
+                            style={{ cursor: 'pointer' }}
                             onMouseMove={(e) => {
                               const rect = e.currentTarget.getBoundingClientRect()
                               setHoverScore(e.clientX - rect.left < rect.width / 2 ? i - 0.5 : i)
