@@ -5,31 +5,35 @@ interface ScoreBadgeProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
+const SIZE_CLASS: Record<string, string> = {
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-lg',
+}
+
+/** 分数徽章（v2 主题：品牌粉 + 主题变量，不依赖 v1 遗留样式类） */
 export function ScoreBadge({ score, size = 'md' }: ScoreBadgeProps) {
-  if (!score || score === 0) {
+  const display = score && score > 0 ? (score / 10).toFixed(1) : null
+
+  if (!display) {
     return (
-      <div className={cn(
-        'inline-flex items-center justify-center bg-paper text-muted border border-black/[0.06] rounded-lg font-display font-semibold',
-        size === 'sm' && 'px-2 py-0.5 text-xs',
-        size === 'md' && 'px-2.5 py-1 text-sm',
-        size === 'lg' && 'px-3.5 py-1.5 text-lg',
-      )}>
-        —
-      </div>
+      <span
+        className={cn('inline-flex items-center font-medium', SIZE_CLASS[size])}
+        style={{ color: 'var(--text-muted)' }}
+      >
+        未评分
+      </span>
     )
   }
 
-  const display = (score / 10).toFixed(1)
-
   return (
-    <div className={cn(
-      'inline-flex items-center gap-1 bg-ink text-brand rounded-lg font-display font-bold',
-      size === 'sm' && 'px-2 py-0.5 text-xs',
-      size === 'md' && 'px-2.5 py-1 text-sm',
-      size === 'lg' && 'px-3.5 py-1.5 text-lg',
-    )}>
-      <span>{display}</span>
-      {size !== 'sm' && <span className="text-white/50 text-[10px] font-normal">/10</span>}
-    </div>
+    <span
+      className={cn('inline-flex items-center gap-0.5 font-semibold', SIZE_CLASS[size])}
+      style={{ color: 'var(--brand)' }}
+    >
+      <span className="text-[0.7em]">★</span>
+      {display}
+      <span className="text-[0.6em]" style={{ color: 'var(--text-muted)' }}>/10</span>
+    </span>
   )
 }
