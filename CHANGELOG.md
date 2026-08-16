@@ -93,6 +93,13 @@
 - 提取 `useResponsiveDialog.ts` composable，封装弹窗响应式尺寸逻辑
 - 各弹窗组件精简，移除重复代码约 300 行
 
+### 修复与安全（2026-08-16 追加）
+- [严重] `require_role` 权限漏洞：原实现无条件给所有登录用户 super_admin 权限（任何注册用户可进后台删人/发邀请码），已改为正确角色语义（仅 super_admin 可访问 super_admin 接口）
+- [严重] 后台管理弹窗无条件渲染：`adminOpen` 只控制滚动锁，弹窗常驻、关不掉、刷新仍在、挂载即发 401 请求；补 `if (!adminOpen) return null`
+- SECRET_KEY 固定：`auth.py` 支持 `backend/.env` 加载（此前 `uvicorn --reload` 每次重启随机密钥，所有登录 token 失效踢人）
+- 后台管理 UI 规范化：邀请码去 font-mono、编辑/删除按钮加边框 + hover 粉/红描边、日期选择换 DatePicker 组件
+- `--accent-coral` / `--accent-purple` 简写变量补齐（Tailwind v4 `@theme` 只生成 `--color-*` 前缀，`var(--accent-coral)` 此前解析为 undefined，删除按钮红色从未生效）
+
 ---
 
 ## v0.3.0 (2026-05-07)

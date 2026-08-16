@@ -36,6 +36,9 @@
   --brand: #FB71A7;
   --brand-light: #FECDDA;
   --brand-deep: #E85D93;
+  /* 强调色简写（供 var(--accent-coral) 等使用；@theme 只生成 --color-* 前缀） */
+  --accent-coral: #FF6B6B;
+  --accent-purple: #C77DFF;
 
   --bg-page: #faf8f5;
   --bg-card: #ffffff;
@@ -62,6 +65,8 @@
   --brand: #FB71A7;
   --brand-light: #FECDDA;
   --brand-deep: #E85D93;
+  --accent-coral: #FF6B6B;
+  --accent-purple: #C77DFF;
 
   --bg-page: #0a0a0a;
   --bg-card: #141414;

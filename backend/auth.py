@@ -10,6 +10,33 @@ from passlib.context import CryptContext
 
 logger = logging.getLogger('uvicorn')
 
+
+def _load_env_file() -> None:
+    """Load backend/.env into os.environ if not already set.
+
+    轻量实现，避免引入 python-dotenv 依赖。
+    优先级：进程环境变量（bash export / docker-compose）> .env 文件。
+    """
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if not os.path.isfile(env_path):
+        return
+    try:
+        with open(env_path, encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, _, value = line.partition('=')
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key:
+                    os.environ.setdefault(key, value)
+    except OSError:
+        pass
+
+
+_load_env_file()
+
 # --- Config ---
 _secret = os.getenv('SECRET_KEY')
 if _secret:
@@ -19,7 +46,7 @@ else:
     logger.warning(
         'SECRET_KEY not set — using random key. '
         'All tokens will be invalidated on restart. '
-        'Set SECRET_KEY env var for production.'
+        'Set SECRET_KEY env var (backend/.env) for production.'
     )
 
 ALGORITHM = 'HS256'

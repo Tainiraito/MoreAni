@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound } from 'lucide-react'
 import type { InviteCode, User } from '@/types'
 
@@ -37,6 +38,9 @@ export function AdminDialog() {
   const { adminOpen, closeAdmin } = useUIStore()
   useLockBodyScroll(adminOpen)
   const [tab, setTab] = useState<'users' | 'invites'>('users')
+
+  // 关键：不打开就不渲染（否则页面加载时弹窗常驻、UserManageTab 自动请求 admin/users）
+  if (!adminOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }} onClick={closeAdmin}>
@@ -232,17 +236,21 @@ function UserManageTab() {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => openEdit(u)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
-                  style={{ color: 'var(--text-muted)', background: 'var(--bg-card)' }}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
                   title="编辑"
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#FB71A7'; e.currentTarget.style.color = '#FB71A7' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-line)'; e.currentTarget.style.color = 'var(--text-muted)' }}
                 >
                   <Pencil size={13} />
                 </button>
                 <button
                   onClick={() => setConfirmDelete(u)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
-                  style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)' }}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
                   title="删除"
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-coral)'; e.currentTarget.style.color = 'var(--accent-coral)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-line)'; e.currentTarget.style.color = 'var(--accent-coral)' }}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -451,7 +459,7 @@ function InviteManageTab() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-mono font-medium truncate" style={{ color: 'var(--text-primary)' }}>{i.code}</p>
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{i.code}</p>
                     <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ background: `${st.color}1a`, color: st.color }}>
                       {st.label}
                     </span>
@@ -463,17 +471,21 @@ function InviteManageTab() {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => openEdit(i)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
-                    style={{ color: 'var(--text-muted)', background: 'var(--bg-card)' }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150"
+                    style={{ color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
                     title="编辑"
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#FB71A7'; e.currentTarget.style.color = '#FB71A7' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-line)'; e.currentTarget.style.color = 'var(--text-muted)' }}
                   >
                     <Pencil size={13} />
                   </button>
                   <button
                     onClick={() => setConfirmDelete(i)}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150 hover:opacity-80"
-                    style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)' }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-all duration-150"
+                    style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
                     title="删除"
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-coral)'; e.currentTarget.style.color = 'var(--accent-coral)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-line)'; e.currentTarget.style.color = 'var(--accent-coral)' }}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -501,15 +513,19 @@ function InviteManageTab() {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">邀请码（留空自动生成）</Label>
-                <Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="如：welcome2026" className="h-9 text-sm font-mono" />
+                <Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="如：welcome2026" className="h-9 text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">可用次数</Label>
                 <Input type="number" min={1} value={form.max_uses} onChange={e => setForm({ ...form, max_uses: e.target.value })} placeholder="1" className="h-9 text-sm" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">有效时间（留空永不过期）</Label>
-                <Input type="date" value={form.expires_at} onChange={e => setForm({ ...form, expires_at: e.target.value })} className="h-9 text-sm" />
+                <DatePicker
+                  label="有效时间（留空永不过期）"
+                  value={form.expires_at}
+                  onChange={v => setForm({ ...form, expires_at: v })}
+                  placeholder="选择日期"
+                />
               </div>
               {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
               <div className="flex gap-2 pt-1">
