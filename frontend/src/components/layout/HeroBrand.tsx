@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTheme } from '@/hooks/use-theme'
+import { useRefreshStore } from '@/stores/refresh-store'
 import { Sun, Moon } from 'lucide-react'
 import { api } from '@/lib/api'
 import { AnimeCard } from '@/components/content/AnimeCard'
@@ -31,7 +32,8 @@ export function HeroBrand() {
   const cardWidth = 160
   const gap = 20
 
-  // 加载番剧内容并随机选取
+  // 加载番剧内容并随机选取（refreshKey 变化时重新加载，评分/收藏后数据保持最新）
+  const refreshKey = useRefreshStore(s => s.refreshKey)
   useEffect(() => {
     api.listContent({ type: 'anime' })
       .then(res => {
@@ -42,7 +44,7 @@ export function HeroBrand() {
         setItems(selected)
       })
       .catch(() => {})
-  }, [])
+  }, [refreshKey])
 
   // 监听鼠标滚轮事件（仅未登录时）
   useEffect(() => {

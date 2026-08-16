@@ -29,8 +29,7 @@ export function HomePage() {
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [ratedFilter, setRatedFilter] = useState<'' | 'rated' | 'unrated'>('')
-  const [reviewedFilter, setReviewedFilter] = useState<'' | 'reviewed' | 'unreviewed'>('')
+  const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
 
   // Infinite scroll pagination state
@@ -50,7 +49,7 @@ export function HomePage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  // 加载所有番剧
+  // 加载所有番剧（refreshKey 变化时重新加载，评分后精选区数据保持最新）
   useEffect(() => {
     if (!user) return
 
@@ -66,7 +65,7 @@ export function HomePage() {
         }
       })
       .catch(() => {})
-  }, [user])
+  }, [user, refreshKey])
 
   // 加载当前 tab 的内容（重置分页）
   useEffect(() => {
@@ -79,8 +78,8 @@ export function HomePage() {
 
     const params: Record<string, string> = { page: '1', size: String(PAGE_SIZE), type: activeType }
     if (searchQuery) params.q = searchQuery
-    if (ratedFilter) params.rated = ratedFilter
-    if (reviewedFilter) params.reviewed = reviewedFilter
+    if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
+    if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     api.listContent(params)
@@ -92,7 +91,7 @@ export function HomePage() {
       })
       .catch(() => { setItems([]); setHasMore(false) })
       .finally(() => setLoading(false))
-  }, [activeType, user, searchQuery, ratedFilter, reviewedFilter, refreshKey, sortBy])
+  }, [activeType, user, searchQuery, myFilter, refreshKey, sortBy])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
@@ -103,8 +102,8 @@ export function HomePage() {
     const nextPage = page + 1
     const params: Record<string, string> = { page: String(nextPage), size: String(PAGE_SIZE), type: activeType }
     if (searchQuery) params.q = searchQuery
-    if (ratedFilter) params.rated = ratedFilter
-    if (reviewedFilter) params.reviewed = reviewedFilter
+    if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
+    if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
     if (sortBy !== 'updated_desc') params.sort = sortBy
 
     try {
@@ -119,7 +118,7 @@ export function HomePage() {
       setLoadingMore(false)
       isLoadingMoreRef.current = false
     }
-  }, [page, hasMore, loading, activeType, searchQuery, ratedFilter, reviewedFilter, sortBy])
+  }, [page, hasMore, loading, activeType, searchQuery, myFilter, sortBy])
 
   // 滚动监听：接近底部 300px 时触发 loadMore
   useEffect(() => {
@@ -262,23 +261,20 @@ export function HomePage() {
             />
           </div>
           <Select
-            value={ratedFilter}
-            onChange={v => setRatedFilter(v as '' | 'rated' | 'unrated')}
-            className="w-[110px]"
-            options={[
-              { value: '', label: '全部' },
-              { value: 'rated', label: '已评分' },
-              { value: 'unrated', label: '未评分' },
-            ]}
-          />
-          <Select
-            value={reviewedFilter}
-            onChange={v => setReviewedFilter(v as '' | 'reviewed' | 'unreviewed')}
-            className="w-[110px]"
-            options={[
-              { value: '', label: '全部评论' },
-              { value: 'reviewed', label: '已评论' },
-              { value: 'unreviewed', label: '未评论' },
+            value={myFilter}
+            onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed')}
+            className="w-[130px]"
+            groups={[
+              {
+                label: '我的状态',
+                options: [
+                  { value: '', label: '全部' },
+                  { value: 'rated', label: '已评分' },
+                  { value: 'unrated', label: '未评分' },
+                  { value: 'reviewed', label: '已评论' },
+                  { value: 'unreviewed', label: '未评论' },
+                ],
+              },
             ]}
           />
           <Select
@@ -291,12 +287,13 @@ export function HomePage() {
               { value: 'air_date_asc', label: '放送日期↑' },
               { value: 'rating', label: '评分最高' },
               { value: 'newest', label: '最新添加' },
+              { value: 'oldest', label: '最早添加' },
               { value: 'title', label: '标题排序' },
             ]}
           />
           <button
             onClick={openAddAnime}
-            className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200"
+            className="ml-auto flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
             style={{
               background: '#FB71A7',
               color: 'white',

@@ -7,16 +7,23 @@ interface SelectOption {
   label: string
 }
 
+interface SelectGroup {
+  label: string
+  options: SelectOption[]
+}
+
 interface SelectProps {
   value: string
   onChange: (value: string) => void
-  options: SelectOption[]
+  options?: SelectOption[]
+  groups?: SelectGroup[]
   placeholder?: string
   className?: string
 }
 
-export function Select({ value, onChange, options, placeholder, className }: SelectProps) {
-  const selected = options.find(o => o.value === value)
+export function Select({ value, onChange, options = [], groups, placeholder, className }: SelectProps) {
+  const allOptions = groups ? groups.flatMap(g => g.options) : options
+  const selected = allOptions.find(o => o.value === value)
 
   return (
     <Listbox value={value} onChange={onChange}>
@@ -45,26 +52,45 @@ export function Select({ value, onChange, options, placeholder, className }: Sel
             border: '1px solid var(--border-line)',
           }}
         >
-          {options.map(option => (
-            <ListboxOption
-              key={option.value}
-              value={option.value}
-              className="relative cursor-pointer select-none py-2 pl-8 pr-3 text-xs transition-colors data-[focus]:opacity-80"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              <span className="block truncate">{option.label}</span>
-              {option.value === value && (
-                <span
-                  className="absolute inset-y-0 left-2 flex items-center"
-                  style={{ color: '#FB71A7' }}
-                >
-                  <Check size={12} />
-                </span>
-              )}
-            </ListboxOption>
-          ))}
+          {groups
+            ? groups.map(group => (
+                <div key={group.label}>
+                  <div
+                    className="px-3 pt-2 pb-1 text-[11px] font-medium"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {group.label}
+                  </div>
+                  {group.options.map(option => (
+                    <SelectOptionItem key={option.value} option={option} value={value} />
+                  ))}
+                </div>
+              ))
+            : options.map(option => (
+                <SelectOptionItem key={option.value} option={option} value={value} />
+              ))}
         </ListboxOptions>
       </div>
     </Listbox>
+  )
+}
+
+function SelectOptionItem({ option, value }: { option: SelectOption; value: string }) {
+  return (
+    <ListboxOption
+      value={option.value}
+      className="relative cursor-pointer select-none py-2 pl-8 pr-3 text-xs transition-colors data-[focus]:opacity-80"
+      style={{ color: 'var(--text-primary)' }}
+    >
+      <span className="block truncate">{option.label}</span>
+      {option.value === value && (
+        <span
+          className="absolute inset-y-0 left-2 flex items-center"
+          style={{ color: '#FB71A7' }}
+        >
+          <Check size={12} />
+        </span>
+      )}
+    </ListboxOption>
   )
 }
