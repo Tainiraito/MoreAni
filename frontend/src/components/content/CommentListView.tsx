@@ -1,6 +1,6 @@
 import { Star, Users, MessageCircle, Heart } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
-import { secureUrl } from '@/components/ui/CoverImage'
+import { CoverImage } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
 
 interface CommentListViewProps {
@@ -44,13 +44,8 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
             onClick={() => onSelect(item.id)}
           >
             {/* 封面：最左侧，占满行高，适配常见 2:3~3:4 封面比例 */}
-            <div
-              className="w-[150px] shrink-0 self-stretch relative"
-              style={{ background: 'var(--bg-card-warm)' }}
-            >
-              {item.cover_url ? (
-                <img src={secureUrl(item.cover_url)} alt="" className="w-full h-full object-cover" />
-              ) : null}
+            <div className="w-[150px] shrink-0 self-stretch relative">
+              <CoverImage src={item.cover_url || ''} alt={item.title} />
               {/* 收藏按钮（右上角，与网格视图风格一致） */}
               {onToggleFavorite && (
                 <button
