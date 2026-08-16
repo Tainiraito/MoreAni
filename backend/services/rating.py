@@ -136,6 +136,7 @@ def get_recent_reviews_map(
             {
                 'nickname': user.nickname,
                 'avatar_id': user.avatar_id,
+                'avatar_url': user.avatar_url,
                 'score': rating.score,
                 'review': rating.review,
                 'created_at': rating.created_at,
@@ -181,6 +182,7 @@ def get_recent_activity(
                 'username': '匿名用户' if guest_mode else user.username,
                 'nickname': '匿名用户' if guest_mode else user.nickname,
                 'avatar_id': 0 if guest_mode else user.avatar_id,
+                'avatar_url': None if guest_mode else user.avatar_url,
                 'created_at': rating.created_at,
             }
         )

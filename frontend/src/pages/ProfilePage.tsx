@@ -57,7 +57,7 @@ export function ProfilePage() {
         }}
       >
         <div className="flex items-center gap-5">
-          <Avatar name={user.nickname} size={64}
+          <Avatar name={user.nickname} src={user.avatar_url} size={64}
             style={{ border: '2px solid var(--brand)', boxShadow: '0 0 15px rgba(255, 140, 212, 0.3)' }} />
           <div>
             <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{user.nickname}</h1>

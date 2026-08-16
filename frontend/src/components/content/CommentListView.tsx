@@ -121,7 +121,7 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                       }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <Avatar name={r.nickname || '?'} size={16} />
+                        <Avatar name={r.nickname || '?'} src={r.avatar_url} size={16} />
                         <span className="text-[11px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                           {r.nickname}
                         </span>

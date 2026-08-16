@@ -152,5 +152,21 @@ export const api = {
   getUser: (id: number) => request<unknown>(`/user/${id}`),
   getUserRatings: (id: number) => request<{ items: unknown[] }>(`/user/${id}/ratings`),
   listUsers: () =>
-    request<{ items: { id: number; username: string; nickname: string; avatar_id: number }[] }>('/user/list'),
+    request<{ items: { id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null }[] }>('/user/list'),
+  // 上传头像（FormData，不设 Content-Type 让浏览器带 boundary）
+  uploadAvatar: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return fetch(`${API_BASE}/user/avatar`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    }).then(async res => {
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.detail || `HTTP ${res.status}`)
+      }
+      return res.json() as Promise<{ avatar_url: string }>
+    })
+  },
 }

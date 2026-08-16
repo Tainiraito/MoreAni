@@ -1,15 +1,30 @@
 interface AvatarProps {
   name: string
+  src?: string | null
   size?: number
   className?: string
   style?: React.CSSProperties
 }
 
 /**
- * Text avatar — first character of the nickname on a solid brand-color circle.
- * Color uses var(--brand) so it adapts to light/dark theme automatically.
+ * Avatar — shows uploaded image if available, otherwise text avatar
+ * (first character of the nickname on a solid brand-color circle).
  */
-export function Avatar({ name, size = 36, className = '', style }: AvatarProps) {
+export function Avatar({ name, src, size = 36, className = '', style }: AvatarProps) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        className={`rounded-full object-cover shrink-0 ${className}`}
+        style={{ width: size, height: size, ...style }}
+        onError={e => {
+          // 图片加载失败 → 回退文字头像
+          e.currentTarget.style.display = 'none'
+        }}
+      />
+    )
+  }
   const firstChar = (name || '?').charAt(0).toUpperCase()
   return (
     <div

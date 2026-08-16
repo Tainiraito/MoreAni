@@ -46,6 +46,19 @@ def _migrate_invite_codes_expires() -> None:
     except Exception as e:  # noqa: BLE001
         print(f'[migrate] invite_codes 迁移跳过: {e}')
 
+    # users.avatar_url（头像上传）
+    try:
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            cols = [r[1] for r in conn.execute(text('PRAGMA table_info(users)'))]
+            if cols and 'avatar_url' not in cols:
+                conn.execute(text('ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)'))
+                conn.commit()
+                print('[migrate] users.avatar_url 已添加')
+    except Exception as e:  # noqa: BLE001
+        print(f'[migrate] users.avatar_url 迁移跳过: {e}')
+
 
 app = FastAPI(
     title='MoreAni API',
@@ -88,6 +101,11 @@ app.include_router(admin_router, prefix='/api/v1')
 COVERS_DIR = os.getenv('COVERS_DIR', 'covers')
 os.makedirs(COVERS_DIR, exist_ok=True)
 app.mount('/api/covers', StaticFiles(directory=COVERS_DIR), name='covers')
+
+# --- 头像静态服务：/api/avatars/{file} ---
+AVATARS_DIR = os.getenv('AVATARS_DIR', 'avatars')
+os.makedirs(AVATARS_DIR, exist_ok=True)
+app.mount('/api/avatars', StaticFiles(directory=AVATARS_DIR), name='avatars')
 
 
 @app.get('/api/health')

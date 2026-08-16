@@ -37,6 +37,8 @@ export function SettingsDialog() {
   const [editingNickname, setEditingNickname] = useState(false)
   const [nickname, setNickname] = useState('')
   const [nicknameError, setNicknameError] = useState('')
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
   const [activity, setActivity] = useState<ActivityItem[]>([])
@@ -124,6 +126,23 @@ export function SettingsDialog() {
     }
   }
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarUploading(true)
+    setAvatarError('')
+    try {
+      const res = await api.uploadAvatar(file)
+      setUser({ ...user!, avatar_url: res.avatar_url })
+      useToastStore.getState().addToast('success', '头像已更新')
+    } catch (err: any) {
+      setAvatarError(err.message || '头像上传失败')
+    } finally {
+      setAvatarUploading(false)
+      e.target.value = '' // 允许重复选择同一文件
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
@@ -151,8 +170,31 @@ export function SettingsDialog() {
 
         {/* 用户信息 */}
         <div className="flex items-start gap-4 mb-8">
-          <Avatar name={user?.nickname || '?'} size={64}
-            style={{ border: '2px solid var(--brand)' }} />
+          <div className="flex flex-col items-center gap-2">
+            <Avatar name={user?.nickname || '?'} src={user?.avatar_url} size={64}
+              style={{ border: '2px solid var(--brand)' }} />
+            {/* 头像上传 */}
+            <label
+              className="text-[11px] px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
+              style={{
+                color: 'var(--brand)',
+                background: 'rgba(251, 113, 167, 0.08)',
+                border: '1px solid rgba(251, 113, 167, 0.35)',
+              }}
+            >
+              {avatarUploading ? '上传中...' : '更换头像'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                disabled={avatarUploading}
+                onChange={handleAvatarChange}
+              />
+            </label>
+            {avatarError && (
+              <p className="text-[11px]" style={{ color: 'var(--accent-coral, #FF6B6B)' }}>{avatarError}</p>
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             {editingNickname ? (
               <form onSubmit={handleUpdateNickname} className="flex items-center gap-2">

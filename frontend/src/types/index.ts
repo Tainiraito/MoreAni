@@ -37,6 +37,7 @@ export interface ContentItem {
 export interface RecentReview {
   nickname: string
   avatar_id: number
+  avatar_url?: string | null
   score: number
   review: string
   created_at: string | null
@@ -59,6 +60,7 @@ export interface User {
   username: string
   nickname: string
   avatar_id: number
+  avatar_url?: string | null
   role: 'user' | 'admin' | 'super_admin'
   created_at: string
 }

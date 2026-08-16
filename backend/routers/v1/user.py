@@ -1,6 +1,9 @@
 """User router — public profile and rating history."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import os
+import time
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
@@ -10,6 +13,10 @@ from services import rating as rating_svc
 from services import user as user_svc
 
 router = APIRouter(prefix='/user', tags=['user'])
+
+AVATARS_DIR = os.getenv('AVATARS_DIR', 'avatars')
+ALLOWED_AVATAR_EXTS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2MB
 
 
 @router.get('/list')
@@ -34,10 +41,43 @@ def list_users(
                 'username': u.username,
                 'nickname': u.nickname,
                 'avatar_id': u.avatar_id,
+                'avatar_url': u.avatar_url,
             }
             for u in users
         ]
     }
+
+
+@router.post('/avatar')
+def upload_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """上传/更换自己的头像（图片 ≤2MB，jpg/png/webp/gif）。"""
+    ext = os.path.splitext(file.filename or '')[1].lower()
+    if ext not in ALLOWED_AVATAR_EXTS:
+        raise HTTPException(status_code=400, detail='仅支持 jpg/png/webp/gif 格式')
+    content_type = (file.content_type or '').lower()
+    if not content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail='文件不是图片')
+
+    data = file.file.read()
+    if len(data) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail='图片不能超过 2MB')
+
+    # 固定文件名 + 时间戳破浏览器缓存（换头像后 URL 变化）
+    os.makedirs(AVATARS_DIR, exist_ok=True)
+    if ext == '.jpeg':
+        ext = '.jpg'
+    filename = f'{user.id}{ext}'
+    with open(os.path.join(AVATARS_DIR, filename), 'wb') as f:
+        f.write(data)
+
+    avatar_url = f'/api/avatars/{filename}?v={int(time.time())}'
+    user.avatar_url = avatar_url
+    db.commit()
+    return {'avatar_url': avatar_url}
 
 
 @router.get('/{user_id}', response_model=UserPublicProfile)

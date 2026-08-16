@@ -54,6 +54,7 @@ class UserResponse(BaseModel):
     username: str
     nickname: str
     avatar_id: int = 0
+    avatar_url: str | None = None
     role: str = 'user'
     created_at: datetime
 
@@ -240,6 +241,7 @@ class RatingResponse(BaseModel):
     user_id: int
     username: str = ''
     nickname: str = ''
+    avatar_url: str | None = None
     score: int
     recommend: int
     review: str = ''
@@ -299,6 +301,7 @@ class UserPublicProfile(BaseModel):
     username: str
     nickname: str = ''
     avatar_id: int = 0
+    avatar_url: str | None = None
     role: str = 'user'
     created_at: datetime
     rating_count: int = 0
