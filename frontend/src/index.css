@@ -100,8 +100,8 @@ html {
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-page);
-  /* 可平铺纹理背景（隐约可见，避免纯色单调）；要更淡调大渐变覆盖比例 */
-  background-image: url('/textures/bg-texture.jpg');
+  /* 可平铺透明底纹理（线条隐约，避免纯色单调）；要更淡调大渐变覆盖比例 */
+  background-image: url('/textures/bg-texture.png');
   background-repeat: repeat;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
