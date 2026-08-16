@@ -100,7 +100,7 @@ html {
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-page);
-  /* 可平铺透明底纹理（线条隐约，避免纯色单调）；要更淡调大渐变覆盖比例 */
+  /* 可平铺透明底纹理（线条隐约，避免纯色单调）；亮色 10%，深色 5%（深色版单独贴图） */
   background-image: url('/textures/bg-texture.png');
   background-repeat: repeat;
   color: var(--text-primary);
@@ -108,6 +108,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 15px;
   line-height: 1.6;
+}
+
+/* 深色模式：背景纹理单独用 5% 版本（深色底更暗，线条更淡不抢眼） */
+:root.dark body {
+  background-image: url('/textures/bg-texture-dark.png');
 }
 
 /* Subtle scrollbar */
