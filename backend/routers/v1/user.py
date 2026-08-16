@@ -39,6 +39,21 @@ def get_user_profile(
     )
 
 
+@router.get('/{user_id}/activity')
+def get_user_activity(
+    user_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """Get a user's activity feed (ratings/reviews/favorites, time desc)."""
+    if not user_svc.get_user_by_id(db, user_id):
+        raise HTTPException(status_code=404, detail='User not found')
+    items, total = user_svc.get_user_activity(db, user_id, page=page, size=size)
+    return {'items': items, 'total': total}
+
+
 @router.get('/{user_id}/ratings')
 def get_user_ratings(
     user_id: int,

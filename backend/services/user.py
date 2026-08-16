@@ -152,3 +152,68 @@ def get_user_stats(db: Session, user_id: int) -> dict:
         'avg_score': avg_score,
         'content_count': content_count,
     }
+
+
+def get_user_activity(
+    db: Session,
+    user_id: int,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[dict], int]:
+    """Get user's activity feed: ratings, reviews, favorites — sorted by time desc.
+
+    Returns list of dicts with type/content info, and total count.
+    """
+    # 评分/评论（Rating 记录）
+    rating_rows = (
+        db.query(Rating, ContentItem)
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(Rating.user_id == user_id)
+        .all()
+    )
+
+    # 收藏（status = want）
+    status_rows = (
+        db.query(UserContentStatus, ContentItem)
+        .join(ContentItem, UserContentStatus.content_id == ContentItem.id)
+        .filter(
+            UserContentStatus.user_id == user_id,
+            UserContentStatus.status == 'want',
+        )
+        .all()
+    )
+
+    entries: list[dict] = []
+    for rating, content in rating_rows:
+        has_review = bool(rating.review and rating.review.strip())
+        entries.append(
+            {
+                'type': 'review' if has_review else 'rating',
+                'content_id': content.id,
+                'content_title': content.title,
+                'content_cover': content.cover_url,
+                'content_type': content.content_type,
+                'score': rating.score,
+                'review': rating.review,
+                'updated_at': rating.updated_at,
+            }
+        )
+
+    for status, content in status_rows:
+        entries.append(
+            {
+                'type': 'favorite',
+                'content_id': content.id,
+                'content_title': content.title,
+                'content_cover': content.cover_url,
+                'content_type': content.content_type,
+                'score': None,
+                'review': '',
+                'updated_at': status.updated_at,
+            }
+        )
+
+    entries.sort(key=lambda e: e['updated_at'], reverse=True)
+    total = len(entries)
+    start = (page - 1) * size
+    return entries[start:start + size], total

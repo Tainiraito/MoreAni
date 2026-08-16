@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { api } from '@/lib/api'
 import { Avatar } from '@/components/ui/Avatar'
+import { secureUrl } from '@/components/ui/CoverImage'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +16,17 @@ interface UserStats {
   review_count: number
   favorite_count: number
   avg_score: number | null
-  content_count: number
+}
+
+interface ActivityItem {
+  type: 'rating' | 'review' | 'favorite'
+  content_id: number
+  content_title: string
+  content_cover: string
+  content_type: string
+  score: number | null
+  review: string
+  updated_at: string
 }
 
 export function SettingsDialog() {
@@ -26,8 +37,12 @@ export function SettingsDialog() {
   const [nicknameError, setNicknameError] = useState('')
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [activityTotal, setActivityTotal] = useState(0)
+  const [activityPage, setActivityPage] = useState(1)
+  const [activityLoading, setActivityLoading] = useState(false)
 
-  // 打开弹窗时加载用户统计
+  // 打开弹窗时加载用户统计 + 动态第一页
   useEffect(() => {
     if (!settingsOpen || !user) return
     api.getUser(user.id)
@@ -38,11 +53,27 @@ export function SettingsDialog() {
           review_count: s.review_count ?? 0,
           favorite_count: s.favorite_count ?? 0,
           avg_score: s.avg_score ?? null,
-          content_count: s.content_count ?? 0,
         })
       })
       .catch(() => {})
+    loadActivity(1, true)
   }, [settingsOpen, user?.id])
+
+  const loadActivity = async (page: number, reset = false) => {
+    if (!user || activityLoading) return
+    setActivityLoading(true)
+    try {
+      const res = await api.getUserActivity(user.id, { page: String(page), size: '10' })
+      const items = (res.items || []) as ActivityItem[]
+      setActivity(prev => (reset ? items : [...prev, ...items]))
+      setActivityTotal(res.total || 0)
+      setActivityPage(page)
+    } catch {
+      // ignore
+    } finally {
+      setActivityLoading(false)
+    }
+  }
 
   if (!settingsOpen) return null
 
@@ -192,13 +223,72 @@ export function SettingsDialog() {
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.review_count}</span>
                   <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>评论</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.content_count}</span>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>添加番剧</span>
-                </div>
               </div>
             )}
           </div>
+        </div>
+
+        {/* 我的动态（评分/收藏/评论，时间降序） */}
+        <div className="mb-8">
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>我的动态</h3>
+          {activity.length === 0 ? (
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>还没有动态</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
+              {activity.map((item, idx) => {
+                const badge =
+                  item.type === 'rating'
+                    ? { text: '评分', color: '#FB71A7' }
+                    : item.type === 'review'
+                      ? { text: '评论', color: '#C77DFF' }
+                      : { text: '收藏', color: '#4DA6FF' }
+                const desc =
+                  item.type === 'rating'
+                    ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}`
+                    : item.type === 'review'
+                      ? (item.review || (item.score ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}` : '写了评论'))
+                      : '收藏了'
+                return (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-14 rounded-md overflow-hidden shrink-0"
+                      style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
+                    >
+                      {item.content_cover ? (
+                        <img src={secureUrl(item.content_cover)} alt="" className="w-full h-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {item.content_title}
+                        </span>
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                          style={{ background: `${badge.color}1a`, color: badge.color }}
+                        >
+                          {badge.text}
+                        </span>
+                      </div>
+                      <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        {desc} · {new Date(item.updated_at).toLocaleDateString('zh-CN')}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {activityTotal > activity.length && (
+                <button
+                  onClick={() => loadActivity(activityPage + 1)}
+                  disabled={activityLoading}
+                  className="w-full py-1.5 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+                  style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
+                >
+                  {activityLoading ? '加载中...' : `加载更多（${activity.length}/${activityTotal}）`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 关于 */}

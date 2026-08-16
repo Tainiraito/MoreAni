@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Search, Star, Tv, Save, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToastStore } from '@/stores/toast-store'
+import { useUIStore } from '@/stores/ui-store'
 import { secureUrl } from '@/components/ui/CoverImage'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
@@ -282,6 +283,8 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       await api.deleteContent(contentId)
       toast.addToast('success', '已删除')
       onClose()
+      // 若详情弹窗还开着（编辑弹窗从详情打开），一并关闭
+      useUIStore.getState().closeDetail()
     } catch (err: any) {
       // 显示真实错误原因（403 无权限 / 429 限流等），避免「到底删没删」的困惑
       toast.addToast('error', err.message || '删除失败')

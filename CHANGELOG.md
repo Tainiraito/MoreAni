@@ -69,7 +69,9 @@
 ### 用户体系
 - 支持修改昵称（设置弹窗表单；唯一性校验 + 防登录二义性，重复昵称 409）
 - 设置弹窗重构为「用户信息」弹窗：昵称旁编辑 icon 行内编辑（原位置变输入框），修改密码改为独立弹窗（按钮在角色右侧），输入框不再常驻
-- 用户信息弹窗新增统计信息：均分/评分/收藏/评论/添加番剧（后端 get_user_stats 扩展 + UserPublicProfile 补 nickname 字段，顺带修复 ProfilePage 昵称不显示）
+- 用户信息弹窗新增统计信息：均分/评分/收藏/评论（后端 get_user_stats 扩展 + UserPublicProfile 补 nickname 字段，顺带修复 ProfilePage 昵称不显示）
+- 用户信息弹窗新增「我的动态」列表：评分/收藏/评论按时间降序展示（封面/名称/类型标签/评分/评论），分页加载更多（后端新增 GET /user/{id}/activity）
+- 删除番剧确认后同时关闭编辑弹窗与详情弹窗
 
 ### 安全加固（审计）
 - [高危] CORS 白名单化：`allow_origins=['*'] + credentials` 改为显式白名单（localhost + moreani.lovelysia.top，ALLOWED_ORIGINS 环境变量可覆盖）
