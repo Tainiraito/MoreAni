@@ -136,7 +136,12 @@ def create_content(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ContentItemResponse:
-    """Create a new content item."""
+    """Create a new content item.
+
+    Only admins can add new content (friends review & rate, admins curate).
+    """
+    if user.role != 'admin':
+        raise HTTPException(status_code=403, detail='No permission to add content')
     try:
         item = content_svc.create_content(
             db,

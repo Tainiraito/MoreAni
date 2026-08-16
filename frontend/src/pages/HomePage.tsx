@@ -306,19 +306,22 @@ export function HomePage() {
               { value: 'title', label: '标题排序' },
             ]}
           />
-          <button
-            onClick={openAddAnime}
-            className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
-            style={{
-              background: '#FB71A7',
-              color: 'white',
-              border: 'none',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-          >
-            + 添加番剧
-          </button>
+          {/* 仅管理员显示新增按钮（普通用户无权限，避免操作后报错） */}
+          {user?.role === 'admin' && (
+            <button
+              onClick={openAddAnime}
+              className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
+              style={{
+                background: '#FB71A7',
+                color: 'white',
+                border: 'none',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+            >
+              + 添加番剧
+            </button>
+          )}
           {/* 视图切换（组合式：评论列表 / 卡片网格） */}
           <div
             className="flex items-center ml-1 rounded-lg overflow-hidden"
