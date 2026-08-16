@@ -62,6 +62,9 @@
 - 详情弹窗：我的评论显示「未打分」标记；他人评论列表展示只评论用户（修复 get_content_ratings 过滤 score>0 导致的只评论评论被吞）
 - 删除番剧错误提示增强：显示真实错误原因（403/429 等），刷新动作移出 try 避免误报「删除失败」
 
+### 修复
+- 删除失败真正根因：浏览器残留的 COI Service Worker 拦截 fetch 后尝试重建 Response，DELETE 的 204（null body）无法构造带 body 的 Response 而抛错。main.tsx 增加 Service Worker 清理（unregister 残留注册），本项目不需要 SW
+
 
 
 ### 重构
