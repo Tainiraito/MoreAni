@@ -199,6 +199,12 @@ class ContentListResponse(BaseModel):
     size: int
 
 
+class RecommendationResponse(BaseModel):
+    """首页推荐池响应。"""
+
+    items: list[ContentItemResponse]
+
+
 class ShareLinkCreate(BaseModel):
     """Create share link request body."""
 

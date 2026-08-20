@@ -6,14 +6,19 @@ from typing import Literal
 
 from fastapi import HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from models import ContentItem, ContentTag, Rating, Tag, UserContentStatus
 
 
 def get_content_by_id(db: Session, content_id: int) -> ContentItem | None:
     """Get a single content item by ID (excludes soft-deleted)."""
-    return db.query(ContentItem).filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None)).first()
+    return (
+        db.query(ContentItem)
+        .options(selectinload(ContentItem.tags))
+        .filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None))
+        .first()
+    )
 
 
 def list_content(
@@ -176,8 +181,89 @@ def list_content(
         # updated_desc (default) — most recently updated first
         query = query.order_by(ContentItem.updated_at.desc(), ContentItem.id.desc())
 
-    items = query.offset((page - 1) * size).limit(size).all()
+    items = query.options(selectinload(ContentItem.tags)).offset((page - 1) * size).limit(size).all()
     return items, total
+
+
+def get_recommendations(
+    db: Session,
+    *,
+    content_type: str,
+    size: int,
+    exclude_ids: list[int],
+    user_id: int | None,
+) -> list[ContentItem]:
+    """生成单次无重复的公开推荐池，排除不足时允许从上一轮回填。"""
+    base_filters = (
+        ContentItem.content_type == content_type,
+        ContentItem.is_public == True,  # noqa: E712
+        ContentItem.deleted_at.is_(None),
+        ContentItem.cover_url.isnot(None),
+        ContentItem.cover_url != '',
+    )
+    excluded = set(exclude_ids)
+    chosen: list[ContentItem] = []
+    chosen_ids: set[int] = set()
+    interacted_subquery = None
+
+    if user_id is not None:
+        mine_limit = size // 2
+        interacted_subquery = db.query(Rating.content_id).filter(
+            Rating.user_id == user_id,
+            (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
+        )
+        mine = (
+            db.query(ContentItem)
+            .join(Rating, Rating.content_id == ContentItem.id)
+            .options(selectinload(ContentItem.tags))
+            .filter(
+                *base_filters,
+                Rating.user_id == user_id,
+                (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
+                ~ContentItem.id.in_(excluded or {-1}),
+            )
+            .distinct()
+            .order_by(func.random())
+            .limit(mine_limit)
+            .all()
+        )
+        chosen.extend(mine)
+        chosen_ids.update(item.id for item in mine)
+
+    remaining = size - len(chosen)
+    if remaining:
+        random_query = (
+            db.query(ContentItem)
+            .options(selectinload(ContentItem.tags))
+            .filter(
+                *base_filters,
+                ~ContentItem.id.in_((excluded | chosen_ids) or {-1}),
+            )
+        )
+        if interacted_subquery is not None:
+            random_query = random_query.filter(~ContentItem.id.in_(interacted_subquery))
+        random_items = random_query.order_by(func.random()).limit(remaining).all()
+        chosen.extend(random_items)
+        chosen_ids.update(item.id for item in random_items)
+
+    # 排除上一轮后不够时，从上一轮回填；响应内部仍按 chosen_ids 去重。
+    remaining = size - len(chosen)
+    if remaining and excluded:
+        backfill_query = (
+            db.query(ContentItem)
+            .options(selectinload(ContentItem.tags))
+            .filter(
+                *base_filters,
+                ContentItem.id.in_(excluded),
+                ~ContentItem.id.in_(chosen_ids or {-1}),
+            )
+        )
+        if interacted_subquery is not None:
+            backfill_query = backfill_query.filter(~ContentItem.id.in_(interacted_subquery))
+        backfill = backfill_query.order_by(func.random()).limit(remaining).all()
+        chosen.extend(backfill)
+
+    return chosen
 
 
 def create_content(
@@ -290,6 +376,7 @@ def get_random_content(db: Session) -> ContentItem | None:
     """Return one random public content item."""
     return (
         db.query(ContentItem)
+        .options(selectinload(ContentItem.tags))
         .filter(
             ContentItem.is_public == True,  # noqa: E712
             ContentItem.deleted_at.is_(None),

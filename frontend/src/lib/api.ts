@@ -1,5 +1,5 @@
 import { useToastStore } from '@/stores/toast-store'
-import type { InviteCode, User } from '@/types'
+import type { ContentItem, InviteCode, PaginatedResponse, User } from '@/types'
 
 const API_BASE = '/api/v1'
 
@@ -76,9 +76,17 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
   // Content
-  listContent: (params?: Record<string, string>) => {
+  listContent: (params?: Record<string, string>, options?: RequestInit) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<{ items: unknown[]; total: number; page: number; size: number }>(`/content${q}`)
+    return request<PaginatedResponse<ContentItem>>(`/content${q}`, options)
+  },
+  getRecommendations: (
+    params: { type?: string; size: number; excludeIds?: number[] },
+    options?: RequestInit,
+  ) => {
+    const query = new URLSearchParams({ type: params.type ?? 'anime', size: String(params.size) })
+    params.excludeIds?.forEach(id => query.append('exclude_id', String(id)))
+    return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getContent: (id: number) => request<unknown>(`/content/${id}`),

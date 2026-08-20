@@ -321,7 +321,7 @@ function UserManageTab() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }} {...confirmMask}>
           <div className="rounded-2xl w-[360px] max-w-[90vw] p-6 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={e => e.stopPropagation()}>
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              确定删除用户「{confirmDelete.nickname}」吗？
+              确定删除用户「{confirmDelete.nickname}」吗？评分、评论和收藏将删除；创建的内容将转交给当前超级管理员。
             </p>
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
               将同时删除其全部评分、评论和收藏，且不可恢复

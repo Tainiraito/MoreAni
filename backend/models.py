@@ -41,7 +41,8 @@ class User(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     ratings = relationship('Rating', back_populates='user', cascade='all, delete-orphan')
-    content_items = relationship('ContentItem', back_populates='creator', cascade='all, delete-orphan')
+    # 删除账号时内容会先转交给执行操作的超级管理员，不能随父用户级联删除。
+    content_items = relationship('ContentItem', back_populates='creator')
     statuses = relationship('UserContentStatus', back_populates='user', cascade='all, delete-orphan')
 
 

@@ -52,8 +52,8 @@ def create_user(
         role=role,
     )
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    # 事务边界由调用方控制。注册流程必须让“用户创建 + 邀请码消费”原子提交。
+    db.flush()
     return user
 
 

@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { secureUrl } from '@/components/ui/CoverImage'
+import { secureUrl } from '@/lib/image-url'
 import type { ContentItem } from '@/types'
 
 const TYPE_LABELS: Record<string, string> = {

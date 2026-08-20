@@ -1,14 +1,10 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
-import { ProfilePage } from '@/pages/ProfilePage'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
-import { ContentFormDialog } from '@/components/content/ContentFormDialog'
 import { AuthDialog } from '@/components/auth/AuthDialog'
-import { SettingsDialog } from '@/components/settings/SettingsDialog'
-import { AdminDialog } from '@/components/admin/AdminDialog'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
@@ -18,14 +14,19 @@ import { api } from '@/lib/api'
 import { useRefreshStore } from '@/stores/refresh-store'
 
 const queryClient = new QueryClient()
+const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
+const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
+const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
+const AdminDialog = lazy(() => import('@/components/admin/AdminDialog').then(module => ({ default: module.AdminDialog })))
 
 function AuthValidator({ children }: { children: React.ReactNode }) {
   const { user, setUser, logout } = useAuthStore()
   const { loadFavorites } = useFavoriteStore()
   const [checking, setChecking] = useState(true)
+  const [initialUser] = useState(user)
 
   useEffect(() => {
-    if (user) {
+    if (initialUser) {
       api.getMe()
         .then(userData => {
           setUser({
@@ -46,7 +47,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
     } else {
       setChecking(false)
     }
-  }, [])
+  }, [initialUser, loadFavorites, logout, setUser])
 
   if (checking) {
     return (
@@ -60,7 +61,15 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
 }
 
 function GlobalDialogs() {
-  const { detailContentId, addAnimeOpen, editContentId, closeAddAnime, closeEditContent } = useUIStore()
+  const {
+    detailContentId,
+    addAnimeOpen,
+    editContentId,
+    settingsOpen,
+    adminOpen,
+    closeAddAnime,
+    closeEditContent,
+  } = useUIStore()
   const { isFavorited, toggleFavorite, loadFavorites } = useFavoriteStore()
 
   const handleRefresh = () => {
@@ -74,8 +83,16 @@ function GlobalDialogs() {
         isFavorited={detailContentId ? isFavorited(detailContentId) : false}
         onToggleFavorite={toggleFavorite}
       />
-      <ContentFormDialog open={addAnimeOpen} onClose={closeAddAnime} onSaved={handleRefresh} />
-      <ContentFormDialog contentId={editContentId} open={!!editContentId} onClose={closeEditContent} onSaved={handleRefresh} />
+      <Suspense fallback={null}>
+        {addAnimeOpen && (
+          <ContentFormDialog open onClose={closeAddAnime} onSaved={handleRefresh} />
+        )}
+        {!!editContentId && (
+          <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleRefresh} />
+        )}
+        {settingsOpen && <SettingsDialog />}
+        {adminOpen && <AdminDialog />}
+      </Suspense>
     </>
   )
 }
@@ -89,15 +106,13 @@ export default function App() {
             <AppHeader />
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/profile/:id" element={<ProfilePage />} />
+              <Route path="/profile/:id" element={<Suspense fallback={null}><ProfilePage /></Suspense>} />
             </Routes>
           </div>
 
           {/* Global Dialogs */}
           <GlobalDialogs />
           <AuthDialog />
-          <SettingsDialog />
-          <AdminDialog />
           <ToastContainer />
         </AuthValidator>
       </BrowserRouter>

@@ -8,7 +8,7 @@ import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from auth import get_password_hash
@@ -85,7 +85,8 @@ def create_user_admin(
     if role not in ('user', 'admin', 'super_admin'):
         raise HTTPException(status_code=422, detail='角色不合法')
     # 唯一性
-    exists = db.query(User).filter((User.username == username) | (User.nickname == nickname)).first()
+    identifiers = [username, nickname]
+    exists = db.query(User).filter(or_(User.username.in_(identifiers), User.nickname.in_(identifiers))).first()
     if exists:
         raise HTTPException(status_code=409, detail='账号或昵称已被使用')
     user = User(
@@ -118,15 +119,22 @@ def update_user_admin(
     password = body.get('password') if 'password' in body else None
     role = body.get('role') if 'role' in body else None
 
-    if username is not None and username and username != user.username:
-        clash = db.query(User).filter(User.username == username, User.id != user.id).first()
-        if clash:
-            raise HTTPException(status_code=409, detail='账号已被使用')
+    candidate_username = username or user.username
+    candidate_nickname = nickname or user.nickname
+    identifiers = [candidate_username, candidate_nickname]
+    clash = (
+        db.query(User)
+        .filter(
+            User.id != user.id,
+            or_(User.username.in_(identifiers), User.nickname.in_(identifiers)),
+        )
+        .first()
+    )
+    if clash:
+        raise HTTPException(status_code=409, detail='账号或昵称已被使用')
+    if username:
         user.username = username
-    if nickname is not None and nickname and nickname != user.nickname:
-        clash = db.query(User).filter(User.nickname == nickname, User.id != user.id).first()
-        if clash:
-            raise HTTPException(status_code=409, detail='昵称已被使用')
+    if nickname:
         user.nickname = nickname
     if password:
         if len(password) < 6:
@@ -157,11 +165,24 @@ def delete_user_admin(
         raise HTTPException(status_code=400, detail='不能删除自己')
     _ensure_super_admin_kept(db, user)
 
-    db.query(Rating).filter(Rating.user_id == user_id).delete()
-    db.query(UserContentStatus).filter(UserContentStatus.user_id == user_id).delete()
-    db.query(ShareLink).filter(ShareLink.created_by == user_id).delete()
-    db.delete(user)
-    db.commit()
+    try:
+        # 使用原生 SQL，避免触发 ContentItem.updated_at 的 onupdate；内容历史只改变归属。
+        db.execute(
+            text('UPDATE content_items SET created_by = :admin_id WHERE created_by = :user_id'),
+            {'admin_id': admin.id, 'user_id': user_id},
+        )
+        db.query(Rating).filter(Rating.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserContentStatus).filter(UserContentStatus.user_id == user_id).delete(synchronize_session=False)
+        db.query(ShareLink).filter(ShareLink.created_by == user_id).delete(synchronize_session=False)
+        db.query(InviteCode).filter(InviteCode.used_by == user_id).update(
+            {InviteCode.used_by: None},
+            synchronize_session=False,
+        )
+        db.delete(user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 # ── 邀请码管理 ──────────────────────────────────────────────────────────

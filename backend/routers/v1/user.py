@@ -127,6 +127,7 @@ def get_user_profile(
         username=target.username,
         nickname=target.nickname,
         avatar_id=target.avatar_id,
+        avatar_url=target.avatar_url,
         role=target.role,
         created_at=target.created_at,
         rating_count=stats['rating_count'],

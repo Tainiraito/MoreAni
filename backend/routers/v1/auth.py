@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import or_, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import create_access_token, get_password_hash, verify_password
@@ -58,7 +60,7 @@ def login(
     return AuthResponse(user=UserResponse.model_validate(user))
 
 
-@router.post('/register', response_model=AuthResponse)
+@router.post('/register', response_model=AuthResponse, status_code=201)
 def register(
     body: RegisterRequest,
     response: Response,
@@ -68,52 +70,57 @@ def register(
 
     Sets httpOnly cookie 'access_token' on success.
     """
-    # Validate invite code
-    invite = db.query(InviteCode).filter(InviteCode.code == body.invite_code).first()
-    if not invite:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='邀请码无效',
+    now = datetime.now(UTC).replace(tzinfo=None)
+    try:
+        # 先用单条条件 UPDATE 占用名额。SQLite 会串行化写入并在锁释放后重新判断 WHERE，
+        # 因此两个 worker 同时使用最后一个名额时也只会有一个 rowcount=1。
+        reserved = db.execute(
+            update(InviteCode)
+            .where(
+                InviteCode.code == body.invite_code,
+                InviteCode.use_count < InviteCode.max_uses,
+                or_(InviteCode.expires_at.is_(None), InviteCode.expires_at >= now),
+            )
+            .values(use_count=InviteCode.use_count + 1)
         )
-    if invite.use_count >= invite.max_uses:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail='邀请码已用完',
-        )
-    # SQLite DATETIME 存的是 naive UTC，用 naive now 比较
-    if invite.expires_at and invite.expires_at < datetime.now(UTC).replace(tzinfo=None):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail='邀请码已过期',
-        )
+        if reserved.rowcount != 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='邀请码无效、已过期或已用完',
+            )
 
-    # Check username & nickname uniqueness — both must not collide with ANY
-    # existing username/nickname, otherwise login lookup becomes ambiguous.
-    if get_user_by_login(db, body.username):
+        # username 与 nickname 共用登录入口，必须在两个字段之间也保持全局不冲突。
+        identifiers = [body.username, body.nickname]
+        collision = db.query(User).filter(or_(User.username.in_(identifiers), User.nickname.in_(identifiers))).first()
+        if collision:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='账号或昵称已被使用',
+            )
+
+        user = create_user(
+            db,
+            username=body.username,
+            nickname=body.nickname,
+            password_hash=get_password_hash(body.password),
+        )
+        invite = db.query(InviteCode).filter(InviteCode.code == body.invite_code).one()
+        if invite.use_count >= invite.max_uses:
+            invite.used_by = user.id
+        db.commit()
+        db.refresh(user)
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail='账号已被使用',
-        )
-    if get_user_by_login(db, body.nickname):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail='昵称已被使用',
-        )
-
-    # Create user
-    password_hash = get_password_hash(body.password)
-    user = create_user(
-        db,
-        username=body.username,
-        nickname=body.nickname,
-        password_hash=password_hash,
-    )
-
-    # Increment invite code usage
-    invite.use_count += 1
-    if invite.use_count >= invite.max_uses:
-        invite.used_by = user.id  # last use — mark with the user
-    db.commit()
+            detail='账号或昵称已被使用',
+        ) from exc
+    except Exception:
+        db.rollback()
+        raise
 
     # Auto-login
     token = create_access_token({'sub': user.id})

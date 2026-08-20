@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from models import ContentItem, Rating, User
@@ -70,37 +70,62 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
     Returns dict with avg_score, avg_recommend, rating_count.
     score=0 means 'no rating' — excluded from average.
     """
-    stats = (
-        db.query(
-            func.avg(Rating.score).label('avg_score'),
-            func.avg(Rating.recommend).label('avg_recommend'),
-            func.count(Rating.id).label('rating_count'),
-        )
-        .filter(Rating.content_id == content_id, Rating.score > 0)
-        .first()
+    return get_rating_stats_map(db, [content_id]).get(
+        content_id,
+        {
+            'avg_score': None,
+            'avg_recommend': None,
+            'rating_count': 0,
+            'review_count': 0,
+        },
     )
 
-    avg_score = round(float(stats[0]), 1) if stats[0] else None
-    avg_recommend = round(float(stats[1]), 1) if stats[1] else None
-    rating_count = stats[2] or 0
 
-    # 评论数（review 非空，含 score=0 的只评论）
-    review_count = (
-        db.query(func.count(Rating.id))
-        .filter(
-            Rating.content_id == content_id,
-            Rating.review.isnot(None),
-            Rating.review != '',
+def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]:
+    """批量计算内容评分统计，返回 content_id -> stats。"""
+    if not content_ids:
+        return {}
+
+    rows = (
+        db.query(
+            Rating.content_id,
+            func.avg(case((Rating.score > 0, Rating.score))).label('avg_score'),
+            func.avg(case((Rating.score > 0, Rating.recommend))).label('avg_recommend'),
+            func.count(case((Rating.score > 0, Rating.id))).label('rating_count'),
+            func.count(
+                case(
+                    (
+                        Rating.review.isnot(None) & (Rating.review != ''),
+                        Rating.id,
+                    )
+                )
+            ).label('review_count'),
         )
-        .scalar()
-    ) or 0
-
+        .filter(Rating.content_id.in_(content_ids))
+        .group_by(Rating.content_id)
+        .all()
+    )
     return {
-        'avg_score': avg_score,
-        'avg_recommend': avg_recommend,
-        'rating_count': rating_count,
-        'review_count': review_count,
+        row.content_id: {
+            'avg_score': round(float(row.avg_score), 1) if row.avg_score else None,
+            'avg_recommend': round(float(row.avg_recommend), 1) if row.avg_recommend else None,
+            'rating_count': row.rating_count or 0,
+            'review_count': row.review_count or 0,
+        }
+        for row in rows
     }
+
+
+def get_user_ratings_map(
+    db: Session,
+    user_id: int | None,
+    content_ids: list[int],
+) -> dict[int, Rating]:
+    """批量返回当前用户在指定内容上的评分记录。"""
+    if user_id is None or not content_ids:
+        return {}
+    ratings = db.query(Rating).filter(Rating.user_id == user_id, Rating.content_id.in_(content_ids)).all()
+    return {rating.content_id: rating for rating in ratings}
 
 
 def get_recent_reviews_map(
@@ -118,7 +143,11 @@ def get_recent_reviews_map(
     rows = (
         db.query(Rating, User)
         .join(User, Rating.user_id == User.id)
-        .filter(Rating.content_id.in_(content_ids))
+        .filter(
+            Rating.content_id.in_(content_ids),
+            Rating.review.isnot(None),
+            Rating.review != '',
+        )
         .order_by(Rating.updated_at.desc())
         .all()
     )

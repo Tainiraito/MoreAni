@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useRefreshStore } from '@/stores/refresh-store'
@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useMaskClose } from '@/hooks/use-mask-close'
 import { Avatar } from '@/components/ui/Avatar'
-import { secureUrl } from '@/components/ui/CoverImage'
+import { secureUrl } from '@/lib/image-url'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,6 +55,25 @@ export function SettingsDialog() {
   const [activityTotal, setActivityTotal] = useState(0)
   const [activityPage, setActivityPage] = useState(1)
   const [activityLoading, setActivityLoading] = useState(false)
+  const activityLoadingRef = useRef(false)
+
+  const loadActivity = useCallback(async (page: number, reset = false) => {
+    if (!user || activityLoadingRef.current) return
+    activityLoadingRef.current = true
+    setActivityLoading(true)
+    try {
+      const res = await api.getUserActivity(user.id, { page: String(page), size: '10' })
+      const items = (res.items || []) as ActivityItem[]
+      setActivity(prev => (reset ? items : [...prev, ...items]))
+      setActivityTotal(res.total || 0)
+      setActivityPage(page)
+    } catch {
+      // ignore
+    } finally {
+      activityLoadingRef.current = false
+      setActivityLoading(false)
+    }
+  }, [user])
 
   // 打开弹窗时加载用户统计 + 动态第一页
   useEffect(() => {
@@ -71,23 +90,7 @@ export function SettingsDialog() {
       })
       .catch(() => {})
     loadActivity(1, true)
-  }, [settingsOpen, user?.id])
-
-  const loadActivity = async (page: number, reset = false) => {
-    if (!user || activityLoading) return
-    setActivityLoading(true)
-    try {
-      const res = await api.getUserActivity(user.id, { page: String(page), size: '10' })
-      const items = (res.items || []) as ActivityItem[]
-      setActivity(prev => (reset ? items : [...prev, ...items]))
-      setActivityTotal(res.total || 0)
-      setActivityPage(page)
-    } catch {
-      // ignore
-    } finally {
-      setActivityLoading(false)
-    }
-  }
+  }, [settingsOpen, user, loadActivity])
 
   if (!settingsOpen) return null
 

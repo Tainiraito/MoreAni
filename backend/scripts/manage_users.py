@@ -17,10 +17,10 @@ from auth import get_password_hash  # noqa: E402
 from database import SessionLocal  # noqa: E402
 from models import User  # noqa: E402
 
-# 固定管理员（需求指定）
+# 固定管理员身份（需求指定）；密码必须由环境变量提供，绝不写入仓库。
 ADMIN_USERNAME = 'Elysia'
 ADMIN_NICKNAME = '爱莉希雅'
-ADMIN_PASSWORD = '***REMOVED***'
+ADMIN_PASSWORD_ENV = 'MOREANI_BOOTSTRAP_ADMIN_PASSWORD'
 
 
 def migrate_nickname() -> None:
@@ -56,10 +56,13 @@ def init_admin() -> None:
                 f'nickname={existing.nickname} role={existing.role} — 跳过创建'
             )
             return
+        password = os.environ.get(ADMIN_PASSWORD_ENV, '')
+        if len(password) < 12:
+            raise SystemExit(f'{ADMIN_PASSWORD_ENV} 未设置或少于 12 位，拒绝创建管理员')
         user = User(
             username=ADMIN_USERNAME,
             nickname=ADMIN_NICKNAME,
-            password_hash=get_password_hash(ADMIN_PASSWORD),
+            password_hash=get_password_hash(password),
             avatar_id=1,
             role='admin',
         )

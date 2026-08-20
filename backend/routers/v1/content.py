@@ -13,6 +13,7 @@ from schemas import (
     ContentItemUpdate,
     ContentListResponse,
     RecentReview,
+    RecommendationResponse,
     ShareLinkCreate,
     ShareLinkResponse,
     TagResponse,
@@ -26,42 +27,41 @@ router = APIRouter(prefix='/content', tags=['content'])
 
 def _to_response(
     item: ContentItem,
-    db: Session,
-    user_id: int | None = None,
-    recent_map: dict[int, list[dict]] | None = None,
+    stats_map: dict[int, dict],
+    recent_map: dict[int, list[dict]],
+    user_ratings_map: dict[int, object],
 ) -> ContentItemResponse:
-    """Convert a ContentItem ORM to response schema with computed fields."""
+    """只组装已批量加载的数据；此函数不得访问数据库。"""
     resp = ContentItemResponse.model_validate(item)
-    stats = rating_svc.get_rating_stats(db, item.id)
+    stats = stats_map.get(
+        item.id,
+        {'avg_score': None, 'avg_recommend': None, 'rating_count': 0, 'review_count': 0},
+    )
     resp.avg_score = stats['avg_score']
     resp.avg_recommend = stats['avg_recommend']
     resp.rating_count = stats['rating_count']
     resp.review_count = stats['review_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
-    # Recent reviews（列表场景传 recent_map 批量填充，单条场景单独查询）
-    if recent_map is not None:
-        resp.recent_reviews = [RecentReview(**r) for r in recent_map.get(item.id, [])]
-    else:
-        single = rating_svc.get_recent_reviews_map(db, [item.id], limit=6)
-        resp.recent_reviews = [RecentReview(**r) for r in single.get(item.id, [])]
-    # User-specific fields
-    if user_id:
-        from models import Rating
-
-        my_rating = (
-            db.query(Rating)
-            .filter(
-                Rating.content_id == item.id,
-                Rating.user_id == user_id,
-            )
-            .first()
-        )
-        if my_rating:
-            # my_score 只在打过分时返回；my_has_review 独立判断（只评论不评分也要标粉）
-            if my_rating.score > 0:
-                resp.my_score = my_rating.score / 10.0
-            resp.my_has_review = bool(my_rating.review and my_rating.review.strip())
+    resp.recent_reviews = [RecentReview(**r) for r in recent_map.get(item.id, [])]
+    my_rating = user_ratings_map.get(item.id)
+    if my_rating:
+        if my_rating.score > 0:
+            resp.my_score = my_rating.score / 10.0
+        resp.my_has_review = bool(my_rating.review and my_rating.review.strip())
     return resp
+
+
+def _build_responses(
+    db: Session,
+    items: list[ContentItem],
+    user_id: int | None = None,
+) -> list[ContentItemResponse]:
+    """用固定次数查询批量补齐列表/详情所需派生字段。"""
+    content_ids = [item.id for item in items]
+    stats_map = rating_svc.get_rating_stats_map(db, content_ids)
+    recent_map = rating_svc.get_recent_reviews_map(db, content_ids, limit=6)
+    user_ratings_map = rating_svc.get_user_ratings_map(db, user_id, content_ids)
+    return [_to_response(item, stats_map, recent_map, user_ratings_map) for item in items]
 
 
 @router.get('', response_model=ContentListResponse)
@@ -104,10 +104,8 @@ def list_content(
         page=page,
         size=size,
     )
-    # 批量取最近评论（避免逐 item 查询的 N+1）；瀑布流视图需要更多条
-    recent_map = rating_svc.get_recent_reviews_map(db, [i.id for i in items], limit=6)
     return ContentListResponse(
-        items=[_to_response(i, db, user.id if user else None, recent_map) for i in items],
+        items=_build_responses(db, items, user.id if user else None),
         total=total,
         page=page,
         size=size,
@@ -120,7 +118,26 @@ def random_content(db: Session = Depends(get_db)) -> ContentItemResponse:
     item = content_svc.get_random_content(db)
     if not item:
         raise HTTPException(status_code=404, detail='No content available')
-    return _to_response(item, db)
+    return _build_responses(db, [item])[0]
+
+
+@router.get('/recommendations', response_model=RecommendationResponse)
+def recommendations(
+    db: Session = Depends(get_db),
+    type: str = Query('anime', description='内容类型'),
+    size: int = Query(12, ge=1, le=30),
+    exclude_id: list[int] = Query(default=[]),
+    user: User | None = Depends(get_current_user_optional),
+) -> RecommendationResponse:
+    """返回首页使用的单一、无重复推荐池。"""
+    items = content_svc.get_recommendations(
+        db,
+        content_type=type,
+        size=size,
+        exclude_ids=exclude_id,
+        user_id=user.id if user else None,
+    )
+    return RecommendationResponse(items=_build_responses(db, items, user.id if user else None))
 
 
 @router.get('/seasons')
@@ -179,7 +196,11 @@ def get_content(
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
-    return _to_response(item, db, user_id=user.id if user else None)
+    if not item.is_public and (
+        user is None or (item.created_by != user.id and user.role not in ('admin', 'super_admin'))
+    ):
+        raise HTTPException(status_code=404, detail='Content not found')
+    return _build_responses(db, [item], user.id if user else None)[0]
 
 
 @router.post('', response_model=ContentItemResponse, status_code=201)
@@ -219,7 +240,8 @@ def create_content(
     # 确认添加后才下载封面到本地（搜索仅预览不下载；失败降级外链）
     covers_svc.localize_cover(item, body.cover_url)
     db.commit()
-    return _to_response(item, db)
+    item = content_svc.get_content_by_id(db, item.id)
+    return _build_responses(db, [item], user.id)[0]
 
 
 @router.put('/{content_id}', response_model=ContentItemResponse)
@@ -245,7 +267,8 @@ def update_content(
     if 'cover_url' in update_data:
         covers_svc.localize_cover(updated, updated.cover_url)
         db.commit()
-    return _to_response(updated, db)
+    updated = content_svc.get_content_by_id(db, updated.id)
+    return _build_responses(db, [updated], user.id)[0]
 
 
 @router.delete('/{content_id}', status_code=204)

@@ -8,7 +8,7 @@ import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
-import { secureUrl } from '@/components/ui/CoverImage'
+import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
 import type { ContentItem } from '@/types'
 
@@ -90,7 +90,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
         .catch(() => toast.addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId, user?.username, refreshKey])
+  }, [detailOpen, detailContentId, user, refreshKey, toast])
 
   // Lock body scroll when dialog is open
   useEffect(() => {

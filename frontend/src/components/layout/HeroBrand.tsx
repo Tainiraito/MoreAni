@@ -1,62 +1,29 @@
 import { useState, useEffect, useRef } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
-import { useRefreshStore } from '@/stores/refresh-store'
 import { useTheme } from '@/hooks/use-theme'
 import { Avatar } from '@/components/ui/Avatar'
 import { Sun, Moon } from 'lucide-react'
-import { api } from '@/lib/api'
 import { AnimeCard } from '@/components/content/AnimeCard'
 import type { ContentItem } from '@/types'
+import { buildLoopItems, getRecommendationSequenceWidth } from '@/lib/content-query'
 
-/** 随机打乱数组 */
-function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  return shuffled
+interface HeroBrandProps {
+  items: ContentItem[]
 }
 
-export function HeroBrand() {
+export function HeroBrand({ items }: HeroBrandProps) {
   const { openAuth, authOpen, detailOpen, openSettings } = useUIStore()
   const { user } = useAuthStore()
   const { theme, toggleTheme } = useTheme()
   const { openDetail } = useUIStore()
-  const [items, setItems] = useState<ContentItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef(0)
   const hasTriggeredRef = useRef(false)
-  const lastShownRef = useRef<Set<number>>(new Set()) // 上次展示的卡片 id（随机推荐避免重复）
   const cardWidth = 160
   const gap = 20
-
-  // 加载番剧内容并随机选取（refreshKey 变化时重新加载，评分/收藏后数据保持最新）
-  const refreshKey = useRefreshStore(s => s.refreshKey)
-  useEffect(() => {
-    // 全量拉取后随机：推荐区从所有番剧里选（不限制数量）
-    api.listContent({ type: 'anime', size: '1000' })
-      .then(res => {
-        const list = (res.items || []) as ContentItem[]
-        const withCover = list.filter(i => i.cover_url)
-        // 自己评分/评论过的优先展示（最多一半），其余随机——推荐区能看出自己的评分评论状态
-        const mine = shuffleArray(withCover.filter(i => i.my_score || i.my_has_review))
-        const others = shuffleArray(withCover.filter(i => !(i.my_score || i.my_has_review)))
-        // 排除上一次展示过的卡片（避免「刚推荐过的又重复推荐」）
-        const prevIds = lastShownRef.current
-        const mineFresh = mine.filter(i => !prevIds.has(i.id))
-        const othersFresh = others.filter(i => !prevIds.has(i.id))
-        // mine 优先最多 6 张（上次的只在不够时补回），others 用没展示过的
-        const mineSelected = (mineFresh.length >= 6 ? mineFresh : [...mineFresh, ...mine.filter(i => prevIds.has(i.id))]).slice(0, 6)
-        const selected = [...mineSelected, ...othersFresh].slice(0, 12)
-        lastShownRef.current = new Set(selected.map(i => i.id))
-        setItems(selected)
-      })
-      .catch(() => {})
-  }, [refreshKey])
 
   // 监听鼠标滚轮事件（仅未登录时）
   useEffect(() => {
@@ -112,13 +79,13 @@ export function HeroBrand() {
     const container = scrollContainerRef.current
     if (!container || items.length === 0) return
 
-    const singleSetWidth = items.length * (cardWidth + gap)
+    const singleSetWidth = getRecommendationSequenceWidth(items.length, cardWidth, gap)
     const duration = singleSetWidth / 25
     container.style.animationDuration = `${duration}s`
   }, [items])
 
-  // 生成足够的卡片用于无缝循环（4组）
-  const displayItems = Array(4).fill(items).flat()
+  // 服务端保证逻辑序列内唯一；DOM 仅复制两份以实现完整一轮后的无缝循环。
+  const displayItems = buildLoopItems(items)
 
   return (
     <div className="relative min-h-screen" style={{ background: 'transparent' }}>
@@ -224,7 +191,7 @@ export function HeroBrand() {
             >
               {displayItems.map((item, index) => (
                 <AnimeCard
-                  key={index}
+                  key={`${Math.floor(index / items.length)}-${item.id}`}
                   content={item}
                   mode="scroll"
                   onSelect={openDetail}

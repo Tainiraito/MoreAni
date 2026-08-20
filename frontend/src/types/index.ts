@@ -18,7 +18,7 @@ export interface ContentItem {
   source_url: string
   metadata: Record<string, unknown>
   is_public: boolean
-  created_by: number
+  created_by: number | null
   created_at: string
   updated_at: string
   // Computed

@@ -5,7 +5,7 @@ import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useMaskClose } from '@/hooks/use-mask-close'
-import { secureUrl } from '@/components/ui/CoverImage'
+import { secureUrl } from '@/lib/image-url'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -154,7 +154,7 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       .then(item => setForm(toForm(item)))
       .catch(() => toast.addToast('error', '加载内容失败'))
       .finally(() => setLoading(false))
-  }, [open, contentId])
+  }, [open, contentId, isEditMode, toast])
 
   // ── Debounced Bangumi search ──
   const doSearch = useCallback(async (q: string) => {
@@ -175,7 +175,7 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
     } finally {
       setSearching(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -257,7 +257,7 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       const candidates = [
         searchTerm,
         form.title_alt?.trim() || '',
-        searchTerm.replace(/[\s\-—–~～・·.。:：'\"'']/g, ''),
+        searchTerm.replace(/[\s\-—–~～・·.。:：'"'']/g, ''),
         (searchTerm.match(/[A-Za-z0-9\u4e00-\u9fff]+/g) || []).join('') || searchTerm,
       ].filter(Boolean)
 

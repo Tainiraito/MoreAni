@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
@@ -13,6 +13,12 @@ import { Select } from '@/components/ui/select'
 import { HeroSection } from '@/components/content/HeroSection'
 import { LayoutGrid, List } from 'lucide-react'
 import type { ContentItem, ContentType } from '@/types'
+import {
+  buildContentListParams,
+  getRecommendationSize,
+  LatestRequestGate,
+  normalizeRecommendationItems,
+} from '@/lib/content-query'
 
 const PAGE_SIZE = 20
 
@@ -24,10 +30,14 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('anime')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
-  const [allAnime, setAllAnime] = useState<ContentItem[]>([])
+  const [recommendations, setRecommendations] = useState<ContentItem[]>([])
+  const recommendationItemsRef = useRef<ContentItem[]>([])
+  const recommendationRequestGate = useRef(new LatestRequestGate())
+  const [recommendationSize, setRecommendationSize] = useState(() => getRecommendationSize(window.innerWidth))
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
   const heroIdRef = useRef<number | null>(null)
+  const listRequestGate = useRef(new LatestRequestGate())
 
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
@@ -79,6 +89,52 @@ export function HomePage() {
   const isLoadingMoreRef = useRef(false)
   const AUTO_REFRESH_MS = 11000
 
+  const fetchRecommendations = useCallback(async (size: number, excludePrevious: boolean) => {
+    const requestId = recommendationRequestGate.current.begin()
+    const excludeIds = excludePrevious ? recommendationItemsRef.current.map(item => item.id) : []
+    try {
+      const response = await api.getRecommendations({ type: 'anime', size, excludeIds })
+      if (!recommendationRequestGate.current.isCurrent(requestId)) return
+      const unique = normalizeRecommendationItems(response.items)
+      recommendationItemsRef.current = unique
+      setRecommendations(unique)
+    } catch {
+      // 保留上一轮推荐，避免短暂网络错误导致首屏清空。
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchRecommendations(recommendationSize, recommendationItemsRef.current.length > 0)
+  }, [fetchRecommendations, recommendationSize, refreshKey, user?.id])
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const handleResize = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const required = getRecommendationSize(window.innerWidth)
+        if (required > recommendationItemsRef.current.length) setRecommendationSize(required)
+      }, 200)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (recommendations.length === 0) {
+      setHero(null)
+      return
+    }
+    const pool = recommendations.filter(item => item.id !== heroIdRef.current)
+    const source = pool.length > 0 ? pool : recommendations
+    const selected = source[Math.floor(Math.random() * source.length)]
+    heroIdRef.current = selected.id
+    setHero(selected)
+  }, [recommendations])
+
   // hero 的收藏状态直接从 store 派生
   const heroFavorited = hero ? isFavorited(hero.id) : false
 
@@ -95,27 +151,14 @@ export function HomePage() {
     }
   }
 
-  // 加载所有番剧（refreshKey 变化时重新加载，评分后精选区数据保持最新）
-  useEffect(() => {
-    if (!user) return
-
-    api.listContent({ type: 'anime', size: '1000' })
-      .then(res => {
-        const animeList = (res.items || []) as ContentItem[]
-        const withCover = animeList.filter(i => i.cover_url)
-        setAllAnime(withCover)
-        
-        if (withCover.length > 0) {
-          // 随机选 hero，排除上一次展示过的（避免连续重复同一张）
-          const pool = withCover.filter(i => i.id !== heroIdRef.current)
-          const source = pool.length > 0 ? pool : withCover
-          const randomIndex = Math.floor(Math.random() * source.length)
-          heroIdRef.current = source[randomIndex].id
-          setHero(source[randomIndex])
-        }
-      })
-      .catch(() => {})
-  }, [user, refreshKey])
+  const contentQuery = useMemo(() => ({
+    activeType,
+    searchQuery,
+    myFilter,
+    sortBy,
+    seasonFilter,
+    userFilter,
+  }), [activeType, searchQuery, myFilter, sortBy, seasonFilter, userFilter])
 
   // 加载当前 tab 的内容（重置分页）
   useEffect(() => {
@@ -126,25 +169,28 @@ export function HomePage() {
     setHasMore(true)
     setTotalCount(0)
 
-    const params: Record<string, string> = { page: '1', size: String(PAGE_SIZE), type: activeType }
-    if (searchQuery) params.q = searchQuery
-    if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
-    if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
-    if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
-    if (sortBy !== 'updated_desc') params.sort = sortBy
-    if (seasonFilter) params.season = seasonFilter
-    if (userFilter) params.rated_by = userFilter
+    const requestId = listRequestGate.current.begin()
+    const controller = new AbortController()
+    const params = buildContentListParams(contentQuery, 1, PAGE_SIZE)
 
-    api.listContent(params)
+    api.listContent(params, { signal: controller.signal })
       .then(res => {
-        const list = (res.items || []) as ContentItem[]
+        if (!listRequestGate.current.isCurrent(requestId)) return
+        const list = res.items || []
         setItems(list)
         setTotalCount(res.total || 0)
-        setHasMore(list.length >= PAGE_SIZE)
+        setHasMore(list.length < (res.total || 0))
       })
-      .catch(() => { setItems([]); setHasMore(false) })
-      .finally(() => setLoading(false))
-  }, [activeType, user, searchQuery, myFilter, refreshKey, sortBy, seasonFilter, userFilter])
+      .catch(() => {
+        if (controller.signal.aborted || !listRequestGate.current.isCurrent(requestId)) return
+        setItems([])
+        setHasMore(false)
+      })
+      .finally(() => {
+        if (listRequestGate.current.isCurrent(requestId)) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [contentQuery, user, refreshKey])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
@@ -153,32 +199,29 @@ export function HomePage() {
     setLoadingMore(true)
 
     const nextPage = page + 1
-    const params: Record<string, string> = { page: String(nextPage), size: String(PAGE_SIZE), type: activeType }
-    if (searchQuery) params.q = searchQuery
-    if (myFilter === 'rated' || myFilter === 'unrated') params.rated = myFilter
-    if (myFilter === 'reviewed' || myFilter === 'unreviewed') params.reviewed = myFilter
-    if (myFilter === 'favorited' || myFilter === 'unfavorited') params.favorited = myFilter
-    if (sortBy !== 'updated_desc') params.sort = sortBy
-    if (seasonFilter) params.season = seasonFilter
-    if (userFilter) params.rated_by = userFilter
+    const requestId = listRequestGate.current.begin()
+    const params = buildContentListParams(contentQuery, nextPage, PAGE_SIZE)
 
     try {
       const res = await api.listContent(params)
-      const list = (res.items || []) as ContentItem[]
+      if (!listRequestGate.current.isCurrent(requestId)) return
+      const list = res.items || []
+      setTotalCount(res.total)
       // 防御：追加前去重（分页偶发重叠时避免重复 key）
       setItems(prev => {
         const seen = new Set(prev.map(i => i.id))
-        return [...prev, ...list.filter(i => !seen.has(i.id))]
+        const next = [...prev, ...list.filter(i => !seen.has(i.id))]
+        setHasMore(next.length < res.total)
+        return next
       })
       setPage(nextPage)
-      setHasMore(list.length >= PAGE_SIZE)
     } catch {
       // ignore load-more errors
     } finally {
       setLoadingMore(false)
       isLoadingMoreRef.current = false
     }
-  }, [page, hasMore, loading, activeType, searchQuery, myFilter, sortBy])
+  }, [page, hasMore, loading, contentQuery])
 
   // 滚动监听：接近底部 300px 时触发 loadMore
   useEffect(() => {
@@ -195,26 +238,26 @@ export function HomePage() {
 
   // 换一个精选（手动或自动触发）
   const handleRefreshHero = useCallback(() => {
-    if (allAnime.length === 0) {
+    if (recommendations.length === 0) {
       setHero(null)
       return
     }
 
-    const remaining = allAnime.filter(a => a.id !== hero?.id)
+    const remaining = recommendations.filter(a => a.id !== hero?.id)
     if (remaining.length === 0) {
-      const randomIndex = Math.floor(Math.random() * allAnime.length)
-      setHero(allAnime[randomIndex])
+      const randomIndex = Math.floor(Math.random() * recommendations.length)
+      setHero(recommendations[randomIndex])
     } else {
       const randomIndex = Math.floor(Math.random() * remaining.length)
       setHero(remaining[randomIndex])
     }
     // Reset progress — timer restarts via useEffect on hero change
     setProgress(0)
-  }, [allAnime, hero])
+  }, [recommendations, hero])
 
   // Auto-refresh: CSS transition drives the animation, JS only sets start/end
   useEffect(() => {
-    if (!hero || allAnime.length <= 1) {
+    if (!hero || recommendations.length <= 1) {
       setProgress(0)
       return
     }
@@ -228,9 +271,9 @@ export function HomePage() {
       const raf2 = requestAnimationFrame(() => {
         setProgress(100)
         timer = setTimeout(() => {
-          if (allAnime.length > 1) {
-            const remaining = allAnime.filter(a => a.id !== hero?.id)
-            const pool = remaining.length > 0 ? remaining : allAnime
+          if (recommendations.length > 1) {
+            const remaining = recommendations.filter(a => a.id !== hero?.id)
+            const pool = remaining.length > 0 ? remaining : recommendations
             const randomIndex = Math.floor(Math.random() * pool.length)
             setHero(pool[randomIndex])
           }
@@ -247,18 +290,18 @@ export function HomePage() {
       cancelAnimationFrame(cleanupRaf2)
       clearTimeout(timer)
     }
-  }, [hero?.id, allAnime.length])
+  }, [hero, recommendations])
 
   // 未登录只显示首屏
   if (!user) {
-    return <HeroBrand />
+    return <HeroBrand items={recommendations} />
   }
 
   const animeItems = items.filter(i => i.content_type === 'anime')
 
   return (
     <PageMain>
-      <HeroBrand />
+      <HeroBrand items={recommendations} />
 
       <div className="pb-20 sm:pb-24">
         {hero && (

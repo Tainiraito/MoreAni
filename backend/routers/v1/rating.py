@@ -56,7 +56,7 @@ def delete_rating(
     rating = db.query(Rating).filter(Rating.id == rating_id).first()
     if not rating:
         raise HTTPException(status_code=404, detail='Rating not found')
-    if rating.user_id != user.id and user.role != 'admin':
+    if rating.user_id != user.id and user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail='No permission to delete this rating')
 
     rating_svc.delete_rating(db, rating)
