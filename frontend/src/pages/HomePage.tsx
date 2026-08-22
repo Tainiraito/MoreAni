@@ -30,10 +30,13 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('anime')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
-  const [recommendations, setRecommendations] = useState<ContentItem[]>([])
-  const recommendationItemsRef = useRef<ContentItem[]>([])
-  const recommendationRequestGate = useRef(new LatestRequestGate())
+  const [scrollRecommendations, setScrollRecommendations] = useState<ContentItem[]>([])
+  const scrollRecommendationsRef = useRef<ContentItem[]>([])
+  const scrollRequestGate = useRef(new LatestRequestGate())
+  const heroRequestGate = useRef(new LatestRequestGate())
   const [recommendationSize, setRecommendationSize] = useState(() => getRecommendationSize(window.innerWidth))
+  const recommendationSizeRef = useRef(recommendationSize)
+  recommendationSizeRef.current = recommendationSize
   const [loading, setLoading] = useState(true)
   const [progress, setProgress] = useState(0)
   const heroIdRef = useRef<number | null>(null)
@@ -89,23 +92,59 @@ export function HomePage() {
   const isLoadingMoreRef = useRef(false)
   const AUTO_REFRESH_MS = 11000
 
-  const fetchRecommendations = useCallback(async (size: number, excludePrevious: boolean) => {
-    const requestId = recommendationRequestGate.current.begin()
-    const excludeIds = excludePrevious ? recommendationItemsRef.current.map(item => item.id) : []
+  const fetchScrollRecommendations = useCallback(async (size: number, excludePrevious: boolean) => {
+    const requestId = scrollRequestGate.current.begin()
+    const previousIds = excludePrevious ? scrollRecommendationsRef.current.map(item => item.id) : []
     try {
-      const response = await api.getRecommendations({ type: 'anime', size, excludeIds })
-      if (!recommendationRequestGate.current.isCurrent(requestId)) return
+      const response = await api.getRecommendations({
+        type: 'anime',
+        size,
+        excludeIds: previousIds,
+      })
+      if (!scrollRequestGate.current.isCurrent(requestId)) return null
       const unique = normalizeRecommendationItems(response.items)
-      recommendationItemsRef.current = unique
-      setRecommendations(unique)
+      scrollRecommendationsRef.current = unique
+      setScrollRecommendations(unique)
+      return unique
     } catch {
       // 保留上一轮推荐，避免短暂网络错误导致首屏清空。
+      return null
     }
   }, [])
 
+  const fetchHeroRecommendation = useCallback(async () => {
+    const requestId = heroRequestGate.current.begin()
+    const currentHeroId = heroIdRef.current
+    const excludeIds = currentHeroId === null ? [] : [currentHeroId]
+    try {
+      const item = await api.getRandom({
+        type: 'anime',
+        excludeIds: [...new Set(excludeIds)],
+      })
+      if (!heroRequestGate.current.isCurrent(requestId)) return
+      if (!item || item.id === currentHeroId) return
+      heroIdRef.current = item.id
+      setHero(item)
+    } catch {
+      // 随机请求失败时保留当前精选，避免精选区闪烁。
+    }
+  }, [])
+
+  const fetchRecommendationPools = useCallback(async (size: number, excludePrevious: boolean, includeHero: boolean) => {
+    const scrollItems = await fetchScrollRecommendations(size, excludePrevious)
+    if (includeHero && scrollItems) {
+      await fetchHeroRecommendation()
+    }
+  }, [fetchHeroRecommendation, fetchScrollRecommendations])
+
   useEffect(() => {
-    void fetchRecommendations(recommendationSize, recommendationItemsRef.current.length > 0)
-  }, [fetchRecommendations, recommendationSize, refreshKey, user?.id])
+    const excludePrevious = scrollRecommendationsRef.current.length > 0
+    if (!user) {
+      heroIdRef.current = null
+      setHero(null)
+    }
+    void fetchRecommendationPools(recommendationSizeRef.current, excludePrevious, Boolean(user))
+  }, [fetchRecommendationPools, refreshKey, user])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
@@ -113,7 +152,10 @@ export function HomePage() {
       clearTimeout(timer)
       timer = setTimeout(() => {
         const required = getRecommendationSize(window.innerWidth)
-        if (required > recommendationItemsRef.current.length) setRecommendationSize(required)
+        if (required > scrollRecommendationsRef.current.length) {
+          setRecommendationSize(required)
+          void fetchScrollRecommendations(required, true)
+        }
       }, 200)
     }
     window.addEventListener('resize', handleResize)
@@ -121,21 +163,9 @@ export function HomePage() {
       clearTimeout(timer)
       window.removeEventListener('resize', handleResize)
     }
-  }, [])
+  }, [fetchScrollRecommendations])
 
-  useEffect(() => {
-    if (recommendations.length === 0) {
-      setHero(null)
-      return
-    }
-    const pool = recommendations.filter(item => item.id !== heroIdRef.current)
-    const source = pool.length > 0 ? pool : recommendations
-    const selected = source[Math.floor(Math.random() * source.length)]
-    heroIdRef.current = selected.id
-    setHero(selected)
-  }, [recommendations])
-
-  // hero 的收藏状态直接从 store 派生
+  // Hero 每次轮换都从全量公开番剧中重新随机抽取；不维护固定 Hero 池。
   const heroFavorited = hero ? isFavorited(hero.id) : false
 
   // Debounce search input：停顿 500ms 才触发搜索（避免每敲一个字符都调接口）；
@@ -238,26 +268,13 @@ export function HomePage() {
 
   // 换一个精选（手动或自动触发）
   const handleRefreshHero = useCallback(() => {
-    if (recommendations.length === 0) {
-      setHero(null)
-      return
-    }
-
-    const remaining = recommendations.filter(a => a.id !== hero?.id)
-    if (remaining.length === 0) {
-      const randomIndex = Math.floor(Math.random() * recommendations.length)
-      setHero(recommendations[randomIndex])
-    } else {
-      const randomIndex = Math.floor(Math.random() * remaining.length)
-      setHero(remaining[randomIndex])
-    }
-    // Reset progress — timer restarts via useEffect on hero change
     setProgress(0)
-  }, [recommendations, hero])
+    void fetchHeroRecommendation()
+  }, [fetchHeroRecommendation])
 
   // Auto-refresh: CSS transition drives the animation, JS only sets start/end
   useEffect(() => {
-    if (!hero || recommendations.length <= 1) {
+    if (!hero) {
       setProgress(0)
       return
     }
@@ -271,12 +288,7 @@ export function HomePage() {
       const raf2 = requestAnimationFrame(() => {
         setProgress(100)
         timer = setTimeout(() => {
-          if (recommendations.length > 1) {
-            const remaining = recommendations.filter(a => a.id !== hero?.id)
-            const pool = remaining.length > 0 ? remaining : recommendations
-            const randomIndex = Math.floor(Math.random() * pool.length)
-            setHero(pool[randomIndex])
-          }
+          void fetchHeroRecommendation()
         }, AUTO_REFRESH_MS)
       })
       // Store raf2 for cleanup
@@ -290,18 +302,18 @@ export function HomePage() {
       cancelAnimationFrame(cleanupRaf2)
       clearTimeout(timer)
     }
-  }, [hero, recommendations])
+  }, [fetchHeroRecommendation, hero])
 
   // 未登录只显示首屏
   if (!user) {
-    return <HeroBrand items={recommendations} />
+    return <HeroBrand items={scrollRecommendations} />
   }
 
   const animeItems = items.filter(i => i.content_type === 'anime')
 
   return (
     <PageMain>
-      <HeroBrand items={recommendations} />
+      <HeroBrand items={scrollRecommendations} />
 
       <div className="pb-20 sm:pb-24">
         {hero && (

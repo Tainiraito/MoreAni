@@ -113,12 +113,17 @@ def list_content(
 
 
 @router.get('/random', response_model=ContentItemResponse)
-def random_content(db: Session = Depends(get_db)) -> ContentItemResponse:
-    """Get a random public content item."""
-    item = content_svc.get_random_content(db)
+def random_content(
+    db: Session = Depends(get_db),
+    type: str | None = Query(None, description='内容类型'),
+    exclude_id: list[int] = Query(default=[]),
+    user: User | None = Depends(get_current_user_optional),
+) -> ContentItemResponse:
+    """Get one random public content item, optionally excluding IDs."""
+    item = content_svc.get_random_content(db, content_type=type, exclude_ids=exclude_id)
     if not item:
         raise HTTPException(status_code=404, detail='No content available')
-    return _build_responses(db, [item])[0]
+    return _build_responses(db, [item], user.id if user else None)[0]
 
 
 @router.get('/recommendations', response_model=RecommendationResponse)

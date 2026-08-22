@@ -1,8 +1,9 @@
 """Auth router — login, register, me, avatar, password."""
 
+import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from schemas import (
     RegisterRequest,
     UserResponse,
 )
+from security import anonymize, cookie_secure_default, get_client_ip, login_failure_tracker, normalize_login_identifier
 from services.user import (
     create_user,
     get_user_by_login,
@@ -28,11 +30,13 @@ from services.user import (
 )
 
 router = APIRouter(prefix='/auth', tags=['auth'])
+security_logger = logging.getLogger('moreani.security')
 
 
 @router.post('/login', response_model=AuthResponse)
 def login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ) -> AuthResponse:
@@ -40,12 +44,33 @@ def login(
 
     Sets httpOnly cookie 'access_token' on success.
     """
+    client_ip = get_client_ip(request)
+    normalized_identifier = normalize_login_identifier(body.username)
+    login_key = f'{normalized_identifier}:{client_ip}'
+    login_identifier_hash = anonymize(normalized_identifier)
+    if login_failure_tracker.is_locked(login_key):
+        security_logger.info('login_locked identifier=%s ip=%s', login_identifier_hash, anonymize(client_ip))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='登录暂时不可用，请稍后再试',
+            headers={'Retry-After': str(login_failure_tracker.lock_seconds)},
+        )
+
     user = get_user_by_login(db, body.username)
     if not user or not verify_password(body.password, user.password_hash):
+        locked = login_failure_tracker.record_failure(login_key)
+        security_logger.info(
+            'login_failed identifier=%s ip=%s locked=%s',
+            login_identifier_hash,
+            anonymize(client_ip),
+            locked,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='账号/昵称或密码错误',
         )
+
+    login_failure_tracker.clear(login_key)
 
     token = create_access_token({'sub': user.id})
     response.set_cookie(
@@ -53,7 +78,7 @@ def login(
         value=token,
         httponly=True,
         samesite='lax',
-        secure=True,  # HTTPS（生产 Cloudflare Tunnel）/localhost 均支持
+        secure=cookie_secure_default(),
         max_age=7 * 24 * 3600,  # 7 days
         path='/',
     )
@@ -129,7 +154,7 @@ def register(
         value=token,
         httponly=True,
         samesite='lax',
-        secure=True,  # HTTPS（生产 Cloudflare Tunnel）/localhost 均支持
+        secure=cookie_secure_default(),
         max_age=7 * 24 * 3600,
         path='/',
     )

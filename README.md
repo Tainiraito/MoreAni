@@ -69,6 +69,13 @@ npm run build
 - 本轮不实现分享链接与游客会话模型。
 - `/api/covers/{id}` 本地封面和公开评分接口暂不根据内容私有状态鉴权；这意味着知道封面地址或内容 ID 的访问者仍可能取得相关静态资源或评分信息。该项为本轮明确接受的剩余风险。
 
+## 公网安全基线
+
+- 生产 CORS 默认仅允许 `https://moreani.lovelysia.top`，本地开发来源通过 `ALLOWED_ORIGINS` 单独配置。
+- 登录、注册、写入和读取接口分别使用分级限流；登录失败达到阈值时只冻结当前账号标识与 IP 的组合。
+- 生产部署使用单个 Uvicorn worker，以保证 SQLite 和进程内限流状态一致。
+- 详细阈值、代理信任和安全响应头说明见 [`docs/SECURITY.md`](docs/SECURITY.md)。
+
 ---
 
 *Made with ❤️ for anime lovers.*

@@ -9,10 +9,15 @@ services:
     environment:
       # 必填：JWT 签名密钥（生产必须显式设置，否则重启后所有登录失效）
       - SECRET_KEY=${SECRET_KEY:?请在 deploy/.env 中设置 SECRET_KEY}
-      # 可选：CORS 白名单（默认 localhost + moreani.lovelysia.top）
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top,http://moreani.lovelysia.top}
+      - DATABASE_URL=sqlite:////app/data/moreani.db
+      # 生产环境只允许 HTTPS 公网前端来源；本地开发请单独设置 ALLOWED_ORIGINS
+      - MOREANI_ENV=production
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://moreani.lovelysia.top}
+      - TRUSTED_PROXY_NETWORKS=${TRUSTED_PROXY_NETWORKS:-127.0.0.1/32,::1/128,172.16.0.0/12}
+      - MOREANI_COOKIE_SECURE=${MOREANI_COOKIE_SECURE:-true}
       # 封面本地化目录（挂载卷内）
       - COVERS_DIR=/app/data/covers
+      - AVATARS_DIR=/app/data/avatars
       # 图片代理：NAS 直连国外 CDN（lain.bgm.tv）超时，走 Windows Clash 7890
       - http_proxy=http://192.168.31.45:7890
       - https_proxy=http://192.168.31.45:7890
@@ -29,7 +34,7 @@ services:
     restart: unless-stopped
     command: tunnel run --protocol http2
     environment:
-      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN:?请在 deploy/.env 中设置 CF_TUNNEL_TOKEN}
     networks:
       - moreani
 

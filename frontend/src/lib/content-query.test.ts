@@ -4,6 +4,7 @@ import type { ContentItem } from '@/types'
 import {
   buildContentListParams,
   buildLoopItems,
+  getRecommendationLoopDistance,
   getRecommendationSequenceWidth,
   getRecommendationSize,
   LatestRequestGate,
@@ -60,5 +61,10 @@ describe('推荐序列', () => {
     expect(new Set(loop.slice(0, size).map(entry => entry.id)).size).toBe(size)
     expect(loop).toHaveLength(size * 2)
     expect(getRecommendationSequenceWidth(size)).toBeGreaterThan(viewport)
+  })
+
+  it('循环距离包含两份序列之间的 gap', () => {
+    expect(getRecommendationLoopDistance(2, 160, 20)).toBe(360)
+    expect(getRecommendationLoopDistance(0, 160, 20)).toBe(0)
   })
 })

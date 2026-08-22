@@ -96,7 +96,13 @@ export const api = {
     request<{ ok: boolean }>(`/content/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteContent: (id: number) =>
     request<{ ok: boolean }>(`/content/${id}`, { method: 'DELETE' }),
-  getRandom: () => request<unknown>('/content/random'),
+  getRandom: (params?: { type?: string; excludeIds?: number[] }, options?: RequestInit) => {
+    const query = new URLSearchParams()
+    if (params?.type) query.set('type', params.type)
+    params?.excludeIds?.forEach(id => query.append('exclude_id', String(id)))
+    const suffix = query.toString() ? `?${query}` : ''
+    return request<ContentItem>(`/content/random${suffix}`, options)
+  },
 
   // Rating
   upsertRating: (data: { content_id: number; score: number; recommend?: number; review?: string }) =>

@@ -164,10 +164,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 @keyframes scroll-left {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-25%);
+    transform: translate3d(calc(var(--loop-distance) * -1), 0, 0);
   }
 }
 
@@ -189,5 +189,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .animate-scroll-left {
-  animation: scroll-left linear infinite;
+  animation: scroll-left 1s linear infinite;
+  will-change: transform;
 }

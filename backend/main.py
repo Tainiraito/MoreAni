@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from database import Base, engine
-from middleware import RateLimitMiddleware
+from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
 from routers.v1.admin import router as admin_router
 from routers.v1.auth import router as auth_router
 from routers.v1.bangumi import router as bangumi_router
@@ -69,20 +69,31 @@ app = FastAPI(
 # --- CORS ---
 # 白名单模式：cookie 认证下不允许通配符（allow_origins=['*'] + credentials=True
 # 等于任何网站都能携带 cookie 调用 API）。生产域名 + 本地开发域名显式列出。
-ALLOWED_ORIGINS = os.getenv(
-    'ALLOWED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top,http://moreani.lovelysia.top',
-).split(',')
+MOREANI_ENV = os.getenv('MOREANI_ENV', 'development').lower()
+if MOREANI_ENV == 'production':
+    default_origins = 'https://moreani.lovelysia.top'
+else:
+    default_origins = 'http://localhost:5173,http://127.0.0.1:5173,https://moreani.lovelysia.top'
+configured_origins = [
+    origin.strip() for origin in os.getenv('ALLOWED_ORIGINS', default_origins).split(',') if origin.strip()
+]
+if MOREANI_ENV == 'production':
+    # 防止部署环境误把明文 HTTP 来源带入生产 Cookie 白名单。
+    ALLOWED_ORIGINS = [origin for origin in configured_origins if origin.lower().startswith('https://')]
+else:
+    ALLOWED_ORIGINS = configured_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in ALLOWED_ORIGINS if o.strip()],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allow_headers=['Accept', 'Content-Type', 'X-Requested-With'],
 )
 
 # --- Rate Limiting ---
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(OriginGuardMiddleware, allowed_origins=ALLOWED_ORIGINS)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # --- V1 API routers ---
 app.include_router(auth_router, prefix='/api/v1')

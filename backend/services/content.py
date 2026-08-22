@@ -372,18 +372,28 @@ def delete_content(db: Session, content: ContentItem) -> None:
     db.commit()
 
 
-def get_random_content(db: Session) -> ContentItem | None:
-    """Return one random public content item."""
-    return (
+def get_random_content(
+    db: Session,
+    *,
+    content_type: str | None = None,
+    exclude_ids: list[int] | None = None,
+) -> ContentItem | None:
+    """Return one random public content item, optionally filtered by type/exclusions."""
+    query = (
         db.query(ContentItem)
         .options(selectinload(ContentItem.tags))
         .filter(
             ContentItem.is_public == True,  # noqa: E712
             ContentItem.deleted_at.is_(None),
+            ContentItem.cover_url.isnot(None),
+            ContentItem.cover_url != '',
         )
-        .order_by(func.random())
-        .first()
     )
+    if content_type:
+        query = query.filter(ContentItem.content_type == content_type)
+    if exclude_ids:
+        query = query.filter(~ContentItem.id.in_(exclude_ids))
+    return query.order_by(func.random()).first()
 
 
 def check_source_duplicate(db: Session, source_type: str, source_id: str) -> ContentItem | None:

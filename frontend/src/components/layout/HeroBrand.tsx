@@ -6,7 +6,13 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Sun, Moon } from 'lucide-react'
 import { AnimeCard } from '@/components/content/AnimeCard'
 import type { ContentItem } from '@/types'
-import { buildLoopItems, getRecommendationSequenceWidth } from '@/lib/content-query'
+import {
+  getRecommendationLoopDistance,
+  normalizeRecommendationItems,
+  RECOMMENDATION_CARD_WIDTH,
+  RECOMMENDATION_GAP,
+  RECOMMENDATION_SCROLL_SPEED,
+} from '@/lib/content-query'
 
 interface HeroBrandProps {
   items: ContentItem[]
@@ -19,11 +25,15 @@ export function HeroBrand({ items }: HeroBrandProps) {
   const { openDetail } = useUIStore()
   const [isPaused, setIsPaused] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const normalizedItems = normalizeRecommendationItems(items)
+  const [activeItems, setActiveItems] = useState<ContentItem[]>(() => normalizedItems)
+  const [pendingItems, setPendingItems] = useState<ContentItem[] | null>(null)
+  const activeItemsRef = useRef(activeItems)
+  const pendingItemsRef = useRef<ContentItem[] | null>(null)
   const progressRef = useRef(0)
   const hasTriggeredRef = useRef(false)
-  const cardWidth = 160
-  const gap = 20
+
+  activeItemsRef.current = activeItems
 
   // 监听鼠标滚轮事件（仅未登录时）
   useEffect(() => {
@@ -74,18 +84,51 @@ export function HeroBrand({ items }: HeroBrandProps) {
     }
   }, [user])
 
-  // 自动循环滚动
+  // 推荐数据更新时先放入第二份序列，当前轮次保持不变。
   useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container || items.length === 0) return
+    const nextItems = normalizeRecommendationItems(items)
+    if (nextItems.length === 0) return
 
-    const singleSetWidth = getRecommendationSequenceWidth(items.length, cardWidth, gap)
-    const duration = singleSetWidth / 25
-    container.style.animationDuration = `${duration}s`
+    const currentItems = activeItemsRef.current
+    const isSameSequence = nextItems.length === currentItems.length
+      && nextItems.every((item, index) => item === currentItems[index])
+
+    if (isSameSequence) {
+      pendingItemsRef.current = null
+      setPendingItems(null)
+      return
+    }
+
+    pendingItemsRef.current = nextItems
+    setPendingItems(nextItems)
   }, [items])
 
-  // 服务端保证逻辑序列内唯一；DOM 仅复制两份以实现完整一轮后的无缝循环。
-  const displayItems = buildLoopItems(items)
+  const handleAnimationIteration = () => {
+    const nextItems = pendingItemsRef.current
+    if (!nextItems) return
+
+    // animationiteration 触发在第二份序列刚好进入视口的边界。
+    // 先让第一份序列同步成当前可见的第二份，再清理待切换状态。
+    activeItemsRef.current = nextItems
+    pendingItemsRef.current = null
+    setActiveItems(nextItems)
+    setPendingItems(null)
+  }
+
+  const loopDistance = getRecommendationLoopDistance(
+    activeItems.length,
+    RECOMMENDATION_CARD_WIDTH,
+    RECOMMENDATION_GAP,
+  )
+  const animationDuration = loopDistance / RECOMMENDATION_SCROLL_SPEED
+  const trackStyle = {
+    '--loop-distance': `${loopDistance}px`,
+    gap: `${RECOMMENDATION_GAP}px`,
+    width: 'max-content',
+    animationDuration: `${animationDuration}s`,
+    animationPlayState: isPaused ? 'paused' : 'running',
+  } as React.CSSProperties
+  const sequences = [activeItems, pendingItems ?? activeItems]
 
   return (
     <div className="relative min-h-screen" style={{ background: 'transparent' }}>
@@ -173,7 +216,7 @@ export function HeroBrand({ items }: HeroBrandProps) {
         </div>
 
         {/* 滚动推荐卡片 */}
-        {items.length > 0 && (
+        {activeItems.length > 0 && (
           <div
             className="w-screen overflow-hidden"
             style={{ padding: '48px 0 80px' }}
@@ -181,21 +224,28 @@ export function HeroBrand({ items }: HeroBrandProps) {
             onMouseLeave={() => setIsPaused(false)}
           >
             <div
-              ref={scrollContainerRef}
               className="flex items-end animate-scroll-left"
-              style={{
-                gap: `${gap}px`,
-                width: 'max-content',
-                animationPlayState: isPaused ? 'paused' : 'running',
-              }}
+              data-testid="hero-brand-scroll-track"
+              onAnimationIteration={handleAnimationIteration}
+              style={trackStyle}
             >
-              {displayItems.map((item, index) => (
-                <AnimeCard
-                  key={`${Math.floor(index / items.length)}-${item.id}`}
-                  content={item}
-                  mode="scroll"
-                  onSelect={openDetail}
-                />
+              {sequences.map((sequence, sequenceIndex) => (
+                <div
+                  key={`sequence-${sequenceIndex}`}
+                  className="flex items-end"
+                  data-testid="hero-brand-scroll-sequence"
+                  aria-hidden={sequenceIndex === 1}
+                  style={{ gap: `${RECOMMENDATION_GAP}px`, width: 'max-content', flex: '0 0 auto' }}
+                >
+                  {sequence.map(item => (
+                    <AnimeCard
+                      key={item.id}
+                      content={item}
+                      mode="scroll"
+                      onSelect={openDetail}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           </div>

@@ -33,6 +33,10 @@ export function getRecommendationSize(viewportWidth: number): number {
   return Math.max(12, Math.min(30, Math.ceil(viewportWidth / 180) + 4))
 }
 
+export const RECOMMENDATION_CARD_WIDTH = 160
+export const RECOMMENDATION_GAP = 20
+export const RECOMMENDATION_SCROLL_SPEED = 25
+
 export function normalizeRecommendationItems(items: ContentItem[]): ContentItem[] {
   return [...new Map(items.map(item => [item.id, item])).values()]
 }
@@ -44,10 +48,23 @@ export function buildLoopItems(items: ContentItem[]): ContentItem[] {
 
 export function getRecommendationSequenceWidth(
   itemCount: number,
-  cardWidth = 160,
-  gap = 20,
+  cardWidth = RECOMMENDATION_CARD_WIDTH,
+  gap = RECOMMENDATION_GAP,
 ): number {
   return itemCount === 0 ? 0 : itemCount * cardWidth + (itemCount - 1) * gap
+}
+
+/**
+ * 两份横向序列之间需要移动的完整距离，包含序列之间的一个 gap。
+ * 只有移动到第二份序列的起点，CSS animationiteration 才能无缝回到 0。
+ */
+export function getRecommendationLoopDistance(
+  itemCount: number,
+  cardWidth = RECOMMENDATION_CARD_WIDTH,
+  gap = RECOMMENDATION_GAP,
+): number {
+  const sequenceWidth = getRecommendationSequenceWidth(itemCount, cardWidth, gap)
+  return sequenceWidth === 0 ? 0 : sequenceWidth + gap
 }
 
 export class LatestRequestGate {

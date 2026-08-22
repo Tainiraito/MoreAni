@@ -47,6 +47,18 @@ def test_recommendations_are_unique_public_and_prioritize_current_user(client, d
     assert not ({item['id'] for item in refreshed} & set(ids))
 
 
+def test_random_content_supports_type_and_exclusions(client, db, make_user):
+    creator = make_user('random-owner')
+    items = seed_content(db, creator, 5)
+    excluded_id = items[0].id
+    response = client.get(f'/api/v1/content/random?type=anime&exclude_id={excluded_id}')
+    assert response.status_code == 200
+    result = response.json()
+    assert result['id'] != excluded_id
+    assert result['content_type'] == 'anime'
+    assert result['is_public'] is True
+
+
 def test_content_list_query_count_is_constant(client, db, db_engine, make_user):
     creator = make_user('query-owner')
     seed_content(db, creator, 25)
