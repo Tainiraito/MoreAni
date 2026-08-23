@@ -183,10 +183,10 @@ export function HeroBrand({ items }: HeroBrandProps) {
               <button
                 onClick={openSettings}
                 title="个人信息"
-                className="w-9 h-9 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
-                style={{ border: '2px solid var(--border-line)' }}
+                className="flex h-9 w-9 items-center justify-center rounded-full overflow-hidden p-0 transition-all duration-200 hover:opacity-80"
+                style={{ border: '1px solid var(--border-line)' }}
               >
-                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={32} />
+                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={34} />
               </button>
             </>
           ) : (

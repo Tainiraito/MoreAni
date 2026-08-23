@@ -73,12 +73,11 @@ export function AppHeader() {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-8 h-8 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
-              style={{ border: '2px solid var(--border-line)' }}
+              className="flex h-8 w-8 items-center justify-center rounded-full overflow-hidden p-0 transition-all duration-200 hover:opacity-80"
+              style={{ border: '1px solid var(--border-line)' }}
             >
               {user ? (
-                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={28}
-                  style={{ border: '2px solid var(--border-line)' }} />
+                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={30} />
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center"

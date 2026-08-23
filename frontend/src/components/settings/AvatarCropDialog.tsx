@@ -123,7 +123,7 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
       >
         <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>裁剪头像</h3>
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-          拖动图片调整位置，滑杆缩放；裁切区域为 1:1 正方形
+          拖动图片调整位置，滑杆缩放；圆形区域为最终头像显示效果
           {(file.type === 'image/gif' || /\.gif$/i.test(file.name)) && '；GIF 会保留动画，裁剪仅影响显示区域'}
         </p>
 
@@ -151,17 +151,22 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
               }}
             />
           )}
-          {/* 裁切框边框（品牌色） */}
+          {/* 圆形最终显示区域：外部压暗，帮助用户直接预览头像效果 */}
           <div
-            className="absolute inset-0 pointer-events-none rounded-xl"
-            style={{ boxShadow: 'inset 0 0 0 2px var(--brand)' }}
-          />
-          {/* 三分线网格 */}
-          <div className="absolute inset-0 pointer-events-none opacity-40">
-            <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/40" />
-            <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/40" />
-            <div className="absolute top-1/3 left-0 right-0 h-px bg-white/40" />
-            <div className="absolute top-2/3 left-0 right-0 h-px bg-white/40" />
+            data-testid="avatar-crop-mask"
+            className="absolute inset-0 pointer-events-none rounded-full"
+            style={{
+              border: '2px solid var(--brand)',
+              boxShadow: '0 0 0 999px rgba(0, 0, 0, 0.62)',
+            }}
+          >
+            {/* 三分线网格只显示在圆形区域内 */}
+            <div className="absolute inset-0 overflow-hidden rounded-full opacity-40">
+              <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/40" />
+              <div className="absolute left-2/3 top-0 bottom-0 w-px bg-white/40" />
+              <div className="absolute top-1/3 left-0 right-0 h-px bg-white/40" />
+              <div className="absolute top-2/3 left-0 right-0 h-px bg-white/40" />
+            </div>
           </div>
         </div>
 

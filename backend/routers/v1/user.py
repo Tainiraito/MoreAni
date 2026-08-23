@@ -14,7 +14,13 @@ from models import User
 from schemas import UserPublicProfile
 from services import rating as rating_svc
 from services import user as user_svc
-from services.avatar import avatar_crop_from_db, avatar_fields, dump_avatar_crop, parse_avatar_crop
+from services.avatar import (
+    avatar_crop_from_db,
+    avatar_fields,
+    dump_avatar_crop,
+    normalize_gif_loop,
+    parse_avatar_crop,
+)
 
 router = APIRouter(prefix='/user', tags=['user'])
 
@@ -80,6 +86,7 @@ def upload_avatar(
             crop_data = parse_avatar_crop(crop, image_width=width, image_height=height)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        data = normalize_gif_loop(data)
 
     # 使用唯一文件名 + 临时文件，避免更换扩展名时残留旧文件或读到半写入文件。
     avatar_dir = Path(AVATARS_DIR)
