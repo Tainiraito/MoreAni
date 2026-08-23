@@ -9,6 +9,8 @@
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "test": "TMPDIR=/tmp vitest run",
+    "e2e": "TMPDIR=${TMPDIR:-/tmp} TMP=${TMP:-/tmp} TEMP=${TEMP:-/tmp} PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/lumine/Hermes_Area/.cache/ms-playwright} playwright test",
+    "e2e:install": "TMPDIR=${TMPDIR:-/tmp} TMP=${TMP:-/tmp} TEMP=${TEMP:-/tmp} PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH:-/home/lumine/Hermes_Area/.cache/ms-playwright} playwright install chromium",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",

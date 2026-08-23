@@ -1,5 +1,5 @@
 import { useToastStore } from '@/stores/toast-store'
-import type { ContentItem, InviteCode, PaginatedResponse, User } from '@/types'
+import type { AvatarCrop, ContentItem, InviteCode, PaginatedResponse, User } from '@/types'
 
 const API_BASE = '/api/v1'
 
@@ -59,15 +59,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   // Auth
   login: (data: { username: string; password: string }) =>
-    request<{ user: unknown; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ user: User; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   register: (data: { invite_code: string; username: string; nickname: string; password: string }) =>
-    request<{ user: unknown; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ user: User; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () =>
-    request<{ id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; role: string }>('/auth/me'),
+    request<{ id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; avatar_crop?: AvatarCrop | null; role: string }>('/auth/me'),
   changePassword: (data: { old_password: string; new_password: string }) =>
     request<{ detail: string }>('/auth/me/password', { method: 'PUT', body: JSON.stringify(data) }),
   updateNickname: (nickname: string) =>
-    request<{ id: number; username: string; nickname: string; avatar_id: number; role: string }>(
+    request<{ id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; avatar_crop?: AvatarCrop | null; role: string }>(
       '/auth/me/nickname',
       { method: 'PUT', body: JSON.stringify({ nickname }) },
     ),
@@ -167,11 +167,12 @@ export const api = {
   getUser: (id: number) => request<unknown>(`/user/${id}`),
   getUserRatings: (id: number) => request<{ items: unknown[] }>(`/user/${id}/ratings`),
   listUsers: () =>
-    request<{ items: { id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null }[] }>('/user/list'),
+    request<{ items: { id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; avatar_crop?: AvatarCrop | null }[] }>('/user/list'),
   // 上传头像（FormData，不设 Content-Type 让浏览器带 boundary）
-  uploadAvatar: (file: File) => {
+  uploadAvatar: (file: File, crop?: AvatarCrop | null) => {
     const fd = new FormData()
     fd.append('file', file)
+    if (crop) fd.append('crop', JSON.stringify(crop))
     return fetch(`${API_BASE}/user/avatar`, {
       method: 'POST',
       credentials: 'include',
@@ -181,7 +182,7 @@ export const api = {
         const err = await res.json().catch(() => null)
         throw new Error(err?.detail || `HTTP ${res.status}`)
       }
-      return res.json() as Promise<{ avatar_url: string }>
+      return res.json() as Promise<{ avatar_url: string; avatar_crop: AvatarCrop | null }>
     })
   },
   // 删除头像
@@ -194,6 +195,6 @@ export const api = {
         const err = await res.json().catch(() => null)
         throw new Error(err?.detail || `HTTP ${res.status}`)
       }
-      return res.json() as Promise<{ avatar_url: null }>
+      return res.json() as Promise<{ avatar_url: null; avatar_crop: null }>
     }),
 }

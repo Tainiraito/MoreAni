@@ -1,5 +1,6 @@
 """Pydantic v2 schemas for MoreAni v2 API request/response models."""
 
+import json
 from datetime import datetime
 from typing import Literal
 
@@ -47,6 +48,15 @@ class RegisterRequest(BaseModel):
     invite_code: str
 
 
+class AvatarCrop(BaseModel):
+    """Source-image square crop used for animated GIF avatars."""
+
+    version: Literal[1] = 1
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+    size: float = Field(gt=0)
+
+
 class UserResponse(BaseModel):
     """Public user info."""
 
@@ -55,8 +65,19 @@ class UserResponse(BaseModel):
     nickname: str
     avatar_id: int = 0
     avatar_url: str | None = None
+    avatar_crop: AvatarCrop | None = None
     role: str = 'user'
     created_at: datetime
+
+    @field_validator('avatar_crop', mode='before')
+    @classmethod
+    def parse_avatar_crop(cls, value):
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return None
+        return value
 
     model_config = {'from_attributes': True}
 
@@ -137,6 +158,7 @@ class RecentReview(BaseModel):
     nickname: str = ''
     avatar_id: int = 0
     avatar_url: str | None = None
+    avatar_crop: AvatarCrop | None = None
     score: int = 0
     review: str = ''
     created_at: datetime | None = None
@@ -247,6 +269,7 @@ class RatingResponse(BaseModel):
     username: str = ''
     nickname: str = ''
     avatar_url: str | None = None
+    avatar_crop: AvatarCrop | None = None
     score: int
     recommend: int
     review: str = ''
@@ -307,6 +330,7 @@ class UserPublicProfile(BaseModel):
     nickname: str = ''
     avatar_id: int = 0
     avatar_url: str | None = None
+    avatar_crop: AvatarCrop | None = None
     role: str = 'user'
     created_at: datetime
     rating_count: int = 0

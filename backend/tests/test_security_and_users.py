@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -109,7 +110,9 @@ def test_admin_roles_can_delete_other_ratings_but_user_cannot(db, make_user):
 
 def test_profile_includes_uploaded_avatar_url(client, db, make_user):
     viewer = make_user('viewer')
-    target = make_user('avatar-user', avatar_url='/api/avatars/2.png?v=1')
+    crop = {'version': 1, 'x': 1, 'y': 2, 'size': 20}
+    target = make_user('avatar-user', avatar_url='/api/avatars/2.gif?v=1', avatar_crop=json.dumps(crop))
     response = client.get(f'/api/v1/user/{target.id}', cookies=auth_cookie(viewer))
     assert response.status_code == 200
     assert response.json()['avatar_url'] == target.avatar_url
+    assert response.json()['avatar_crop'] == crop

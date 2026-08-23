@@ -2,6 +2,13 @@ export type ContentType = 'anime' | 'movie' | 'game' | 'software' | 'website' | 
 
 export type WatchStatus = 'want' | 'watching' | 'watched' | 'dropped'
 
+export interface AvatarCrop {
+  version: 1
+  x: number
+  y: number
+  size: number
+}
+
 export interface ContentItem {
   id: number
   title: string
@@ -38,6 +45,7 @@ export interface RecentReview {
   nickname: string
   avatar_id: number
   avatar_url?: string | null
+  avatar_crop?: AvatarCrop | null
   score: number
   review: string
   created_at: string | null
@@ -48,6 +56,9 @@ export interface Rating {
   content_id: number
   user_id: number
   username?: string
+  nickname?: string
+  avatar_url?: string | null
+  avatar_crop?: AvatarCrop | null
   score: number        // 0-100
   recommend: number    // 0-100
   review: string
@@ -61,6 +72,7 @@ export interface User {
   nickname: string
   avatar_id: number
   avatar_url?: string | null
+  avatar_crop?: AvatarCrop | null
   role: 'user' | 'admin' | 'super_admin'
   created_at: string
 }

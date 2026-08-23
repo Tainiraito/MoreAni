@@ -77,7 +77,7 @@ export function AppHeader() {
               style={{ border: '2px solid var(--border-line)' }}
             >
               {user ? (
-                <Avatar name={user.nickname} src={user.avatar_url} size={28}
+                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={28}
                   style={{ border: '2px solid var(--border-line)' }} />
               ) : (
                 <div
@@ -109,7 +109,7 @@ export function AppHeader() {
                     style={{ borderBottom: '1px solid var(--border-line)' }}
                   >
                     <div className="flex items-center gap-3">
-                      <Avatar name={user.nickname} src={user.avatar_url} size={40} />
+                    <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={40} />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                           {user.nickname}

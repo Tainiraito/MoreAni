@@ -186,7 +186,7 @@ export function HeroBrand({ items }: HeroBrandProps) {
                 className="w-9 h-9 rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
                 style={{ border: '2px solid var(--border-line)' }}
               >
-                <Avatar name={user.nickname} src={user.avatar_url} size={32} />
+                <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={32} />
               </button>
             </>
           ) : (

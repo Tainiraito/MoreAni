@@ -1,10 +1,12 @@
 """User router — public profile and rating history."""
 
 import os
+import secrets
 import time
 from contextlib import suppress
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
@@ -12,6 +14,7 @@ from models import User
 from schemas import UserPublicProfile
 from services import rating as rating_svc
 from services import user as user_svc
+from services.avatar import avatar_crop_from_db, avatar_fields, dump_avatar_crop, parse_avatar_crop
 
 router = APIRouter(prefix='/user', tags=['user'])
 
@@ -36,8 +39,7 @@ def list_users(
                 'id': u.id,
                 'username': u.username,
                 'nickname': u.nickname,
-                'avatar_id': u.avatar_id,
-                'avatar_url': u.avatar_url,
+                **avatar_fields(u),
             }
             for u in users
         ]
@@ -47,6 +49,7 @@ def list_users(
 @router.post('/avatar')
 def upload_avatar(
     file: UploadFile = File(...),
+    crop: str | None = Form(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -54,6 +57,8 @@ def upload_avatar(
     ext = os.path.splitext(file.filename or '')[1].lower()
     if ext not in ALLOWED_AVATAR_EXTS:
         raise HTTPException(status_code=400, detail='仅支持 jpg/png/webp/gif 格式')
+    if ext == '.jpeg':
+        ext = '.jpg'
     content_type = (file.content_type or '').lower()
     if not content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail='文件不是图片')
@@ -66,18 +71,42 @@ def upload_avatar(
     if not _is_valid_image_magic(data, ext):
         raise HTTPException(status_code=400, detail='文件内容不是有效的图片')
 
-    # 固定文件名 + 时间戳破浏览器缓存（换头像后 URL 变化）
-    os.makedirs(AVATARS_DIR, exist_ok=True)
-    if ext == '.jpeg':
-        ext = '.jpg'
-    filename = f'{user.id}{ext}'
-    with open(os.path.join(AVATARS_DIR, filename), 'wb') as f:
-        f.write(data)
+    crop_data = None
+    if ext == '.gif':
+        width, height = _gif_dimensions(data)
+        if crop and (width is None or height is None):
+            raise HTTPException(status_code=400, detail='文件内容不是有效的 GIF 图片')
+        try:
+            crop_data = parse_avatar_crop(crop, image_width=width, image_height=height)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # 使用唯一文件名 + 临时文件，避免更换扩展名时残留旧文件或读到半写入文件。
+    avatar_dir = Path(AVATARS_DIR)
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    filename = f'{user.id}-{secrets.token_hex(8)}{ext}'
+    final_path = avatar_dir / filename
+    temp_path = avatar_dir / f'.{filename}.tmp'
+    old_path = _avatar_path(user.avatar_url)
     avatar_url = f'/api/avatars/{filename}?v={int(time.time())}'
-    user.avatar_url = avatar_url
-    db.commit()
-    return {'avatar_url': avatar_url}
+    try:
+        temp_path.write_bytes(data)
+        os.replace(temp_path, final_path)
+        user.avatar_url = avatar_url
+        user.avatar_crop = dump_avatar_crop(crop_data)
+        db.commit()
+    except Exception:
+        db.rollback()
+        with suppress(OSError):
+            temp_path.unlink()
+        with suppress(OSError):
+            final_path.unlink()
+        raise
+
+    if old_path and old_path != final_path:
+        with suppress(OSError):
+            old_path.unlink()
+    return {'avatar_url': avatar_url, 'avatar_crop': crop_data}
 
 
 @router.delete('/avatar')
@@ -86,15 +115,15 @@ def delete_avatar(
     db: Session = Depends(get_db),
 ) -> dict:
     """删除自己的头像（清空 avatar_url + 删除文件）。"""
-    if user.avatar_url:
-        fname = os.path.basename(user.avatar_url.split('?')[0])
-        path = os.path.join(AVATARS_DIR, fname)
-        if os.path.exists(path):
+    if user.avatar_url or user.avatar_crop:
+        path = _avatar_path(user.avatar_url)
+        if path:
             with suppress(OSError):
-                os.remove(path)  # 文件删除失败不阻塞（URL 已清空）
+                path.unlink()  # 文件删除失败不阻塞（URL 已清空）
         user.avatar_url = None
+        user.avatar_crop = None
         db.commit()
-    return {'avatar_url': None}
+    return {'avatar_url': None, 'avatar_crop': None}
 
 
 def _is_valid_image_magic(data: bytes, ext: str) -> bool:
@@ -108,6 +137,25 @@ def _is_valid_image_magic(data: bytes, ext: str) -> bool:
     if ext == '.webp':
         return data[:4] == b'RIFF' and data[8:12] == b'WEBP'
     return False
+
+
+def _gif_dimensions(data: bytes) -> tuple[int | None, int | None]:
+    """Read the GIF logical screen dimensions without decoding its frames."""
+    if len(data) < 10 or data[:6] not in (b'GIF87a', b'GIF89a'):
+        return None, None
+    width = int.from_bytes(data[6:8], 'little')
+    height = int.from_bytes(data[8:10], 'little')
+    return (width, height) if width > 0 and height > 0 else (None, None)
+
+
+def _avatar_path(avatar_url: str | None) -> Path | None:
+    """Resolve only the basename of a stored avatar URL inside AVATARS_DIR."""
+    if not avatar_url:
+        return None
+    filename = os.path.basename(avatar_url.split('?', 1)[0])
+    if not filename:
+        return None
+    return Path(AVATARS_DIR) / filename
 
 
 @router.get('/{user_id}', response_model=UserPublicProfile)
@@ -128,6 +176,7 @@ def get_user_profile(
         nickname=target.nickname,
         avatar_id=target.avatar_id,
         avatar_url=target.avatar_url,
+        avatar_crop=avatar_crop_from_db(target.avatar_crop),
         role=target.role,
         created_at=target.created_at,
         rating_count=stats['rating_count'],

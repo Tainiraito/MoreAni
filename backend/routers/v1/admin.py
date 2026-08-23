@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from auth import get_password_hash
 from deps import get_db, require_role
 from models import InviteCode, Rating, ShareLink, User, UserContentStatus
+from services.avatar import avatar_fields
 
 router = APIRouter(prefix='/admin', tags=['admin'])
 
@@ -24,8 +25,7 @@ def _to_admin_user(u: User) -> dict:
         'username': u.username,
         'nickname': u.nickname,
         'role': u.role,
-        'avatar_id': u.avatar_id,
-        'avatar_url': u.avatar_url,
+        **avatar_fields(u),
         'created_at': u.created_at.isoformat() if u.created_at else None,
     }
 

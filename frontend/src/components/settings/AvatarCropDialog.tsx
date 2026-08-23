@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useMaskClose } from '@/hooks/use-mask-close'
+import type { AvatarCrop } from '@/types'
+import { AVATAR_CROP_VIEW_SIZE, calculateAvatarCrop } from '@/lib/avatar-crop'
 
-const VIEW_SIZE = 320 // 裁切框/预览容器（正方形）
+const VIEW_SIZE = AVATAR_CROP_VIEW_SIZE // 裁切框/预览容器（正方形）
 
 interface AvatarCropDialogProps {
   file: File
-  onConfirm: (processed: File) => void
+  onConfirm: (processed: File, crop: AvatarCrop | null) => void
   onCancel: () => void
 }
 
 /**
  * 头像手动裁切弹窗：1:1 裁切框固定居中，图片可拖拽 + 滑杆缩放。
- * 确认后按裁切区域生成 256×256 JPEG。
+ * 普通图片确认后生成 256×256 JPEG；GIF 保留原文件并保存原图裁剪区域。
  */
 export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialogProps) {
   const [img, setImg] = useState<HTMLImageElement | null>(null)
@@ -85,6 +87,14 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
 
   const confirm = () => {
     if (!img) return
+    const crop = calculateAvatarCrop(img, offset, scale)
+    const px = baseScale * scale
+    const isGif = file.type === 'image/gif' || /\.gif$/i.test(file.name)
+    if (isGif) {
+      onConfirm(file, crop)
+      return
+    }
+
     const canvas = document.createElement('canvas')
     canvas.width = 256
     canvas.height = 256
@@ -92,13 +102,12 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
     if (!ctx) return
     ctx.imageSmoothingQuality = 'high'
     // 显示坐标 → 原图坐标（裁切区域 = 容器可视方框）
-    const px = baseScale * scale
     const sx = (0 - offset.x) / px
     const sy = (0 - offset.y) / px
     const cropSize = VIEW_SIZE / px
     ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, 256, 256)
     canvas.toBlob(blob => {
-      if (blob) onConfirm(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+      if (blob) onConfirm(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }), null)
     }, 'image/jpeg', 0.9)
   }
 
@@ -115,6 +124,7 @@ export function AvatarCropDialog({ file, onConfirm, onCancel }: AvatarCropDialog
         <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-primary)' }}>裁剪头像</h3>
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
           拖动图片调整位置，滑杆缩放；裁切区域为 1:1 正方形
+          {(file.type === 'image/gif' || /\.gif$/i.test(file.name)) && '；GIF 会保留动画，裁剪仅影响显示区域'}
         </p>
 
         {/* 裁切预览区 */}

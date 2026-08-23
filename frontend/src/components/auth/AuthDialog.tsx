@@ -32,14 +32,14 @@ export function AuthDialog() {
     try {
       if (mode === 'login') {
         const res = await api.login({ username, password })
-        const userData = res.user as { nickname: string }
-        setUser(res.user as any)
+        const userData = res.user
+        setUser(res.user)
         if (res.token) setToken(res.token)
         useToastStore.getState().addToast('success', `欢迎回来，${userData.nickname}！`)
       } else {
         const res = await api.register({ invite_code: code, username, nickname, password })
-        const userData = res.user as { nickname: string }
-        setUser(res.user as any)
+        const userData = res.user
+        setUser(res.user)
         if (res.token) setToken(res.token)
         useToastStore.getState().addToast('success', `注册成功，欢迎加入，${userData.nickname}！`)
       }

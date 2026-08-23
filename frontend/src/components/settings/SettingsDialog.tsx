@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog'
 import { X, Pencil } from 'lucide-react'
+import type { AvatarCrop } from '@/types'
 
 interface UserStats {
   rating_count: number
@@ -148,13 +149,13 @@ export function SettingsDialog() {
   }
 
   // 裁切确认 → 上传
-  const handleCropConfirm = async (processed: File) => {
+  const handleCropConfirm = async (processed: File, crop: AvatarCrop | null) => {
     setCropFile(null)
     setAvatarUploading(true)
     setAvatarError('')
     try {
-      const res = await api.uploadAvatar(processed)
-      setUser({ ...user!, avatar_url: res.avatar_url })
+      const res = await api.uploadAvatar(processed, crop)
+      setUser({ ...user!, avatar_url: res.avatar_url, avatar_crop: res.avatar_crop })
       // 全局刷新：评论列表/详情评论等处重新拉取，头像全面生效
       useRefreshStore.getState().triggerRefresh()
       useToastStore.getState().addToast('success', '头像已更新')
@@ -170,7 +171,7 @@ export function SettingsDialog() {
     setAvatarError('')
     try {
       await api.deleteAvatar()
-      setUser({ ...user!, avatar_url: null })
+      setUser({ ...user!, avatar_url: null, avatar_crop: null })
       // 全局刷新：评论列表/详情评论等处头像同步清除
       useRefreshStore.getState().triggerRefresh()
       useToastStore.getState().addToast('success', '头像已删除')
@@ -215,7 +216,7 @@ export function SettingsDialog() {
               onClick={() => fileInputRef.current?.click()}
               title={user?.avatar_url ? '点击更换头像' : '点击上传头像'}
             >
-              <Avatar name={user?.nickname || '?'} src={user?.avatar_url} size={64}
+              <Avatar name={user?.nickname || '?'} src={user?.avatar_url} crop={user?.avatar_crop} size={64}
                 style={{ border: '2px solid var(--brand)' }} />
               {user?.avatar_url && (
                 <div className="absolute inset-0 rounded-full flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ background: 'rgba(0,0,0,0.55)' }}>

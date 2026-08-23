@@ -6,6 +6,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from models import ContentItem, Rating, User
+from services.avatar import avatar_fields
 
 
 def get_user_rating(db: Session, user_id: int, content_id: int) -> Rating | None:
@@ -160,8 +161,7 @@ def get_recent_reviews_map(
         lst.append(
             {
                 'nickname': user.nickname,
-                'avatar_id': user.avatar_id,
-                'avatar_url': user.avatar_url,
+                **avatar_fields(user),
                 'score': rating.score,
                 'review': rating.review,
                 'created_at': rating.created_at,
@@ -206,8 +206,7 @@ def get_recent_activity(
                 'review': rating.review,
                 'username': '匿名用户' if guest_mode else user.username,
                 'nickname': '匿名用户' if guest_mode else user.nickname,
-                'avatar_id': 0 if guest_mode else user.avatar_id,
-                'avatar_url': None if guest_mode else user.avatar_url,
+                **avatar_fields(user, anonymous=guest_mode),
                 'created_at': rating.created_at,
             }
         )
@@ -285,8 +284,7 @@ def get_content_ratings(
                 'user_id': rating.user_id,
                 'username': user.username,
                 'nickname': user.nickname,
-                'avatar_id': user.avatar_id,
-                'avatar_url': user.avatar_url,
+                **avatar_fields(user),
                 'score': rating.score,
                 'recommend': rating.recommend,
                 'review': rating.review,

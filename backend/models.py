@@ -36,6 +36,7 @@ class User(Base):
     password_hash = Column(String(128), nullable=False)
     avatar_id = Column(Integer, default=0)
     avatar_url = Column(String(255), nullable=True)  # 上传的头像图片路径（/api/avatars/...）
+    avatar_crop = Column(Text, nullable=True)  # GIF 显示裁剪参数（JSON）
     role = Column(String(20), default='user')  # admin / user
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

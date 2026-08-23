@@ -7,6 +7,7 @@ from deps import get_current_user, get_db
 from models import Rating, User
 from schemas import RatingCreate, RatingHistoryResponse, RatingResponse
 from services import rating as rating_svc
+from services.avatar import avatar_fields
 
 router = APIRouter(prefix='/rating', tags=['rating'])
 
@@ -35,6 +36,8 @@ def create_or_update_rating(
         content_id=rating.content_id,
         user_id=rating.user_id,
         username=user.username,
+        nickname=user.nickname,
+        **{key: value for key, value in avatar_fields(user).items() if key != 'avatar_id'},
         score=rating.score,
         recommend=rating.recommend,
         review=rating.review,

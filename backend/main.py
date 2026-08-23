@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     """Create database tables on startup + lightweight migrations."""
     Base.metadata.create_all(bind=engine)
     _migrate_invite_codes_expires()
+    _migrate_users_avatar_crop()
     yield
 
 
@@ -58,6 +59,21 @@ def _migrate_invite_codes_expires() -> None:
                 print('[migrate] users.avatar_url 已添加')
     except Exception as e:  # noqa: BLE001
         print(f'[migrate] users.avatar_url 迁移跳过: {e}')
+
+
+def _migrate_users_avatar_crop() -> None:
+    """SQLite 轻量迁移：users 表补 avatar_crop 列（幂等）。"""
+    try:
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            cols = [r[1] for r in conn.execute(text('PRAGMA table_info(users)'))]
+            if cols and 'avatar_crop' not in cols:
+                conn.execute(text('ALTER TABLE users ADD COLUMN avatar_crop TEXT'))
+                conn.commit()
+                print('[migrate] users.avatar_crop 已添加')
+    except Exception as e:  # noqa: BLE001
+        print(f'[migrate] users.avatar_crop 迁移跳过: {e}')
 
 
 app = FastAPI(

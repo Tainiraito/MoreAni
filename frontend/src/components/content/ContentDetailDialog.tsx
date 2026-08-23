@@ -10,7 +10,7 @@ import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Buildin
 import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
-import type { ContentItem } from '@/types'
+import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
   anime: { label: '番剧', icon: Play, color: 'var(--type-anime)' },
@@ -29,6 +29,7 @@ interface Review {
   nickname: string
   avatar_id: number
   avatar_url?: string | null
+  avatar_crop?: AvatarCrop | null
   score: number
   recommend: number
   review: string
@@ -443,7 +444,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Avatar name={user.nickname} src={user.avatar_url} size={24} />
+                        <Avatar name={user.nickname} src={user.avatar_url} crop={user.avatar_crop} size={24} />
                         <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                           {user.nickname}
                           <span className="ml-1.5 font-normal" style={{ color: '#FB71A7' }}>
@@ -602,7 +603,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <Avatar name={review.nickname || review.username} src={review.avatar_url} size={24} />
+                            <Avatar name={review.nickname || review.username} src={review.avatar_url} crop={review.avatar_crop} size={24} />
                             <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
                               {review.nickname || review.username}
                             </span>

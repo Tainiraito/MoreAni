@@ -71,13 +71,19 @@ def client(session_factory) -> Iterator[TestClient]:
 def make_user(db):
     created: list[User] = []
 
-    def factory(username: str, role: str = 'user', avatar_url: str | None = None) -> User:
+    def factory(
+        username: str,
+        role: str = 'user',
+        avatar_url: str | None = None,
+        avatar_crop: str | None = None,
+    ) -> User:
         user = User(
             username=username,
             nickname=f'{username}-nick',
             password_hash=get_password_hash('a-test-password'),
             role=role,
             avatar_url=avatar_url,
+            avatar_crop=avatar_crop,
         )
         db.add(user)
         db.commit()
