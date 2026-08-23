@@ -116,3 +116,34 @@ def test_profile_includes_uploaded_avatar_url(client, db, make_user):
     assert response.status_code == 200
     assert response.json()['avatar_url'] == target.avatar_url
     assert response.json()['avatar_crop'] == crop
+
+
+def test_avatar_crop_is_consistent_in_ratings_admin_and_recent_reviews(client, db, make_user):
+    crop = {'version': 1, 'x': 680.5360671936756, 'y': 166.86017786561266, 'size': 469.56521739130443}
+    target = make_user(
+        'gif-avatar-user',
+        avatar_url='/api/avatars/11-animation.gif?v=1',
+        avatar_crop=json.dumps(crop),
+    )
+    admin = make_user('avatar-admin', 'super_admin')
+    content = ContentItem(title='带 GIF 评论的内容', content_type='anime', is_public=True)
+    db.add(content)
+    db.flush()
+    db.add(Rating(content_id=content.id, user_id=target.id, score=80, review='动画头像评论'))
+    db.commit()
+
+    ratings = client.get(f'/api/v1/rating/content/{content.id}').json()['items']
+    rating_user = next(item for item in ratings if item['user_id'] == target.id)
+    assert rating_user['avatar_url'] == target.avatar_url
+    assert rating_user['avatar_crop'] == crop
+
+    admin_users = client.get('/api/v1/admin/users', cookies=auth_cookie(admin)).json()['items']
+    admin_user = next(item for item in admin_users if item['id'] == target.id)
+    assert admin_user['avatar_url'] == target.avatar_url
+    assert admin_user['avatar_crop'] == crop
+
+    content_items = client.get('/api/v1/content?size=20').json()['items']
+    content_item = next(item for item in content_items if item['id'] == content.id)
+    recent_review = next(review for review in content_item['recent_reviews'] if review['nickname'] == target.nickname)
+    assert recent_review['avatar_url'] == target.avatar_url
+    assert recent_review['avatar_crop'] == crop
