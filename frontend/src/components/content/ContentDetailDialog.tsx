@@ -10,6 +10,7 @@ import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Buildin
 import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
+import { CollapsibleText } from '@/components/ui/CollapsibleText'
 import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
@@ -201,6 +202,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   const director = metadata.director
   const studio = metadata.studio
   const airDate = metadata.air_date || content?.release_date
+  const collapsibleResetKey = content ? `${content.id}:${content.updated_at}` : 'empty'
 
   return (
     <div
@@ -384,11 +386,17 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
               </div>
 
               {tags.length > 0 && (
-                <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+                <CollapsibleText
+                  label="标签"
+                  lineHeight={24}
+                  resetKey={collapsibleResetKey}
+                  className="text-xs mb-4"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   {tags.map((tag: string, index: number) => (
-                    <span key={index}>#{tag} </span>
+                    <span key={index}>#{tag}{' '}</span>
                   ))}
-                </p>
+                </CollapsibleText>
               )}
 
               {(director || studio || airDate) && (
@@ -422,12 +430,16 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
               )}
 
               {content.description && (
-                <p
-                  className="text-sm leading-relaxed mb-6 whitespace-pre-line"
+                <CollapsibleText
+                  label="简介"
+                  lineHeight={28}
+                  resetKey={collapsibleResetKey}
+                  className="text-sm mb-6"
+                  contentClassName="whitespace-pre-line"
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   {content.description}
-                </p>
+                </CollapsibleText>
               )}
 
               {/* ===== 我的评论（查看态 / 编辑态） ===== */}
