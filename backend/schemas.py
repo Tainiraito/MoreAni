@@ -384,6 +384,150 @@ class BangumiImportResponse(BaseModel):
 
 
 # =============================================================================
+# Anime Garden / notification schemas
+# =============================================================================
+
+
+class ResourcePartyResponse(BaseModel):
+    """Anime Garden fansub or publisher summary."""
+
+    id: int | str | None = None
+    name: str
+    avatar: str | None = None
+
+
+class AnimeResourceResponseItem(BaseModel):
+    """Normalized resource item from one configured source."""
+
+    id: int
+    source: Literal['mikan', 'animegarden'] = 'animegarden'
+    provider: str
+    provider_id: str
+    title: str
+    href: str
+    type: str
+    magnet: str
+    size: int = 0
+    fansub: ResourcePartyResponse | None = None
+    publisher: ResourcePartyResponse | None = None
+    subject_id: int | None = None
+    created_at: datetime
+    fetched_at: datetime
+
+
+class AnimeResourcePagination(BaseModel):
+    """Anime Garden pagination state."""
+
+    page: int
+    page_size: int
+    complete: bool
+
+
+class AnimeResourceListResponse(BaseModel):
+    """Resources for one MoreAni anime."""
+
+    source: Literal['mikan', 'animegarden']
+    available: bool
+    matched: bool = True
+    match_method: Literal['bangumi', 'none'] = 'bangumi'
+    subject_id: int | None = None
+    resources: list[AnimeResourceResponseItem] = []
+    pagination: AnimeResourcePagination
+    message: str | None = None
+
+
+class ResourceSubscriptionResponse(BaseModel):
+    """One user's resource subscription."""
+
+    id: int
+    content_id: int
+    subject_id: int
+    source: Literal['mikan', 'animegarden']
+    fansub_key: str
+    fansub_name: str
+    fansub_id: str | None = None
+    active: bool
+    last_seen_created_at: datetime | None = None
+    last_seen_resource_key: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ResourceSubscriptionCreate(BaseModel):
+    """Create a subscription for a Bangumi title, source, and fansub."""
+
+    content_id: int
+    source: Literal['mikan', 'animegarden'] = 'animegarden'
+    fansub_name: str = Field(min_length=1, max_length=120)
+    fansub_id: str | None = Field(default=None, max_length=120)
+
+
+class NotificationResponse(BaseModel):
+    """Notification item with the current user's read state."""
+
+    id: int
+    scope: Literal['public', 'private']
+    kind: str
+    title: str
+    body: str
+    payload: dict = {}
+    created_at: datetime
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+    is_read: bool = False
+
+
+class NotificationListResponse(BaseModel):
+    """Paginated notification list."""
+
+    items: list[NotificationResponse]
+    total: int
+    unread_count: int
+    page: int
+    size: int
+
+
+class NotificationUnreadCountResponse(BaseModel):
+    """Unread notification counters."""
+
+    total: int
+    public: int
+    private: int
+
+
+class AnnouncementCreate(BaseModel):
+    """Create a public announcement."""
+
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(default='', max_length=10000)
+    is_published: bool = True
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class AnnouncementUpdate(BaseModel):
+    """Update a public announcement."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    body: str | None = Field(default=None, max_length=10000)
+    is_published: bool | None = None
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+class AnnouncementResponse(BaseModel):
+    """Announcement row returned to the admin panel."""
+
+    id: int
+    title: str
+    body: str
+    is_published: bool
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+    created_at: datetime
+
+
+# =============================================================================
 # Pagination
 # =============================================================================
 

@@ -6,6 +6,7 @@ import { useTheme } from '@/hooks/use-theme'
 import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { Avatar } from '@/components/ui/Avatar'
+import { NotificationCenter } from '@/components/notification/NotificationFab'
 import { User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
 
 export function AppHeader() {
@@ -69,8 +70,10 @@ export function AppHeader() {
             </span>
           </a>
 
-          {/* 右侧：头像菜单 */}
-          <div className="relative" ref={menuRef}>
+          {/* 右侧：通知与头像菜单 */}
+          <div className="flex items-center gap-3">
+            <NotificationCenter />
+            <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex h-8 w-8 items-center justify-center rounded-full overflow-hidden p-0 transition-all duration-200 hover:opacity-80"
@@ -190,6 +193,7 @@ export function AppHeader() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       </PageContainer>

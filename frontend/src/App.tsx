@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
@@ -9,7 +9,7 @@ import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useUIStore } from '@/stores/ui-store'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 
 import { useRefreshStore } from '@/stores/refresh-store'
 
@@ -24,31 +24,69 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
   const { loadFavorites } = useFavoriteStore()
   const [checking, setChecking] = useState(true)
   const [initialUser] = useState(user)
+  const validationInFlight = useRef(false)
+  const lastValidationAt = useRef(0)
+
+  const validateSession = useCallback(async (force = false) => {
+    const currentUser = useAuthStore.getState().user
+    if (!currentUser || validationInFlight.current) return
+    const now = Date.now()
+    if (!force && now - lastValidationAt.current < 30_000) return
+    validationInFlight.current = true
+    lastValidationAt.current = now
+    try {
+      const userData = await api.getMe()
+      const nextUser = {
+        id: userData.id,
+        username: userData.username,
+        nickname: userData.nickname,
+        avatar_id: userData.avatar_id,
+        avatar_url: userData.avatar_url ?? null,
+        avatar_crop: userData.avatar_crop ?? null,
+        role: userData.role as 'user' | 'admin' | 'super_admin',
+        created_at: currentUser.created_at,
+      }
+      const latestUser = useAuthStore.getState().user
+      const changed = !latestUser
+        || latestUser.id !== nextUser.id
+        || latestUser.username !== nextUser.username
+        || latestUser.nickname !== nextUser.nickname
+        || latestUser.avatar_id !== nextUser.avatar_id
+        || latestUser.avatar_url !== nextUser.avatar_url
+        || latestUser.avatar_crop !== nextUser.avatar_crop
+        || latestUser.role !== nextUser.role
+      if (changed) setUser(nextUser)
+      await loadFavorites()
+    } catch (error) {
+      // 只有服务端明确确认会话失效时才退出；网络唤醒或 5xx 保留当前页面与用户态。
+      if (error instanceof ApiError && error.status === 401) logout()
+    } finally {
+      validationInFlight.current = false
+    }
+  }, [loadFavorites, logout, setUser])
 
   useEffect(() => {
-    if (initialUser) {
-      api.getMe()
-        .then(userData => {
-          setUser({
-            id: userData.id,
-            username: userData.username,
-            nickname: userData.nickname,
-            avatar_id: userData.avatar_id,
-            avatar_url: userData.avatar_url ?? null,
-            avatar_crop: userData.avatar_crop ?? null,
-            role: userData.role as 'user' | 'admin' | 'super_admin',
-            created_at: new Date().toISOString(),
-          })
-          loadFavorites()
-        })
-        .catch(() => {
-          logout()
-        })
-        .finally(() => setChecking(false))
-    } else {
+    if (!initialUser) {
       setChecking(false)
+      return
     }
-  }, [initialUser, loadFavorites, logout, setUser])
+    void validateSession(true).finally(() => setChecking(false))
+  }, [initialUser, validateSession])
+
+  useEffect(() => {
+    if (!user) return
+    const handleWake = () => {
+      if (document.visibilityState === 'visible') void validateSession()
+    }
+    window.addEventListener('focus', handleWake)
+    window.addEventListener('pageshow', handleWake)
+    document.addEventListener('visibilitychange', handleWake)
+    return () => {
+      window.removeEventListener('focus', handleWake)
+      window.removeEventListener('pageshow', handleWake)
+      document.removeEventListener('visibilitychange', handleWake)
+    }
+  }, [user, validateSession])
 
   if (checking) {
     return (

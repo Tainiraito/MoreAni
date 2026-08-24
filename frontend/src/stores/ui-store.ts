@@ -1,5 +1,13 @@
 import { create } from 'zustand'
 
+export interface ResourceFocus {
+  contentId: number
+  source?: 'mikan' | 'animegarden'
+  fansubName?: string
+  fansubId?: string
+  resourceKey?: string
+}
+
 interface UIState {
   detailOpen: boolean
   detailContentId: number | null
@@ -7,7 +15,10 @@ interface UIState {
   settingsOpen: boolean
   addAnimeOpen: boolean
   editContentId: number | null
+  resourceFocus: ResourceFocus | null
   openDetail: (id: number) => void
+  openDetailResource: (focus: ResourceFocus) => void
+  clearResourceFocus: () => void
   closeDetail: () => void
   openAuth: () => void
   closeAuth: () => void
@@ -29,9 +40,12 @@ export const useUIStore = create<UIState>((set) => ({
   settingsOpen: false,
   addAnimeOpen: false,
   editContentId: null,
+  resourceFocus: null,
 
-  openDetail: (id) => set({ detailOpen: true, detailContentId: id }),
-  closeDetail: () => set({ detailOpen: false, detailContentId: null }),
+  openDetail: (id) => set({ detailOpen: true, detailContentId: id, resourceFocus: null }),
+  openDetailResource: (focus) => set({ detailOpen: true, detailContentId: focus.contentId, resourceFocus: focus }),
+  clearResourceFocus: () => set({ resourceFocus: null }),
+  closeDetail: () => set({ detailOpen: false, detailContentId: null, resourceFocus: null }),
   openAuth: () => set({ authOpen: true }),
   closeAuth: () => set({ authOpen: false }),
   openSettings: () => set({ settingsOpen: true }),

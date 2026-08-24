@@ -21,6 +21,31 @@ import {
 } from '@/lib/content-query'
 
 const PAGE_SIZE = 20
+const RECOMMENDATION_CACHE_PREFIX = 'moreani-recommendations-v1'
+
+function recommendationCacheKey(userId: number | null): string {
+  return `${RECOMMENDATION_CACHE_PREFIX}:${userId ?? 'guest'}`
+}
+
+function readRecommendationCache(userId: number | null): ContentItem[] {
+  try {
+    const raw = sessionStorage.getItem(recommendationCacheKey(userId))
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? normalizeRecommendationItems(parsed as ContentItem[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writeRecommendationCache(userId: number | null, items: ContentItem[]): void {
+  if (items.length === 0) return
+  try {
+    sessionStorage.setItem(recommendationCacheKey(userId), JSON.stringify(items))
+  } catch {
+    // sessionStorage 不可用时仍保留当前内存中的推荐。
+  }
+}
 
 export function HomePage() {
   const { user } = useAuthStore()
@@ -30,10 +55,11 @@ export function HomePage() {
   const [activeType, setActiveType] = useState<ContentType | 'all'>('anime')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
-  const [scrollRecommendations, setScrollRecommendations] = useState<ContentItem[]>([])
-  const scrollRecommendationsRef = useRef<ContentItem[]>([])
+  const [scrollRecommendations, setScrollRecommendations] = useState<ContentItem[]>(() => readRecommendationCache(user?.id ?? null))
+  const scrollRecommendationsRef = useRef<ContentItem[]>(scrollRecommendations)
   const scrollRequestGate = useRef(new LatestRequestGate())
   const heroRequestGate = useRef(new LatestRequestGate())
+  const recommendationWakeAt = useRef(0)
   const [recommendationSize, setRecommendationSize] = useState(() => getRecommendationSize(window.innerWidth))
   const recommendationSizeRef = useRef(recommendationSize)
   recommendationSizeRef.current = recommendationSize
@@ -103,14 +129,16 @@ export function HomePage() {
       })
       if (!scrollRequestGate.current.isCurrent(requestId)) return null
       const unique = normalizeRecommendationItems(response.items)
+      if (unique.length === 0) return scrollRecommendationsRef.current
       scrollRecommendationsRef.current = unique
       setScrollRecommendations(unique)
+      writeRecommendationCache(user?.id ?? null, unique)
       return unique
     } catch {
       // 保留上一轮推荐，避免短暂网络错误导致首屏清空。
       return null
     }
-  }, [])
+  }, [user?.id])
 
   const fetchHeroRecommendation = useCallback(async () => {
     const requestId = heroRequestGate.current.begin()
@@ -138,6 +166,12 @@ export function HomePage() {
   }, [fetchHeroRecommendation, fetchScrollRecommendations])
 
   useEffect(() => {
+    const cached = readRecommendationCache(user?.id ?? null)
+    scrollRecommendationsRef.current = cached
+    setScrollRecommendations(cached)
+  }, [user?.id])
+
+  useEffect(() => {
     const excludePrevious = scrollRecommendationsRef.current.length > 0
     if (!user) {
       heroIdRef.current = null
@@ -145,6 +179,28 @@ export function HomePage() {
     }
     void fetchRecommendationPools(recommendationSizeRef.current, excludePrevious, Boolean(user))
   }, [fetchRecommendationPools, refreshKey, user])
+
+  useEffect(() => {
+    const refreshOnWake = () => {
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - recommendationWakeAt.current < 30_000) return
+      recommendationWakeAt.current = now
+      void fetchRecommendationPools(
+        recommendationSizeRef.current,
+        scrollRecommendationsRef.current.length > 0,
+        Boolean(user),
+      )
+    }
+    window.addEventListener('focus', refreshOnWake)
+    window.addEventListener('pageshow', refreshOnWake)
+    document.addEventListener('visibilitychange', refreshOnWake)
+    return () => {
+      window.removeEventListener('focus', refreshOnWake)
+      window.removeEventListener('pageshow', refreshOnWake)
+      document.removeEventListener('visibilitychange', refreshOnWake)
+    }
+  }, [fetchRecommendationPools, user])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>

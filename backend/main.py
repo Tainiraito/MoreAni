@@ -4,6 +4,7 @@ Includes all v1 routers under /api/v1, CORS middleware,
 rate limit middleware, and creates tables on startup.
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -13,15 +14,19 @@ from fastapi.staticfiles import StaticFiles
 
 from database import Base, engine
 from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
+from models import ResourceSubscription
 from routers.v1.admin import router as admin_router
 from routers.v1.auth import router as auth_router
 from routers.v1.bangumi import router as bangumi_router
 from routers.v1.content import router as content_router
+from routers.v1.notifications import router as notifications_router
+from routers.v1.notifications import subscription_router
 from routers.v1.proxy import router as proxy_router
 from routers.v1.rating import router as rating_router
 from routers.v1.status import router as status_router
 from routers.v1.tag import router as tag_router
 from routers.v1.user import router as user_router
+from services.notifications import run_worker
 
 
 @asynccontextmanager
@@ -30,7 +35,19 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _migrate_invite_codes_expires()
     _migrate_users_avatar_crop()
-    yield
+    _migrate_resource_subscriptions()
+    worker_task = None
+    stop_event = asyncio.Event()
+    worker_enabled = os.getenv('MOREANI_NOTIFICATION_WORKER', 'false').lower() in {'1', 'true', 'yes', 'on'}
+    if worker_enabled:
+        interval = max(60, int(os.getenv('MOREANI_NOTIFICATION_INTERVAL_SECONDS', '1800')))
+        worker_task = asyncio.create_task(run_worker(stop_event, interval_seconds=interval))
+    try:
+        yield
+    finally:
+        if worker_task:
+            stop_event.set()
+            await worker_task
 
 
 def _migrate_invite_codes_expires() -> None:
@@ -76,6 +93,55 @@ def _migrate_users_avatar_crop() -> None:
         print(f'[migrate] users.avatar_crop 迁移跳过: {e}')
 
 
+def _migrate_resource_subscriptions() -> None:
+    """Upgrade subscriptions to source-aware rows while preserving cursors."""
+    from sqlalchemy import text
+
+    table_name = ResourceSubscription.__tablename__
+    try:
+        with engine.connect() as conn:
+            columns = [row[1] for row in conn.execute(text(f'PRAGMA table_info({table_name})'))]
+            if not columns:
+                return
+            indexes = []
+            for index in conn.execute(text(f'PRAGMA index_list({table_name})')).mappings():
+                index_name = index['name']
+                index_columns = [row[2] for row in conn.execute(text(f'PRAGMA index_info("{index_name}")'))]
+                indexes.append((bool(index['unique']), index_columns))
+            has_new_unique = any(
+                unique and index_columns == ['user_id', 'subject_id', 'source', 'fansub_key']
+                for unique, index_columns in indexes
+            )
+            if {'source', 'fansub_id'} <= set(columns) and has_new_unique:
+                return
+
+        legacy_table = f'{table_name}_legacy'
+        with engine.begin() as conn:
+            conn.exec_driver_sql('PRAGMA foreign_keys=OFF')
+            conn.exec_driver_sql(f'ALTER TABLE {table_name} RENAME TO {legacy_table}')
+            ResourceSubscription.__table__.create(conn)
+            source_expr = "COALESCE(source, 'animegarden')" if 'source' in columns else "'animegarden'"
+            fansub_id_expr = 'fansub_id' if 'fansub_id' in columns else 'NULL'
+            conn.execute(
+                text(
+                    f"""INSERT INTO {table_name} (
+                        id, user_id, content_id, subject_id, source, fansub_key,
+                        fansub_name, fansub_id, active, last_seen_created_at,
+                        last_seen_resource_key, created_at, updated_at
+                    )
+                    SELECT id, user_id, content_id, subject_id, {source_expr}, fansub_key,
+                        fansub_name, {fansub_id_expr}, active, last_seen_created_at,
+                        last_seen_resource_key, created_at, updated_at
+                    FROM {legacy_table}""",
+                )
+            )
+            conn.exec_driver_sql(f'DROP TABLE {legacy_table}')
+            conn.exec_driver_sql('PRAGMA foreign_keys=ON')
+        print('[migrate] resource_subscriptions 已升级为多资源源订阅表')
+    except Exception as exc:  # noqa: BLE001
+        print(f'[migrate] resource_subscriptions 迁移跳过: {exc}')
+
+
 app = FastAPI(
     title='MoreAni API',
     version='2.0.0',
@@ -114,6 +180,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 # --- V1 API routers ---
 app.include_router(auth_router, prefix='/api/v1')
 app.include_router(content_router, prefix='/api/v1')
+app.include_router(notifications_router, prefix='/api/v1')
+app.include_router(subscription_router, prefix='/api/v1')
 app.include_router(rating_router, prefix='/api/v1')
 app.include_router(status_router, prefix='/api/v1')
 app.include_router(tag_router, prefix='/api/v1')

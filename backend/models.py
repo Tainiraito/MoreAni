@@ -1,8 +1,4 @@
-"""SQLAlchemy ORM models for MoreAni v2.
-
-All tables: User, InviteCode, ContentItem, Tag, ContentTag,
-Rating, UserContentStatus, ShareLink.
-"""
+"""SQLAlchemy ORM models for MoreAni v2."""
 
 from datetime import UTC, datetime
 
@@ -184,6 +180,36 @@ class UserContentStatus(Base):
     __table_args__ = (UniqueConstraint('user_id', 'content_id', name='uq_user_content_status'),)
 
 
+class ResourceSubscription(Base):
+    """A user's subscription to one Bangumi title, source, and fansub team."""
+
+    __tablename__ = 'resource_subscriptions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey('content_items.id', ondelete='CASCADE'), nullable=False, index=True)
+    subject_id = Column(Integer, nullable=False, index=True)
+    source = Column(String(30), nullable=False, default='animegarden', index=True)
+    fansub_key = Column(String(120), nullable=False)
+    fansub_name = Column(String(120), nullable=False)
+    fansub_id = Column(String(120), nullable=True)
+    active = Column(Boolean, nullable=False, default=True, index=True)
+    last_seen_created_at = Column(DateTime, nullable=True)
+    last_seen_resource_key = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'user_id',
+            'subject_id',
+            'source',
+            'fansub_key',
+            name='uq_resource_subscription_target',
+        ),
+    )
+
+
 class ShareLink(Base):
     """Share link token for guest access."""
 
@@ -195,3 +221,43 @@ class ShareLink(Base):
     expires_at = Column(DateTime, nullable=True)
     view_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=_utcnow)
+
+
+class Notification(Base):
+    """Public announcement or private user notification."""
+
+    __tablename__ = 'notifications'
+
+    id = Column(Integer, primary_key=True, index=True)
+    scope = Column(String(20), nullable=False, index=True)  # public / private
+    recipient_user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
+    kind = Column(String(30), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=False, default='')
+    payload_json = Column(Text, nullable=False, default='{}')
+    created_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    is_published = Column(Boolean, nullable=False, default=True, index=True)
+    published_at = Column(DateTime, nullable=True, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    dedupe_key = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=_utcnow, index=True)
+
+    __table_args__ = (UniqueConstraint('recipient_user_id', 'dedupe_key', name='uq_notification_recipient_dedupe'),)
+
+
+class NotificationRead(Base):
+    """Per-user read receipt for public and private notifications."""
+
+    __tablename__ = 'notification_reads'
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(
+        Integer,
+        ForeignKey('notifications.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    read_at = Column(DateTime, default=_utcnow, nullable=False)
+
+    __table_args__ = (UniqueConstraint('notification_id', 'user_id', name='uq_notification_read'),)

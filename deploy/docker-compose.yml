@@ -18,6 +18,9 @@ services:
       # 封面本地化目录（挂载卷内）
       - COVERS_DIR=/app/data/covers
       - AVATARS_DIR=/app/data/avatars
+      # 单 Uvicorn worker 内运行资源更新通知检测
+      - MOREANI_NOTIFICATION_WORKER=${MOREANI_NOTIFICATION_WORKER:-true}
+      - MOREANI_NOTIFICATION_INTERVAL_SECONDS=${MOREANI_NOTIFICATION_INTERVAL_SECONDS:-1800}
       # 图片代理：NAS 直连国外 CDN（lain.bgm.tv）超时，走 Windows Clash 7890
       - http_proxy=http://192.168.31.45:7890
       - https_proxy=http://192.168.31.45:7890

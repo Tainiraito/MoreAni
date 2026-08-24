@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
@@ -6,11 +6,12 @@ import { useRefreshStore } from '@/stores/refresh-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
-import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil } from 'lucide-react'
+import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil, Search } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
 import { CollapsibleText } from '@/components/ui/CollapsibleText'
+import { AnimeResourceDialog } from '@/components/content/AnimeResourceDialog'
 import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
@@ -43,11 +44,12 @@ interface ContentDetailDialogProps {
 }
 
 export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
-  const { detailOpen, detailContentId, closeDetail, openEditContent } = useUIStore()
+  const { detailOpen, detailContentId, closeDetail, openEditContent, resourceFocus, clearResourceFocus } = useUIStore()
   const maskProps = useMaskClose(closeDetail)
   useLockBodyScroll(detailOpen)
   const { user } = useAuthStore()
-  const toast = useToastStore.getState()
+  const addToast = useToastStore(state => state.addToast)
+  const username = user?.username
   const [content, setContent] = useState<ContentItem | null>(null)
   const [loading, setLoading] = useState(false)
   const [score, setScore] = useState(0)
@@ -58,6 +60,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [resourceOpen, setResourceOpen] = useState(false)
+  const previousDetailKey = useRef<string | null>(null)
   // 监听全局刷新信号：编辑保存/删除/评分变化后详情弹窗内容保持最新
   const refreshKey = useRefreshStore(s => s.refreshKey)
 
@@ -80,8 +84,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
           setAllReviews(ratings)
 
           // Extract current user's existing rating from the list
-          if (user) {
-            const mine = ratings.find((r: Review) => r.username === user.username)
+          if (username) {
+            const mine = ratings.find((r: Review) => r.username === username)
             if (mine) {
               setScore(mine.score / 10) // API returns 0-100, UI shows 1-10
               setReviewText(mine.review || '')
@@ -89,10 +93,24 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
             }
           }
         })
-        .catch(() => toast.addToast('error', '加载失败'))
+        .catch(() => addToast('error', '加载失败'))
         .finally(() => setLoading(false))
     }
-  }, [detailOpen, detailContentId, user, refreshKey, toast])
+  }, [addToast, detailContentId, detailOpen, refreshKey, username])
+
+  useEffect(() => {
+    const nextDetailKey = detailOpen && detailContentId ? String(detailContentId) : null
+    if (previousDetailKey.current !== nextDetailKey) {
+      previousDetailKey.current = nextDetailKey
+      setResourceOpen(false)
+    }
+  }, [detailContentId, detailOpen])
+
+  useEffect(() => {
+    if (detailOpen && content && resourceFocus?.contentId === content.id) {
+      setResourceOpen(true)
+    }
+  }, [content, detailOpen, resourceFocus?.contentId])
 
   // Lock body scroll when dialog is open
   useEffect(() => {
@@ -129,9 +147,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
       setEditing(false)
       // 触发全局刷新：详情弹窗本组件监听 refreshKey 会自动重新加载（含我的评分提取）
       useRefreshStore.getState().triggerRefresh()
-      toast.addToast('success', '评分已保存')
+      addToast('success', '评分已保存')
     } catch (err: any) {
-      toast.addToast('error', err.message || '保存失败')
+      addToast('error', err.message || '保存失败')
     }
   }
 
@@ -153,9 +171,9 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
       }
       // 通知列表刷新（删除评分后 my_score 变化）
       useRefreshStore.getState().triggerRefresh()
-      toast.addToast('success', '评分已删除')
+      addToast('success', '评分已删除')
     } catch {
-      toast.addToast('error', '删除失败')
+      addToast('error', '删除失败')
     }
   }
 
@@ -176,13 +194,13 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
         if (items.length > 0) bgmId = items[0].bgm_id
       }
       if (!bgmId) {
-        toast.addToast('error', '未在 Bangumi 找到匹配条目')
+        addToast('error', '未在 Bangumi 找到匹配条目')
         return
       }
       const res = await api.getBangumiScore(bgmId)
       setBangumiScore(res.score)
     } catch {
-      toast.addToast('error', '查询失败')
+      addToast('error', '查询失败')
     } finally {
       setBangumiLoading(false)
     }
@@ -382,6 +400,16 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                     <ExternalLink size={12} />
                     Bangumi
                   </a>
+                )}
+                {content.content_type === 'anime' && (
+                  <button
+                    onClick={() => setResourceOpen(true)}
+                    className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+                    style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)', background: 'rgba(251,113,167,0.06)' }}
+                  >
+                    <Search size={12} />
+                    寻找资源
+                  </button>
                 )}
               </div>
 
@@ -649,6 +677,20 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
           </div>
         )}
       </div>
+      {content && resourceOpen && (
+        <AnimeResourceDialog
+          open
+          content={content}
+          focusSource={resourceFocus?.source}
+          focusFansubName={resourceFocus?.fansubName}
+          focusFansubId={resourceFocus?.fansubId}
+          focusResourceKey={resourceFocus?.resourceKey}
+          onClose={() => {
+            setResourceOpen(false)
+            clearResourceFocus()
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,7 +1,28 @@
 import { useToastStore } from '@/stores/toast-store'
-import type { AvatarCrop, ContentItem, InviteCode, PaginatedResponse, User } from '@/types'
+import type {
+  AnimeResourceResponse,
+  Announcement,
+  AvatarCrop,
+  ContentItem,
+  InviteCode,
+  NotificationListResponse,
+  NotificationUnreadCount,
+  PaginatedResponse,
+  ResourceSubscription,
+  User,
+} from '@/types'
 
 const API_BASE = '/api/v1'
+
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -45,7 +66,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       toast.addToast('error', errorMessage, 3000)
     }
 
-    throw new Error(errorMessage)
+    throw new ApiError(errorMessage, res.status)
   }
 
   // Handle 204 No Content (e.g., DELETE requests)
@@ -90,6 +111,14 @@ export const api = {
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getContent: (id: number) => request<unknown>(`/content/${id}`),
+  getAnimeResources: (id: number, params?: { source?: 'mikan' | 'animegarden'; page?: number; size?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.source) query.set('source', params.source)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.size) query.set('size', String(params.size))
+    const suffix = query.toString() ? `?${query}` : ''
+    return request<AnimeResourceResponse>(`/content/${id}/resources${suffix}`)
+  },
   createContent: (data: unknown) =>
     request<{ id: number }>('/content', { method: 'POST', body: JSON.stringify(data) }),
   updateContent: (id: number, data: unknown) =>
@@ -117,6 +146,30 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`)
   },
+  // Resource subscriptions
+  listResourceSubscriptions: (contentId?: number) => {
+    const suffix = contentId ? `?content_id=${contentId}` : ''
+    return request<ResourceSubscription[]>(`/resource-subscriptions${suffix}`)
+  },
+  createResourceSubscription: (data: { content_id: number; source: 'mikan' | 'animegarden'; fansub_name: string; fansub_id?: string | null }) =>
+    request<ResourceSubscription>('/resource-subscriptions', { method: 'POST', body: JSON.stringify(data) }),
+  deleteResourceSubscription: (id: number) =>
+    request<undefined>(`/resource-subscriptions/${id}`, { method: 'DELETE' }),
+  // Notifications
+  listNotifications: (params?: { scope?: 'all' | 'public' | 'private'; page?: number; size?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.scope) query.set('scope', params.scope)
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.size) query.set('size', String(params.size))
+    const suffix = query.toString() ? `?${query}` : ''
+    return request<NotificationListResponse>(`/notifications${suffix}`)
+  },
+  getNotificationUnreadCount: () => request<NotificationUnreadCount>('/notifications/unread-count'),
+  refreshNotifications: () => request<{ created: number }>('/notifications/refresh', { method: 'POST' }),
+  markNotificationRead: (id: number) =>
+    request<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: (scope: 'all' | 'public' | 'private' = 'public') =>
+    request<{ marked: number }>(`/notifications/read-all?scope=${scope}`, { method: 'POST' }),
   adminListUsers: (params?: Record<string, string>) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: User[]; total: number; page: number; size: number }>(`/admin/users${q}`)
@@ -137,6 +190,16 @@ export const api = {
     request<InviteCode>(`/admin/invites/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   adminDeleteInvite: (id: number) =>
     request<undefined>(`/admin/invites/${id}`, { method: 'DELETE' }),
+  adminListAnnouncements: (params?: Record<string, string>) => {
+    const q = params ? '?' + new URLSearchParams(params).toString() : ''
+    return request<{ items: Announcement[]; total: number; page: number; size: number }>(`/admin/announcements${q}`)
+  },
+  adminCreateAnnouncement: (data: { title: string; body: string; is_published: boolean; published_at?: string; expires_at?: string }) =>
+    request<Announcement>('/admin/announcements', { method: 'POST', body: JSON.stringify(data) }),
+  adminUpdateAnnouncement: (id: number, data: Partial<{ title: string; body: string; is_published: boolean; published_at: string | null; expires_at: string | null }>) =>
+    request<Announcement>(`/admin/announcements/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  adminDeleteAnnouncement: (id: number) =>
+    request<undefined>(`/admin/announcements/${id}`, { method: 'DELETE' }),
   getUserActivity: (id: number, params?: Record<string, string>) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/user/${id}/activity${q}`)

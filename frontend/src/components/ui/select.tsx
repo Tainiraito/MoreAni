@@ -46,7 +46,7 @@ export function Select({ value, onChange, options = [], groups, placeholder, cla
 
         <ListboxOptions
           anchor="bottom start"
-          className="z-50 mt-1 max-h-60 w-[var(--button-width)] overflow-auto rounded-lg py-1 shadow-lg outline-none"
+          className="z-[70] mt-1 max-h-60 w-[var(--button-width)] overflow-auto rounded-lg py-1 shadow-lg outline-none"
           style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-line)',

@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from deps import get_current_user, get_current_user_optional, get_db
 from models import ContentItem, ShareLink, User
 from schemas import (
+    AnimeResourceListResponse,
+    AnimeResourcePagination,
+    AnimeResourceResponseItem,
     ContentItemCreate,
     ContentItemResponse,
     ContentItemUpdate,
@@ -18,9 +21,12 @@ from schemas import (
     ShareLinkResponse,
     TagResponse,
 )
+from services import animegarden  # noqa: F401 - kept for existing test/integration monkeypatches
 from services import content as content_svc
 from services import covers as covers_svc
 from services import rating as rating_svc
+from services import resources as resources_svc
+from services.resource_common import subject_id_for_content
 
 router = APIRouter(prefix='/content', tags=['content'])
 
@@ -189,6 +195,63 @@ def list_seasons(db: Session = Depends(get_db)) -> dict:
         season_map[key] = season_map.get(key, 0) + cnt
     items = [{'value': k, 'count': v} for k, v in sorted(season_map.items(), reverse=True)]
     return {'items': items}
+
+
+@router.get('/{content_id}/resources', response_model=AnimeResourceListResponse)
+async def get_content_resources(
+    content_id: int,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+    source: str = Query('mikan', pattern='^(mikan|animegarden)$'),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=1000),
+) -> AnimeResourceListResponse:
+    """Find resources from the requested source for a Bangumi-linked anime."""
+    item = content_svc.get_content_by_id(db, content_id)
+    if not item:
+        raise HTTPException(status_code=404, detail='Content not found')
+    if not item.is_public and (
+        user is None or (item.created_by != user.id and user.role not in ('admin', 'super_admin'))
+    ):
+        raise HTTPException(status_code=404, detail='Content not found')
+
+    subject_id = subject_id_for_content(item)
+    if subject_id is None:
+        return AnimeResourceListResponse(
+            source=source,
+            available=False,
+            matched=False,
+            match_method='none',
+            subject_id=None,
+            resources=[],
+            pagination=AnimeResourcePagination(page=page, page_size=size, complete=True),
+            message='当前番剧未关联 Bangumi，无法精确寻找资源。',
+        )
+
+    try:
+        result = await resources_svc.fetch_for_content(
+            item,
+            source=source,
+            page=page,
+            page_size=size,
+        )
+    except resources_svc.ResourceProviderError as exc:
+        raise HTTPException(status_code=502, detail='资源服务暂时不可用，请稍后重试') from exc
+
+    return AnimeResourceListResponse(
+        source=source,
+        available=True,
+        matched=result.matched,
+        match_method=result.match_method,
+        subject_id=subject_id,
+        resources=[AnimeResourceResponseItem.model_validate(resource) for resource in result.resources],
+        pagination=AnimeResourcePagination(
+            page=result.page,
+            page_size=result.page_size,
+            complete=result.complete,
+        ),
+        message=result.message,
+    )
 
 
 @router.get('/{content_id}', response_model=ContentItemResponse)

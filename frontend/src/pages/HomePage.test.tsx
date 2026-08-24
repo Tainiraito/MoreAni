@@ -24,6 +24,8 @@ vi.mock('@/lib/api', () => ({
 
 describe('HomePage 推荐数据', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    sessionStorage.clear()
     vi.mocked(api.getRecommendations).mockResolvedValue({
       items: Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }) as ContentItem),
     })
@@ -32,6 +34,17 @@ describe('HomePage 推荐数据', () => {
   it('HomePage 与 HeroBrand 共用一次推荐请求', async () => {
     const { getByTestId } = render(<HomePage />)
     await waitFor(() => expect(getByTestId('hero-brand')).toHaveTextContent('12'))
+    expect(api.getRecommendations).toHaveBeenCalledTimes(1)
+  })
+
+  it('推荐接口返回空数组时保留标签页缓存', async () => {
+    sessionStorage.setItem('moreani-recommendations-v1:guest', JSON.stringify([
+      { id: 99, title: '缓存推荐' },
+    ]))
+    vi.mocked(api.getRecommendations).mockResolvedValueOnce({ items: [] })
+
+    const { getAllByTestId } = render(<HomePage />)
+    await waitFor(() => expect(getAllByTestId('hero-brand').at(-1)).toHaveTextContent('1'))
     expect(api.getRecommendations).toHaveBeenCalledTimes(1)
   })
 })

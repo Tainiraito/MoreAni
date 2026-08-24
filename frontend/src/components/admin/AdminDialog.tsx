@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
-import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound } from 'lucide-react'
-import type { InviteCode, User } from '@/types'
+import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound, Megaphone } from 'lucide-react'
+import type { Announcement, InviteCode, User } from '@/types'
 
 const ROLE_LABEL: Record<string, string> = { user: '成员', admin: '管理员', super_admin: '超级管理员' }
 const ROLE_COLOR: Record<string, string> = { user: '#4DA6FF', admin: '#FB71A7', super_admin: '#C77DFF' }
@@ -39,7 +40,7 @@ export function AdminDialog() {
   const { adminOpen, closeAdmin } = useUIStore()
   const maskProps = useMaskClose(closeAdmin)
   useLockBodyScroll(adminOpen)
-  const [tab, setTab] = useState<'users' | 'invites'>('users')
+  const [tab, setTab] = useState<'users' | 'invites' | 'announcements'>('users')
 
   // 关键：不打开就不渲染（否则页面加载时弹窗常驻、UserManageTab 自动请求 admin/users）
   if (!adminOpen) return null
@@ -82,6 +83,18 @@ export function AdminDialog() {
               >
                 <KeyRound size={12} /> 邀请码
               </button>
+              <button
+                onClick={() => setTab('announcements')}
+                className="h-8 px-3.5 text-xs font-medium flex items-center gap-1.5 transition-all duration-150"
+                style={{
+                  background: tab === 'announcements' ? 'var(--bg-card-warm)' : 'transparent',
+                  color: tab === 'announcements' ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderLeft: '1px solid var(--border-line)',
+                  boxShadow: tab === 'announcements' ? 'inset 0 -2px 0 #FB71A7' : 'none',
+                }}
+              >
+                <Megaphone size={12} /> 公共通知
+              </button>
             </div>
           </div>
           <button onClick={closeAdmin} className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
@@ -91,8 +104,10 @@ export function AdminDialog() {
 
         {tab === 'users' ? (
           <UserManageTab />
-        ) : (
+        ) : tab === 'invites' ? (
           <InviteManageTab />
+        ) : (
+          <AnnouncementManageTab />
         )}
       </div>
     </div>
@@ -559,6 +574,163 @@ function InviteManageTab() {
               <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
               <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
             </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ── 公共通知管理 ─────────────────────────────────────────── */
+
+interface AnnouncementForm {
+  title: string
+  body: string
+  published_at: string
+  expires_at: string
+  is_published: boolean
+}
+
+function AnnouncementManageTab() {
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<Announcement | null>(null)
+  const [form, setForm] = useState<AnnouncementForm>({ title: '', body: '', published_at: '', expires_at: '', is_published: true })
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const loadAnnouncements = async () => {
+    setLoading(true)
+    try {
+      const response = await api.adminListAnnouncements({ page: '1', size: '50' })
+      setAnnouncements(response.items)
+    } catch (err: any) {
+      useToastStore.getState().addToast('error', err.message || '加载公共通知失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadAnnouncements()
+  }, [])
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ title: '', body: '', published_at: '', expires_at: '', is_published: true })
+    setFormError('')
+    setFormOpen(true)
+  }
+
+  const openEdit = (announcement: Announcement) => {
+    setEditing(announcement)
+    setForm({
+      title: announcement.title,
+      body: announcement.body,
+      published_at: announcement.published_at ? announcement.published_at.slice(0, 16) : '',
+      expires_at: announcement.expires_at ? announcement.expires_at.slice(0, 10) : '',
+      is_published: announcement.is_published,
+    })
+    setFormError('')
+    setFormOpen(true)
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!form.title.trim() || !form.body.trim()) {
+      setFormError('标题和正文不能为空')
+      return
+    }
+    setSaving(true)
+    setFormError('')
+    try {
+      if (editing) {
+        await api.adminUpdateAnnouncement(editing.id, {
+          title: form.title.trim(),
+          body: form.body,
+          is_published: form.is_published,
+          published_at: form.published_at ? `${form.published_at}:00` : null,
+          expires_at: form.expires_at || null,
+        })
+        useToastStore.getState().addToast('success', '公共通知已更新')
+      } else {
+        await api.adminCreateAnnouncement({
+          title: form.title.trim(),
+          body: form.body,
+          is_published: form.is_published,
+          ...(form.published_at ? { published_at: `${form.published_at}:00` } : {}),
+          ...(form.expires_at ? { expires_at: form.expires_at } : {}),
+        })
+        useToastStore.getState().addToast('success', '公共通知已创建')
+      }
+      setFormOpen(false)
+      await loadAnnouncements()
+    } catch (err: any) {
+      setFormError(err.message || '保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (announcement: Announcement) => {
+    try {
+      await api.adminDeleteAnnouncement(announcement.id)
+      useToastStore.getState().addToast('success', '公共通知已删除')
+      await loadAnnouncements()
+    } catch (err: any) {
+      useToastStore.getState().addToast('error', err.message || '删除失败')
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between px-6 pt-3">
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>公共通知会展示给所有访客，正文仅支持纯文本。</p>
+        <Button onClick={openAdd} size="sm" style={{ background: '#FB71A7', color: 'white' }}><Plus size={13} /> 新建通知</Button>
+      </div>
+      <div className="flex-1 space-y-2 overflow-y-auto px-6 py-3">
+        {loading ? (
+          <p className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+        ) : announcements.length === 0 ? (
+          <p className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>还没有公共通知</p>
+        ) : announcements.map(announcement => (
+          <div key={announcement.id} className="rounded-xl p-3" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{announcement.title}</p>
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ color: announcement.is_published ? '#00B894' : 'var(--text-muted)', background: announcement.is_published ? 'rgba(0,184,148,0.1)' : 'var(--bg-card)' }}>
+                    {announcement.is_published ? '已发布' : '已撤回'}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-line text-xs" style={{ color: 'var(--text-secondary)' }}>{announcement.body}</p>
+                <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  创建于 {announcement.created_at.slice(0, 10)}{announcement.published_at ? ` · ${announcement.published_at.slice(0, 16).replace('T', ' ')} 发布` : ''}{announcement.expires_at ? ` · ${announcement.expires_at.slice(0, 10)} 过期` : ''}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" onClick={() => openEdit(announcement)} className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} title="编辑"><Pencil size={13} /></button>
+                <button type="button" onClick={() => void handleDelete(announcement)} className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} title="删除"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {formOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-[500px] max-w-[92vw] rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }} onClick={event => event.stopPropagation()}>
+            <h3 className="mb-4 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{editing ? '编辑公共通知' : '新建公共通知'}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1.5"><Label className="text-xs">标题</Label><Input value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} className="h-9 text-sm" placeholder="例如：MoreAni v2.1 已上线" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">正文</Label><Textarea value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} rows={6} className="resize-none text-sm" placeholder="支持纯文本和换行" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">发布时间（可选，留空立即发布）</Label><Input type="datetime-local" value={form.published_at} onChange={event => setForm({ ...form, published_at: event.target.value })} className="h-9 text-sm" /></div>
+              <div className="space-y-1.5"><DatePicker label="过期时间（可选）" value={form.expires_at} onChange={value => setForm({ ...form, expires_at: value })} placeholder="选择日期" /></div>
+              <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}><input type="checkbox" checked={form.is_published} onChange={event => setForm({ ...form, is_published: event.target.checked })} /> 立即发布</label>
+              {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
+              <div className="flex gap-2 pt-1"><Button type="submit" loading={saving} className="flex-1" style={{ background: '#FB71A7', color: 'white' }}>{editing ? '保存修改' : '创建通知'}</Button><Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>取消</Button></div>
+            </form>
           </div>
         </div>
       )}

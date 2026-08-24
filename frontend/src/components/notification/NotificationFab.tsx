@@ -1,0 +1,56 @@
+import { useEffect, useRef } from 'react'
+import { Bell } from 'lucide-react'
+
+import { NotificationPanel } from '@/components/notification/NotificationPanel'
+import { useAuthStore } from '@/stores/auth-store'
+import { useNotificationStore } from '@/stores/notification-store'
+
+export function NotificationCenter() {
+  const { user } = useAuthStore()
+  const open = useNotificationStore(state => state.open)
+  const unreadCount = useNotificationStore(state => state.unreadCount)
+  const openPanel = useNotificationStore(state => state.openPanel)
+  const closePanel = useNotificationStore(state => state.closePanel)
+  const loadUnreadCount = useNotificationStore(state => state.loadUnreadCount)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && containerRef.current && !containerRef.current.contains(event.target)) {
+        closePanel()
+      }
+    }
+    document.addEventListener('pointerdown', handleOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+  }, [closePanel, open])
+
+  useEffect(() => {
+    void loadUnreadCount()
+    const timer = window.setInterval(() => void loadUnreadCount(), 60_000)
+    return () => window.clearInterval(timer)
+  }, [loadUnreadCount, user?.id])
+
+  return (
+    <>
+      <div ref={containerRef} className="relative">
+        <button
+          type="button"
+          aria-label="打开通知"
+          aria-expanded={open}
+          onClick={() => open ? closePanel() : void openPanel()}
+          className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+          style={{ color: open ? '#FB71A7' : 'var(--text-secondary)' }}
+        >
+          <Bell size={17} />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 min-w-4 rounded-full px-1 text-center text-[9px] font-bold leading-4" style={{ background: '#ef4444', color: 'white', border: '2px solid var(--bg-card)' }}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+        <NotificationPanel />
+      </div>
+    </>
+  )
+}

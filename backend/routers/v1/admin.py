@@ -13,7 +13,18 @@ from sqlalchemy.orm import Session
 
 from auth import get_password_hash
 from deps import get_db, require_role
-from models import InviteCode, Rating, ShareLink, User, UserContentStatus
+from models import (
+    InviteCode,
+    Notification,
+    NotificationRead,
+    Rating,
+    ResourceSubscription,
+    ShareLink,
+    User,
+    UserContentStatus,
+)
+from schemas import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate
+from services import notifications as notification_svc
 from services.avatar import avatar_fields
 
 router = APIRouter(prefix='/admin', tags=['admin'])
@@ -173,6 +184,9 @@ def delete_user_admin(
         )
         db.query(Rating).filter(Rating.user_id == user_id).delete(synchronize_session=False)
         db.query(UserContentStatus).filter(UserContentStatus.user_id == user_id).delete(synchronize_session=False)
+        db.query(ResourceSubscription).filter(ResourceSubscription.user_id == user_id).delete(synchronize_session=False)
+        db.query(NotificationRead).filter(NotificationRead.user_id == user_id).delete(synchronize_session=False)
+        db.query(Notification).filter(Notification.recipient_user_id == user_id).delete(synchronize_session=False)
         db.query(ShareLink).filter(ShareLink.created_by == user_id).delete(synchronize_session=False)
         db.query(InviteCode).filter(InviteCode.used_by == user_id).update(
             {InviteCode.used_by: None},
@@ -183,6 +197,79 @@ def delete_user_admin(
     except Exception:
         db.rollback()
         raise
+
+
+# ── 公共通知管理 ───────────────────────────────────────────────────────
+
+
+def _announcement_response(item: Notification) -> AnnouncementResponse:
+    """Serialize an announcement for the admin panel."""
+    return AnnouncementResponse(
+        id=item.id,
+        title=item.title,
+        body=item.body,
+        is_published=item.is_published,
+        published_at=item.published_at,
+        expires_at=item.expires_at,
+        created_at=item.created_at,
+    )
+
+
+@router.get('/announcements')
+def list_announcements_admin(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> dict:
+    """List public announcements, including drafts and expired rows."""
+    items, total = notification_svc.list_announcements(db, page=page, size=size)
+    return {
+        'items': [_announcement_response(item) for item in items],
+        'total': total,
+        'page': page,
+        'size': size,
+    }
+
+
+@router.post('/announcements', response_model=AnnouncementResponse, status_code=201)
+def create_announcement_admin(
+    body: AnnouncementCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role('super_admin')),
+) -> AnnouncementResponse:
+    """Create a public announcement."""
+    item = notification_svc.create_announcement(db, admin_id=admin.id, data=body.model_dump())
+    return _announcement_response(item)
+
+
+@router.put('/announcements/{announcement_id}', response_model=AnnouncementResponse)
+def update_announcement_admin(
+    announcement_id: int,
+    body: AnnouncementUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+) -> AnnouncementResponse:
+    """Update a public announcement."""
+    item = notification_svc.update_announcement(
+        db,
+        announcement_id=announcement_id,
+        data=body.model_dump(exclude_unset=True),
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail='公告不存在')
+    return _announcement_response(item)
+
+
+@router.delete('/announcements/{announcement_id}', status_code=204)
+def delete_announcement_admin(
+    announcement_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_role('super_admin')),
+) -> None:
+    """Delete a public announcement."""
+    if not notification_svc.delete_announcement(db, announcement_id=announcement_id):
+        raise HTTPException(status_code=404, detail='公告不存在')
 
 
 # ── 邀请码管理 ──────────────────────────────────────────────────────────

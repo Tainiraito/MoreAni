@@ -9,7 +9,7 @@ engine = create_engine(
     DATABASE_URL,
     connect_args={
         'check_same_thread': False,
-        # 生产使用两个 uvicorn worker。给 SQLite 写锁留出等待时间，避免短暂并发直接报 locked。
+        # 当前生产使用单个 uvicorn worker；给 SQLite 写锁留出等待时间，避免短暂并发直接报 locked。
         'timeout': 10,
     },
 )

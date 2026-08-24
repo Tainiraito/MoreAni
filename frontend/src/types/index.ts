@@ -99,3 +99,96 @@ export interface PaginatedResponse<T> {
   page: number
   size: number
 }
+
+export interface ResourceParty {
+  id?: number | string | null
+  name: string
+  avatar?: string | null
+}
+
+export interface AnimeResource {
+  id: number
+  source: 'mikan' | 'animegarden'
+  provider: string
+  provider_id: string
+  title: string
+  href: string
+  type: string
+  magnet: string
+  size: number
+  fansub?: ResourceParty | null
+  publisher?: ResourceParty | null
+  subject_id?: number | null
+  created_at: string
+  fetched_at: string
+}
+
+export interface AnimeResourceResponse {
+  source: 'mikan' | 'animegarden'
+  available: boolean
+  matched: boolean
+  match_method: 'bangumi' | 'none'
+  subject_id: number | null
+  resources: AnimeResource[]
+  pagination: {
+    page: number
+    page_size: number
+    complete: boolean
+  }
+  message: string | null
+}
+
+export interface ResourceSubscription {
+  id: number
+  content_id: number
+  subject_id: number
+  source: 'mikan' | 'animegarden'
+  fansub_key: string
+  fansub_name: string
+  fansub_id: string | null
+  active: boolean
+  last_seen_created_at: string | null
+  last_seen_resource_key: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type NotificationScope = 'public' | 'private'
+export type NotificationKind = 'announcement' | 'resource_update' | 'system'
+
+export interface NotificationItem {
+  id: number
+  scope: NotificationScope
+  kind: NotificationKind | string
+  title: string
+  body: string
+  payload: Record<string, unknown>
+  created_at: string
+  published_at: string | null
+  expires_at: string | null
+  is_read: boolean
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[]
+  total: number
+  unread_count: number
+  page: number
+  size: number
+}
+
+export interface NotificationUnreadCount {
+  total: number
+  public: number
+  private: number
+}
+
+export interface Announcement {
+  id: number
+  title: string
+  body: string
+  is_published: boolean
+  published_at: string | null
+  expires_at: string | null
+  created_at: string
+}
