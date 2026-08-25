@@ -70,8 +70,18 @@ def test_parse_group_rss_normalizes_resource_fields():
 def test_mikan_resource_cleanup_drops_placeholders_and_duplicate_magnets():
     resources = [
         {'title': 'Mikan 资源', 'size': 0, 'provider_id': 'placeholder-1', 'magnet': ''},
-        {'title': '[LoliHouse] 测试番剧', 'size': 1024, 'provider_id': 'episode-1', 'magnet': 'magnet:?xt=urn:btih:ABC123'},
-        {'title': '[LoliHouse] 测试番剧（重复行）', 'size': 2048, 'provider_id': 'episode-2', 'magnet': 'magnet:?xt=urn:btih:ABC123'},
+        {
+            'title': '[LoliHouse] 测试番剧',
+            'size': 1024,
+            'provider_id': 'episode-1',
+            'magnet': 'magnet:?xt=urn:btih:ABC123',
+        },
+        {
+            'title': '[LoliHouse] 测试番剧（重复行）',
+            'size': 2048,
+            'provider_id': 'episode-2',
+            'magnet': 'magnet:?xt=urn:btih:ABC123',
+        },
     ]
 
     cleaned = mikan._deduplicate_resources(resources)

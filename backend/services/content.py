@@ -404,12 +404,7 @@ def get_random_content(
             Rating.user_id == user_id,
             (Rating.score > 0) | (Rating.review.isnot(None) & (func.trim(Rating.review) != '')),
         )
-        fresh_item = (
-            build_query()
-            .filter(~ContentItem.id.in_(interacted_subquery))
-            .order_by(func.random())
-            .first()
-        )
+        fresh_item = build_query().filter(~ContentItem.id.in_(interacted_subquery)).order_by(func.random()).first()
         if fresh_item is not None:
             return fresh_item
 

@@ -228,9 +228,7 @@ def _fallback_group(title: str) -> tuple[str | None, str | None]:
     return (None, _clean_text(match.group(1))) if match else (None, None)
 
 
-def _canonicalize_fansub_groups(
-    resources: list[dict[str, Any]], groups: dict[str, dict[str, Any]]
-) -> None:
+def _canonicalize_fansub_groups(resources: list[dict[str, Any]], groups: dict[str, dict[str, Any]]) -> None:
     """Attach title-only resources to a unique stable group ID when possible.
 
     Mikan occasionally omits the PublishGroup link for an individual resource,
@@ -605,7 +603,11 @@ async def _resolve_and_fetch(subject_id: int, title: str, title_alt: str, releas
             if new_candidates:
                 matched = await _validate_candidates(subject_id, new_candidates, client)
                 if matched:
-                    logger.info('Mikan lookup subject=%s method=title elapsed=%.3fs', subject_id, time.perf_counter() - started_at)
+                    logger.info(
+                        'Mikan lookup subject=%s method=title elapsed=%.3fs',
+                        subject_id,
+                        time.perf_counter() - started_at,
+                    )
                     return matched
 
         # 搜索页面通常已经足够，只有两个标题都没有候选时才回退季番接口。
@@ -627,7 +629,11 @@ async def _resolve_and_fetch(subject_id: int, title: str, title_alt: str, releas
                     if new_candidates:
                         matched = await _validate_candidates(subject_id, new_candidates, client)
                         if matched:
-                            logger.info('Mikan lookup subject=%s method=season elapsed=%.3fs', subject_id, time.perf_counter() - started_at)
+                            logger.info(
+                                'Mikan lookup subject=%s method=season elapsed=%.3fs',
+                                subject_id,
+                                time.perf_counter() - started_at,
+                            )
                             return matched
                 except MikanError as exc:
                     discovery_error = exc
