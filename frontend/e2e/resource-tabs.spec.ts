@@ -45,6 +45,37 @@ function resource(source: 'mikan' | 'animegarden', title: string, fansubId: stri
   }
 }
 
+test('未登录用户不显示寻找资源入口', async ({ page }) => {
+  await page.addInitScript(({ cachedContent }) => {
+    window.sessionStorage.setItem('moreani-recommendations-v1:guest', JSON.stringify([cachedContent]))
+  }, { cachedContent: content })
+  await page.route('**/api/v1/content/recommendations**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ items: [content] }),
+  }))
+  await page.route('**/api/v1/content/198', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(content),
+  }))
+  await page.route('**/api/v1/rating/content/198**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ items: [], total: 0 }),
+  }))
+  await page.route('**/api/v1/notifications/unread-count', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ total: 0, public: 0, private: 0 }),
+  }))
+
+  await page.goto('/')
+  await page.getByText(content.title, { exact: true }).last().click({ force: true })
+  await expect(page.locator('h2').filter({ hasText: content.title })).toBeVisible()
+  await expect(page.getByRole('button', { name: '寻找资源' })).toHaveCount(0)
+})
+
 test('资源弹窗默认查询 Mikan，切换后按来源缓存结果', async ({ page }) => {
   const resourceSources: string[] = []
   const resourcePages: number[] = []

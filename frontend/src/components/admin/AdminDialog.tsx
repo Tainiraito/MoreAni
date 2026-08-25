@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
@@ -11,6 +11,11 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { DatePicker } from '@/components/ui/date-picker'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Skeleton } from '@/components/ui/skeleton'
+import { formatAnnouncementTime } from '@/components/admin/announcement-utils'
+import { formatDate, toLocalDateTimeInput, toUtcISOString } from '@/lib/utils'
 import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound, Megaphone } from 'lucide-react'
 import type { Announcement, InviteCode, User } from '@/types'
 
@@ -131,6 +136,7 @@ function UserManageTab() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const PAGE_SIZE = 15
+  const initialLoadRef = useRef(false)
 
   const loadUsers = async (p = 1, search = q) => {
     setLoading(true)
@@ -147,6 +153,8 @@ function UserManageTab() {
   }
 
   useEffect(() => {
+    if (initialLoadRef.current) return
+    initialLoadRef.current = true
     setUsers([])
     setPage(1)
     setQ('')
@@ -369,6 +377,7 @@ function InviteManageTab() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const PAGE_SIZE = 20
+  const initialLoadRef = useRef(false)
 
   const loadInvites = async (p = 1, search = q) => {
     setLoading(true)
@@ -385,6 +394,8 @@ function InviteManageTab() {
   }
 
   useEffect(() => {
+    if (initialLoadRef.current) return
+    initialLoadRef.current = true
     setInvites([])
     setPage(1)
     setQ('')
@@ -591,6 +602,24 @@ interface AnnouncementForm {
   is_published: boolean
 }
 
+function AnnouncementLoadingSkeleton() {
+  return (
+    <div className="space-y-2" aria-label="公共通知加载中">
+      {[0, 1, 2].map(index => (
+        <div key={index} className="rounded-xl border p-3" style={{ background: 'var(--bg-card-warm)', borderColor: 'var(--border-line)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-3 w-2/5" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+          <Skeleton className="mt-3 h-2.5 w-11/12" />
+          <Skeleton className="mt-2 h-2.5 w-3/5" />
+          <Skeleton className="mt-3 h-2 w-1/3" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AnnouncementManageTab() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [formOpen, setFormOpen] = useState(false)
@@ -599,6 +628,7 @@ function AnnouncementManageTab() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
+  const initialLoadRef = useRef(false)
 
   const loadAnnouncements = async () => {
     setLoading(true)
@@ -613,6 +643,8 @@ function AnnouncementManageTab() {
   }
 
   useEffect(() => {
+    if (initialLoadRef.current) return
+    initialLoadRef.current = true
     void loadAnnouncements()
   }, [])
 
@@ -628,7 +660,7 @@ function AnnouncementManageTab() {
     setForm({
       title: announcement.title,
       body: announcement.body,
-      published_at: announcement.published_at ? announcement.published_at.slice(0, 16) : '',
+      published_at: toLocalDateTimeInput(announcement.published_at),
       expires_at: announcement.expires_at ? announcement.expires_at.slice(0, 10) : '',
       is_published: announcement.is_published,
     })
@@ -645,12 +677,13 @@ function AnnouncementManageTab() {
     setSaving(true)
     setFormError('')
     try {
+      const publishedAt = form.published_at ? toUtcISOString(form.published_at) : null
       if (editing) {
         await api.adminUpdateAnnouncement(editing.id, {
           title: form.title.trim(),
           body: form.body,
           is_published: form.is_published,
-          published_at: form.published_at ? `${form.published_at}:00` : null,
+          published_at: publishedAt,
           expires_at: form.expires_at || null,
         })
         useToastStore.getState().addToast('success', '公共通知已更新')
@@ -659,7 +692,7 @@ function AnnouncementManageTab() {
           title: form.title.trim(),
           body: form.body,
           is_published: form.is_published,
-          ...(form.published_at ? { published_at: `${form.published_at}:00` } : {}),
+          ...(publishedAt ? { published_at: publishedAt } : {}),
           ...(form.expires_at ? { expires_at: form.expires_at } : {}),
         })
         useToastStore.getState().addToast('success', '公共通知已创建')
@@ -691,22 +724,22 @@ function AnnouncementManageTab() {
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto px-6 py-3">
         {loading ? (
-          <p className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+          <AnnouncementLoadingSkeleton />
         ) : announcements.length === 0 ? (
           <p className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>还没有公共通知</p>
         ) : announcements.map(announcement => (
           <div key={announcement.id} className="rounded-xl p-3" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}>
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{announcement.title}</p>
                   <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ color: announcement.is_published ? '#00B894' : 'var(--text-muted)', background: announcement.is_published ? 'rgba(0,184,148,0.1)' : 'var(--bg-card)' }}>
                     {announcement.is_published ? '已发布' : '已撤回'}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-line text-xs" style={{ color: 'var(--text-secondary)' }}>{announcement.body}</p>
+                <p className="mt-1 min-w-0 whitespace-pre-line break-words text-xs" style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{announcement.body}</p>
                 <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  创建于 {announcement.created_at.slice(0, 10)}{announcement.published_at ? ` · ${announcement.published_at.slice(0, 16).replace('T', ' ')} 发布` : ''}{announcement.expires_at ? ` · ${announcement.expires_at.slice(0, 10)} 过期` : ''}
+                  {formatAnnouncementTime(announcement)}{announcement.expires_at ? ` · ${formatDate(announcement.expires_at)} 过期` : ''}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -725,9 +758,12 @@ function AnnouncementManageTab() {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5"><Label className="text-xs">标题</Label><Input value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} className="h-9 text-sm" placeholder="例如：MoreAni v2.1 已上线" /></div>
               <div className="space-y-1.5"><Label className="text-xs">正文</Label><Textarea value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} rows={6} className="resize-none text-sm" placeholder="支持纯文本和换行" /></div>
-              <div className="space-y-1.5"><Label className="text-xs">发布时间（可选，留空立即发布）</Label><Input type="datetime-local" value={form.published_at} onChange={event => setForm({ ...form, published_at: event.target.value })} className="h-9 text-sm" /></div>
+              <DateTimePicker label="发布时间（可选，使用本地时间）" value={form.published_at} onChange={value => setForm({ ...form, published_at: value })} placeholder="留空立即发布" />
               <div className="space-y-1.5"><DatePicker label="过期时间（可选）" value={form.expires_at} onChange={value => setForm({ ...form, expires_at: value })} placeholder="选择日期" /></div>
-              <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}><input type="checkbox" checked={form.is_published} onChange={event => setForm({ ...form, is_published: event.target.checked })} /> 立即发布</label>
+              <label className="flex cursor-pointer items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <Checkbox checked={form.is_published} onCheckedChange={checked => setForm({ ...form, is_published: checked })} aria-label="立即发布" />
+                <span>立即发布</span>
+              </label>
               {formError && <p className="text-xs" style={{ color: 'var(--accent-coral)' }}>{formError}</p>}
               <div className="flex gap-2 pt-1"><Button type="submit" loading={saving} className="flex-1" style={{ background: '#FB71A7', color: 'white' }}>{editing ? '保存修改' : '创建通知'}</Button><Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>取消</Button></div>
             </form>

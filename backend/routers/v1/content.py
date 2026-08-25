@@ -126,7 +126,12 @@ def random_content(
     user: User | None = Depends(get_current_user_optional),
 ) -> ContentItemResponse:
     """Get one random public content item, optionally excluding IDs."""
-    item = content_svc.get_random_content(db, content_type=type, exclude_ids=exclude_id)
+    item = content_svc.get_random_content(
+        db,
+        content_type=type,
+        exclude_ids=exclude_id,
+        user_id=user.id if user else None,
+    )
     if not item:
         raise HTTPException(status_code=404, detail='No content available')
     return _build_responses(db, [item], user.id if user else None)[0]

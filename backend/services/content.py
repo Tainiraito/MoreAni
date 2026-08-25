@@ -377,23 +377,44 @@ def get_random_content(
     *,
     content_type: str | None = None,
     exclude_ids: list[int] | None = None,
+    user_id: int | None = None,
 ) -> ContentItem | None:
-    """Return one random public content item, optionally filtered by type/exclusions."""
-    query = (
-        db.query(ContentItem)
-        .options(selectinload(ContentItem.tags))
-        .filter(
-            ContentItem.is_public == True,  # noqa: E712
-            ContentItem.deleted_at.is_(None),
-            ContentItem.cover_url.isnot(None),
-            ContentItem.cover_url != '',
+    """Return one random public item, preferring content the user has not handled."""
+    excluded = set(exclude_ids or [])
+
+    def build_query():
+        query = (
+            db.query(ContentItem)
+            .options(selectinload(ContentItem.tags))
+            .filter(
+                ContentItem.is_public == True,  # noqa: E712
+                ContentItem.deleted_at.is_(None),
+                ContentItem.cover_url.isnot(None),
+                ContentItem.cover_url != '',
+            )
         )
-    )
-    if content_type:
-        query = query.filter(ContentItem.content_type == content_type)
-    if exclude_ids:
-        query = query.filter(~ContentItem.id.in_(exclude_ids))
-    return query.order_by(func.random()).first()
+        if content_type:
+            query = query.filter(ContentItem.content_type == content_type)
+        if excluded:
+            query = query.filter(~ContentItem.id.in_(excluded))
+        return query
+
+    if user_id is not None:
+        interacted_subquery = db.query(Rating.content_id).filter(
+            Rating.user_id == user_id,
+            (Rating.score > 0) | (Rating.review.isnot(None) & (func.trim(Rating.review) != '')),
+        )
+        fresh_item = (
+            build_query()
+            .filter(~ContentItem.id.in_(interacted_subquery))
+            .order_by(func.random())
+            .first()
+        )
+        if fresh_item is not None:
+            return fresh_item
+
+    # 未处理番剧不足时允许回退，避免「换一个」在内容池耗尽后失效。
+    return build_query().order_by(func.random()).first()
 
 
 def check_source_duplicate(db: Session, source_type: str, source_id: str) -> ContentItem | None:

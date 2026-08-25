@@ -59,6 +59,42 @@ def test_random_content_supports_type_and_exclusions(client, db, make_user):
     assert result['is_public'] is True
 
 
+def test_random_content_prefers_unhandled_items_for_authenticated_user(client, db, make_user):
+    user = make_user('random-filter-user')
+    items = seed_content(db, user, 6)
+    db.add_all(
+        [
+            Rating(content_id=items[0].id, user_id=user.id, score=80),
+            Rating(content_id=items[1].id, user_id=user.id, score=0, review='已经看过'),
+            Rating(content_id=items[2].id, user_id=user.id, score=0, review='   '),
+        ],
+    )
+    db.commit()
+
+    response = client.get(
+        f'/api/v1/content/random?type=anime&exclude_id={items[3].id}',
+        cookies=auth_cookie(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()['id'] in {items[2].id, items[4].id, items[5].id}
+
+
+def test_random_content_falls_back_when_all_items_are_handled(client, db, make_user):
+    user = make_user('random-fallback-user')
+    items = seed_content(db, user, 3)
+    db.add_all([Rating(content_id=item.id, user_id=user.id, score=80) for item in items])
+    db.commit()
+
+    response = client.get(
+        f'/api/v1/content/random?type=anime&exclude_id={items[0].id}',
+        cookies=auth_cookie(user),
+    )
+
+    assert response.status_code == 200
+    assert response.json()['id'] in {items[1].id, items[2].id}
+
+
 def test_content_list_query_count_is_constant(client, db, db_engine, make_user):
     creator = make_user('query-owner')
     seed_content(db, creator, 25)

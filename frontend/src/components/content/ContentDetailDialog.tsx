@@ -401,11 +401,12 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                     Bangumi
                   </a>
                 )}
-                {content.content_type === 'anime' && (
+                {user && content.content_type === 'anime' && (
                   <button
+                    type="button"
                     onClick={() => setResourceOpen(true)}
-                    className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-                    style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)', background: 'rgba(251,113,167,0.06)' }}
+                    className="flex cursor-pointer items-center gap-1 text-xs transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FB71A7]/50"
+                    style={{ color: 'var(--text-muted)' }}
                   >
                     <Search size={12} />
                     寻找资源

@@ -32,6 +32,15 @@ def utcnow_naive() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def api_datetime(value: datetime | None) -> datetime | None:
+    """Return a notification timestamp as an explicit UTC datetime for API responses."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _subscription_dict(subscription: ResourceSubscription) -> dict[str, Any]:
     """Serialize a resource subscription."""
     return {
@@ -215,9 +224,9 @@ def notification_dict(notification: Notification, *, is_read: bool = False) -> d
         'title': notification.title,
         'body': notification.body,
         'payload': _payload(notification),
-        'created_at': notification.created_at,
-        'published_at': notification.published_at,
-        'expires_at': notification.expires_at,
+        'created_at': api_datetime(notification.created_at),
+        'published_at': api_datetime(notification.published_at),
+        'expires_at': api_datetime(notification.expires_at),
         'is_read': is_read,
     }
 

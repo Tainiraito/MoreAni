@@ -52,6 +52,7 @@
   --bg-card: #ffffff;
   --bg-card-warm: #f5f2ee;
   --resource-list-bg: rgb(245, 242, 238);
+  --skeleton-bg: rgba(26, 26, 26, 0.1);
   --text-primary: #1a1a1a;
   --text-secondary: #555555;
   --text-muted: #999999;
@@ -81,6 +82,7 @@
   --bg-card: #141414;
   --bg-card-warm: #1a1a1a;
   --resource-list-bg: #1a1a1a;
+  --skeleton-bg: rgba(255, 255, 255, 0.14);
   --text-primary: #f0f0f0;
   --text-secondary: #b0b0b0;
   --text-muted: #808080;

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { CheckCheck, ExternalLink } from 'lucide-react'
+import { CheckCheck, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore, type NotificationFilter } from '@/stores/notification-store'
 import { useUIStore } from '@/stores/ui-store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDateTime } from '@/lib/utils'
 import type { NotificationItem } from '@/types'
 
 const FILTERS: Array<{ key: NotificationFilter; label: string }> = [
@@ -12,9 +13,9 @@ const FILTERS: Array<{ key: NotificationFilter; label: string }> = [
   { key: 'private', label: '私人' },
 ]
 
-function formatDate(value: string): string {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+function isExpandableAnnouncement(item: NotificationItem): boolean {
+  if (item.scope !== 'public' || item.kind !== 'announcement') return false
+  return item.body.length > 120 || item.body.split(/\r?\n/).length > 4
 }
 
 function payloadString(item: NotificationItem, key: string): string | undefined {
@@ -73,7 +74,11 @@ export function NotificationPanel() {
         return
       }
     }
-    setExpandedId(current => current === item.id ? null : item.id)
+    if (isExpandableAnnouncement(item)) {
+      setExpandedId(current => current === item.id ? null : item.id)
+    } else {
+      setExpandedId(null)
+    }
   }
 
   return (
@@ -116,28 +121,29 @@ export function NotificationPanel() {
           <div className="space-y-2">
             {items.map(item => {
               const expanded = expandedId === item.id
+              const expandable = isExpandableAnnouncement(item)
               return (
                 <button
                   type="button"
                   key={item.id}
                   onClick={() => handleClick(item)}
+                  aria-expanded={expandable ? expanded : undefined}
                   className="block w-full cursor-pointer rounded-xl p-3 text-left transition-colors hover:opacity-90"
                   style={{ background: item.is_read ? 'var(--bg-card-warm)' : 'rgba(251,113,167,0.08)', border: `1px solid ${item.is_read ? 'var(--border-line)' : 'rgba(251,113,167,0.28)'}` }}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-                      <p className="mt-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>{item.body}</p>
+                      <p className={`mt-1 min-w-0 whitespace-pre-line break-words text-[11px] ${expandable && !expanded ? 'line-clamp-3' : ''}`} style={{ color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>{item.body}</p>
                     </div>
                     {!item.is_read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: '#ef4444' }} />}
                   </div>
-                  {expanded && (
-                    <div className="mt-2 border-t pt-2 text-[11px] whitespace-pre-line" style={{ borderColor: 'var(--border-line)', color: 'var(--text-secondary)' }}>
-                      {item.body}
-                      {item.kind === 'announcement' && <span className="mt-2 flex items-center gap-1" style={{ color: '#FB71A7' }}><ExternalLink size={11} /> 公共公告</span>}
-                    </div>
+                  {expandable && (
+                    <span className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: '#FB71A7' }}>
+                      {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />} {expanded ? '收起公告' : '展开公告'}
+                    </span>
                   )}
-                  <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>{formatDate(item.created_at)}{item.kind === 'resource_update' ? ' · 资源更新' : ''}</p>
+                  <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>{formatDateTime(item.created_at)}{item.kind === 'resource_update' ? ' · 资源更新' : ''}</p>
                 </button>
               )
             })}

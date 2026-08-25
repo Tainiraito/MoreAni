@@ -200,6 +200,21 @@ def test_public_announcement_visibility_and_admin_permissions(client, make_user)
     created = client.post('/api/v1/admin/announcements', cookies=auth_cookie(admin), json=body)
     assert created.status_code == 201
     announcement_id = created.json()['id']
+    assert created.json()['published_at'].endswith('Z')
+    assert created.json()['created_at'].endswith('Z')
+
+    scheduled = client.post(
+        '/api/v1/admin/announcements',
+        cookies=auth_cookie(admin),
+        json={
+            'title': '定时公告',
+            'body': '稍后发布',
+            'is_published': True,
+            'published_at': '2099-01-01T04:19:00+00:00',
+        },
+    )
+    assert scheduled.status_code == 201
+    assert scheduled.json()['published_at'] == '2099-01-01T04:19:00Z'
 
     public_list = client.get('/api/v1/notifications?scope=public')
     assert public_list.status_code == 200
@@ -207,6 +222,7 @@ def test_public_announcement_visibility_and_admin_permissions(client, make_user)
 
     user_list = client.get('/api/v1/notifications?scope=public', cookies=auth_cookie(user))
     assert user_list.json()['unread_count'] == 1
+    assert user_list.json()['items'][0]['published_at'].endswith('Z')
     notification_id = user_list.json()['items'][0]['id']
     assert client.post(f'/api/v1/notifications/{notification_id}/read', cookies=auth_cookie(user)).status_code == 200
     assert client.get('/api/v1/notifications/unread-count', cookies=auth_cookie(user)).json()['total'] == 0

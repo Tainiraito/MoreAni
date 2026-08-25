@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { usePopoverOutsideClose } from '@/hooks/use-popover-outside-close'
 
 interface DatePickerProps {
   label?: string
@@ -9,7 +10,7 @@ interface DatePickerProps {
   placeholder?: string
 }
 
-function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (d: Date) => void }) {
+export function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (d: Date) => void }) {
   const [viewDate, setViewDate] = useState(selected || new Date())
 
   const year = viewDate.getFullYear()
@@ -127,7 +128,9 @@ function SimpleCalendar({ selected, onSelect }: { selected?: Date; onSelect: (d:
 
 export function DatePicker({ label, value, onChange, placeholder }: DatePickerProps) {
   const [open, setOpen] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
   const selectedDate = value ? new Date(value + "T00:00:00") : undefined
+  usePopoverOutsideClose(open, () => setOpen(false), contentRef)
 
   const handleSelect = (date: Date) => {
     const y = date.getFullYear()
@@ -148,19 +151,20 @@ export function DatePicker({ label, value, onChange, placeholder }: DatePickerPr
         <PopoverTrigger asChild>
           <button
             type="button"
+            aria-haspopup="dialog"
+            aria-expanded={open}
             className="w-full flex items-center h-9 px-3 rounded-lg text-sm outline-none transition-shadow cursor-pointer text-left"
             style={{
               background: 'transparent',
               border: '1px solid var(--border-line)',
               color: value ? 'var(--text-primary)' : 'var(--text-muted)',
             }}
-            onClick={() => setOpen(!open)}
           >
             <CalendarIcon size={14} className="mr-2 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
             {selectedDate ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}` : (placeholder || "选择日期")}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
+        <PopoverContent ref={contentRef} className="w-auto p-2" align="start" onInteractOutside={() => setOpen(false)}>
           <SimpleCalendar selected={selectedDate} onSelect={handleSelect} />
         </PopoverContent>
       </Popover>

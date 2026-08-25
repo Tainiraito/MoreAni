@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
 import { AuthDialog } from '@/components/auth/AuthDialog'
 import { ToastContainer } from '@/components/ui/toast'
+import { AdminDialog } from '@/components/admin/admin-dialog-loader'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useUIStore } from '@/stores/ui-store'
@@ -17,7 +18,22 @@ const queryClient = new QueryClient()
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
 const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
 const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
-const AdminDialog = lazy(() => import('@/components/admin/AdminDialog').then(module => ({ default: module.AdminDialog })))
+function AdminDialogLoading() {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }} role="status" aria-label="后台管理加载中">
+      <div className="w-[320px] max-w-[90vw] rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}>
+        <div className="flex items-center gap-3">
+          <div className="h-5 w-5 animate-spin rounded-full border-2" style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }} />
+          <span className="text-sm" style={{ color: 'var(--text-primary)' }}>后台管理加载中</span>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="h-3 w-2/5 animate-pulse rounded" style={{ background: 'var(--skeleton-bg)' }} />
+          <div className="h-3 w-4/5 animate-pulse rounded" style={{ background: 'var(--skeleton-bg)' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function AuthValidator({ children }: { children: React.ReactNode }) {
   const { user, setUser, logout } = useAuthStore()
@@ -130,6 +146,8 @@ function GlobalDialogs() {
           <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleRefresh} />
         )}
         {settingsOpen && <SettingsDialog />}
+      </Suspense>
+      <Suspense fallback={adminOpen ? <AdminDialogLoading /> : null}>
         {adminOpen && <AdminDialog />}
       </Suspense>
     </>

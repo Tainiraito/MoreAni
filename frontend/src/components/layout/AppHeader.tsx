@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { Avatar } from '@/components/ui/Avatar'
 import { NotificationCenter } from '@/components/notification/NotificationFab'
+import { preloadAdminDialog } from '@/components/admin/admin-dialog-loader'
 import { User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
 
 export function AppHeader() {
@@ -75,6 +76,8 @@ export function AppHeader() {
             <NotificationCenter />
             <div className="relative" ref={menuRef}>
             <button
+              type="button"
+              aria-label={user ? '打开用户菜单' : '打开登录菜单'}
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex h-8 w-8 items-center justify-center rounded-full overflow-hidden p-0 transition-all duration-200 hover:opacity-80"
               style={{ border: '1px solid var(--border-line)' }}
@@ -150,7 +153,11 @@ export function AppHeader() {
 
                 {user?.role === 'super_admin' && (
                   <button
+                    type="button"
                     onClick={() => { openAdmin(); setMenuOpen(false) }}
+                    onPointerEnter={preloadAdminDialog}
+                    onPointerDown={preloadAdminDialog}
+                    onFocus={preloadAdminDialog}
                     className={menuItemStyle}
                     style={{ color: 'var(--brand)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}

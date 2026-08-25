@@ -209,9 +209,9 @@ def _announcement_response(item: Notification) -> AnnouncementResponse:
         title=item.title,
         body=item.body,
         is_published=item.is_published,
-        published_at=item.published_at,
-        expires_at=item.expires_at,
-        created_at=item.created_at,
+        published_at=notification_svc.api_datetime(item.published_at),
+        expires_at=notification_svc.api_datetime(item.expires_at),
+        created_at=notification_svc.api_datetime(item.created_at),
     )
 
 
