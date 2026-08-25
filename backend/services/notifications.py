@@ -496,11 +496,11 @@ async def refresh_subscriptions_with_cooldown(db: Session) -> int:
     """Refresh all subscriptions at most once per cooldown window per process."""
     global _refresh_last_checked
     now = time.monotonic()
-    if now - _refresh_last_checked < _REFRESH_COOLDOWN_SECONDS:
+    if _refresh_last_checked > 0 and now - _refresh_last_checked < _REFRESH_COOLDOWN_SECONDS:
         return 0
     async with _refresh_lock:
         now = time.monotonic()
-        if now - _refresh_last_checked < _REFRESH_COOLDOWN_SECONDS:
+        if _refresh_last_checked > 0 and now - _refresh_last_checked < _REFRESH_COOLDOWN_SECONDS:
             return 0
         created = await refresh_subscriptions(db)
         _refresh_last_checked = time.monotonic()
