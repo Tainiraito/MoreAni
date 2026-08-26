@@ -21,6 +21,7 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
     bangumi_url: 'https://bgm.tv/subject/1002',
   }
   let createPayload: Record<string, unknown> | null = null
+  let detailShouldFail = false
 
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
@@ -86,6 +87,14 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
       return
     }
     if (path.endsWith('/bangumi/detail/1002')) {
+      if (detailShouldFail) {
+        await route.fulfill({
+          status: 502,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Bangumi 服务暂时不可用，请稍后重试' }),
+        })
+        return
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -136,6 +145,15 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
     source_id: '1002',
     source_url: 'https://bangumi.tv/subject/1002',
   }))
+
+  detailShouldFail = true
+  await page.getByRole('button', { name: '打开 未关联周历番剧 的操作' }).first().click()
+  await page.getByRole('button', { name: '添加番剧 未关联周历番剧' }).first().click()
+  await expect(page.getByRole('heading', { name: '添加番剧' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '标题 *' })).toHaveValue('未关联周历番剧')
+  await expect(page.getByText('Bangumi 信息获取失败，请手动搜索或补充内容')).toBeVisible()
+  await expect(page.getByText('服务器错误，请稍后再试')).toHaveCount(0)
+  await page.getByRole('heading', { name: '添加番剧' }).locator('..').getByRole('button').click()
 
   await page.getByRole('button', { name: '打开 未关联周历番剧 的操作' }).first().click()
   const bangumiPagePromise = page.waitForEvent('popup')

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useRefreshStore } from '@/stores/refresh-store'
 import { ApiTimeoutError, api } from '@/lib/api'
+import { normalizeAiringWeek } from '@/lib/airing'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
 import { AnimeCard } from '@/components/content/AnimeCard'
@@ -25,7 +27,15 @@ import {
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 300
 const RECOMMENDATION_CACHE_PREFIX = 'moreani-recommendations-v1'
+const AIRING_WEEK_CACHE_KEY = 'moreani-airing-week-v2'
+const AIRING_STALE_TIME_MS = 5 * 60 * 1000
+const AIRING_GC_TIME_MS = 30 * 60 * 1000
 type HomeTab = 'anime' | 'calendar' | 'other'
+
+interface AiringWeekCacheRecord {
+  week: AiringCalendarWeek
+  cachedAt: number
+}
 
 function recommendationCacheKey(userId: number | null): string {
   return `${RECOMMENDATION_CACHE_PREFIX}:${userId ?? 'guest'}`
@@ -49,6 +59,29 @@ function writeRecommendationCache(userId: number | null, items: ContentItem[]): 
   } catch {
     // sessionStorage 不可用时仍保留当前内存中的推荐。
   }
+}
+
+function readAiringWeekCache(): AiringWeekCacheRecord | null {
+  try {
+    const raw = sessionStorage.getItem(AIRING_WEEK_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const record = parsed as Record<string, unknown>
+    if (!record.week || typeof record.week !== 'object' || typeof record.cachedAt !== 'number') return null
+    return { week: normalizeAiringWeek(record.week as AiringCalendarWeek), cachedAt: record.cachedAt }
+  } catch {
+    return null
+  }
+}
+
+function currentWeekStart(): string {
+  const current = new Date()
+  const day = current.getDay() || 7
+  current.setDate(current.getDate() - day + 1)
+  const month = String(current.getMonth() + 1).padStart(2, '0')
+  const date = String(current.getDate()).padStart(2, '0')
+  return `${current.getFullYear()}-${month}-${date}`
 }
 
 export function HomePage() {
@@ -81,11 +114,22 @@ export function HomePage() {
   const hasMoreRef = useRef(true)
   const paginationControllerRef = useRef<AbortController | null>(null)
   const lastListContextRef = useRef<{ activeTab: HomeTab; userId: number } | null>(null)
-  const airingRequestGate = useRef(new LatestRequestGate())
-  const [airingWeek, setAiringWeek] = useState<AiringCalendarWeek | null>(null)
-  const [airingLoading, setAiringLoading] = useState(false)
-  const [airingError, setAiringError] = useState<string | null>(null)
-  const [airingLoaded, setAiringLoaded] = useState(false)
+  const airingQuery = useQuery({
+    queryKey: ['airing-week'],
+    queryFn: ({ signal }) => api.getAiringWeek({ signal }),
+    enabled: userId !== undefined && activeTab === 'calendar',
+    staleTime: AIRING_STALE_TIME_MS,
+    gcTime: AIRING_GC_TIME_MS,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    initialData: () => readAiringWeekCache()?.week,
+    initialDataUpdatedAt: () => {
+      const cached = readAiringWeekCache()
+      if (!cached) return 0
+      return cached.week.week_start === currentWeekStart() ? cached.cachedAt : 0
+    },
+  })
 
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
@@ -360,42 +404,6 @@ export function HomePage() {
       })
     return () => controller.abort()
   }, [activeTab, contentQuery, userId, refreshKey, listRetryKey])
-
-  useEffect(() => {
-    if (userId === undefined) {
-      setAiringWeek(null)
-      setAiringLoaded(false)
-      return
-    }
-    setAiringWeek(null)
-    setAiringLoaded(false)
-    setAiringError(null)
-  }, [userId])
-
-  useEffect(() => {
-    if (userId === undefined || activeTab !== 'calendar' || airingLoaded) return
-    const requestId = airingRequestGate.current.begin()
-    const controller = new AbortController()
-    setAiringLoading(true)
-    setAiringError(null)
-
-    api.getAiringWeek({ signal: controller.signal })
-      .then(response => {
-        if (!airingRequestGate.current.isCurrent(requestId)) return
-        setAiringWeek(response)
-        setAiringLoaded(true)
-      })
-      .catch(error => {
-        if (controller.signal.aborted || !airingRequestGate.current.isCurrent(requestId)) return
-        setAiringError(error instanceof Error ? error.message : '周历加载失败')
-        setAiringLoaded(true)
-      })
-      .finally(() => {
-        if (airingRequestGate.current.isCurrent(requestId)) setAiringLoading(false)
-      })
-
-    return () => controller.abort()
-  }, [activeTab, airingLoaded, userId])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
@@ -675,9 +683,9 @@ export function HomePage() {
 
         {activeTab === 'calendar' ? (
           <WeeklyAiringPanel
-            week={airingWeek}
-            loading={airingLoading}
-            error={airingError}
+            week={airingQuery.data ?? null}
+            loading={airingQuery.isPending}
+            error={airingQuery.error instanceof Error ? airingQuery.error.message : null}
             onOpenContent={openDetail}
             onAddAnime={item => openAddAnime({
               bangumiId: item.subject_id,

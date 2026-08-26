@@ -1,12 +1,15 @@
-import { render, waitFor } from '@testing-library/react'
+import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ContentFormDialog } from '@/components/content/ContentFormDialog'
 import { api } from '@/lib/api'
+import { useToastStore } from '@/stores/toast-store'
 
 describe('ContentFormDialog 周历导入', () => {
   afterEach(() => {
+    cleanup()
     vi.restoreAllMocks()
+    useToastStore.getState().clearToasts()
   })
 
   it('按 Bangumi subject_id 精确获取并填充新建表单', async () => {
@@ -48,5 +51,25 @@ describe('ContentFormDialog 周历导入', () => {
       source_id: '1002',
       source_url: 'https://bangumi.tv/subject/1002',
     }))
+  })
+
+  it('Bangumi 详情失败时保留周历标题并继续打开弹窗', async () => {
+    vi.spyOn(api, 'getBangumiDetail').mockRejectedValue(new Error('Bangumi unavailable'))
+
+    const view = render(
+      <ContentFormDialog
+        open
+        onClose={vi.fn()}
+        initialBangumiSubjectId={1002}
+        initialBangumiTitle="周历番剧"
+        initialBangumiTitleAlt="Weekly Anime"
+      />,
+    )
+
+    await waitFor(() => expect(view.getByDisplayValue('周历番剧')).toBeInTheDocument())
+    expect(view.getByDisplayValue('Weekly Anime')).toBeInTheDocument()
+    expect(useToastStore.getState().toasts.map(toast => toast.message)).toEqual([
+      'Bangumi 信息获取失败，请手动搜索或补充内容',
+    ])
   })
 })

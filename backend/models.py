@@ -295,3 +295,30 @@ class AiringCalendarSyncState(Base):
     error_message = Column(Text, nullable=True)
     item_count = Column(Integer, nullable=False, default=0)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class CoverAsset(Base):
+    """A cached cover asset keyed by its upstream Bangumi subject."""
+
+    __tablename__ = 'cover_assets'
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_type = Column(String(20), nullable=False, default='bangumi', index=True)
+    source_id = Column(String(50), nullable=False, index=True)
+    source_url = Column(String(500), nullable=False, default='')
+    local_path = Column(String(500), nullable=True)
+    source_version = Column(String(16), nullable=False, default='')
+    content_hash = Column(String(64), nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    byte_size = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default='failed', index=True)  # ready/failed
+    failure_count = Column(Integer, nullable=False, default=0)
+    last_attempt_at = Column(DateTime, nullable=True)
+    last_success_at = Column(DateTime, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('source_type', 'source_id', name='uq_cover_asset_source'),
+    )

@@ -57,6 +57,10 @@ def _load_rules() -> dict[str, RateLimitRule]:
             max_requests=env_int('MOREANI_RATE_LIMIT_ASSET', 600),
             window_seconds=env_int('MOREANI_RATE_LIMIT_ASSET_WINDOW_SECONDS', 60),
         ),
+        'image': RateLimitRule(
+            max_requests=env_int('MOREANI_RATE_LIMIT_IMAGE', 120),
+            window_seconds=env_int('MOREANI_RATE_LIMIT_IMAGE_WINDOW_SECONDS', 60),
+        ),
     }
 
 
@@ -110,6 +114,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if method == 'OPTIONS' or path == '/api/health':
             return None, None
+        if path == '/api/v1/proxy/image':
+            return 'image', self.rules['image']
         if path.startswith('/api/covers/') or path.startswith('/api/avatars/'):
             return 'asset', self.rules['asset']
         if path.endswith('/auth/login') and method == 'POST':

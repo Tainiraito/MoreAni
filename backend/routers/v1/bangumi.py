@@ -26,7 +26,10 @@ async def search_bangumi(
 
     Returns matching subjects with cover images, ratings, and metadata.
     """
-    result = await bangumi_svc.search_subjects(q, limit=limit)
+    try:
+        result = await bangumi_svc.search_subjects(q, limit=limit)
+    except bangumi_svc.BangumiError as exc:
+        raise HTTPException(status_code=502, detail='Bangumi 服务暂时不可用，请稍后重试') from exc
     items = []
     for item in result.get('items', []):
         items.append(
@@ -63,7 +66,10 @@ async def import_from_bangumi(
         return BangumiImportResponse(content_id=existing.id, status='exists')
 
     # Fetch detail from Bangumi v0 API
-    detail = await bangumi_svc.get_subject_detail(bgm_id)
+    try:
+        detail = await bangumi_svc.get_subject_detail(bgm_id)
+    except bangumi_svc.BangumiError as exc:
+        raise HTTPException(status_code=502, detail='Bangumi 服务暂时不可用，请稍后重试') from exc
     if not detail:
         raise HTTPException(status_code=404, detail='Bangumi subject not found')
 
@@ -100,7 +106,10 @@ async def get_bangumi_score(
 
     Returns the current score without caching.
     """
-    detail = await bangumi_svc.get_subject_detail(bgm_id)
+    try:
+        detail = await bangumi_svc.get_subject_detail(bgm_id)
+    except bangumi_svc.BangumiError as exc:
+        raise HTTPException(status_code=502, detail='Bangumi 服务暂时不可用，请稍后重试') from exc
     if not detail:
         raise HTTPException(status_code=404, detail='Bangumi subject not found')
 
@@ -112,7 +121,10 @@ async def get_bangumi_score(
 @router.get('/detail/{bgm_id}')
 async def get_bangumi_detail(bgm_id: int) -> dict:
     """Get full Bangumi subject details (including tags, summary, etc)."""
-    detail = await bangumi_svc.get_subject_detail(bgm_id)
+    try:
+        detail = await bangumi_svc.get_subject_detail(bgm_id)
+    except bangumi_svc.BangumiError as exc:
+        raise HTTPException(status_code=502, detail='Bangumi 服务暂时不可用，请稍后重试') from exc
     if not detail:
         raise HTTPException(status_code=404, detail='Bangumi subject not found')
     return detail

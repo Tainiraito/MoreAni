@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models import AiringCalendarItem, AiringCalendarSyncState, ContentItem
-from services import bangumi
+from services import bangumi, covers
 
 logger = logging.getLogger('uvicorn')
 
@@ -123,6 +124,16 @@ def _set_failed(db: Session, error_message: str) -> None:
     db.commit()
 
 
+def _prefetch_enabled() -> bool:
+    """Whether the daily worker should warm Bangumi cover assets."""
+    return os.getenv('MOREANI_AIRING_COVER_PREFETCH', 'false').lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _cleanup_enabled() -> bool:
+    """Keep destructive orphan cleanup opt-in during rollout."""
+    return os.getenv('MOREANI_COVER_CLEANUP_ENABLED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+
+
 async def sync_calendar(db: Session) -> int:
     """Fetch and atomically replace the active calendar snapshot."""
     attempted_at = utcnow_naive()
@@ -148,15 +159,14 @@ async def sync_calendar(db: Session) -> int:
         {'active': False, 'updated_at': now},
         synchronize_session=False,
     )
+    existing_rows = (
+        db.query(AiringCalendarItem)
+        .filter(AiringCalendarItem.subject_id.in_([record['subject_id'] for record in records]))
+        .all()
+    )
+    existing_by_key = {(row.subject_id, row.weekday): row for row in existing_rows}
     for record in records:
-        item = (
-            db.query(AiringCalendarItem)
-            .filter(
-                AiringCalendarItem.subject_id == record['subject_id'],
-                AiringCalendarItem.weekday == record['weekday'],
-            )
-            .first()
-        )
+        item = existing_by_key.get((record['subject_id'], record['weekday']))
         if item is None:
             item = AiringCalendarItem(
                 subject_id=record['subject_id'],
@@ -179,6 +189,18 @@ async def sync_calendar(db: Session) -> int:
     state.item_count = len(records)
     state.updated_at = now
     db.commit()
+    if _prefetch_enabled():
+        try:
+            await covers.prefetch_airing_covers(db, records)
+        except Exception:  # noqa: BLE001
+            # 周历数据已经成功落盘，单张或整批封面失败都不应回滚周历快照。
+            db.rollback()
+            logger.exception('Bangumi airing cover prefetch failed after calendar sync')
+    if _cleanup_enabled():
+        try:
+            covers.cleanup_orphan_cover_assets(db)
+        except Exception:  # noqa: BLE001
+            logger.exception('Bangumi cover cleanup failed after calendar sync')
     elapsed = (datetime.now(UTC) - started_at).total_seconds()
     logger.info('Bangumi calendar sync succeeded: items=%d elapsed=%.3fs', len(records), elapsed)
     return len(records)
@@ -226,6 +248,7 @@ def get_week(db: Session, now: datetime | None = None) -> dict[str, object]:
         .all()
     )
     subject_ids = {row.subject_id for row in rows}
+    asset_urls = covers.get_asset_url_map(db, subject_ids)
     local_items: dict[int, ContentItem] = {}
     if subject_ids:
         local_rows = (
@@ -245,6 +268,9 @@ def get_week(db: Session, now: datetime | None = None) -> dict[str, object]:
     grouped: dict[int, list[dict[str, object]]] = {weekday: [] for weekday in range(1, 8)}
     for row in rows:
         content = local_items.get(row.subject_id)
+        content_cover = content.cover_url if content and content.cover_url else ''
+        if content_cover.startswith('/api/covers/') and not covers.is_local_cover_available(content_cover):
+            content_cover = ''
         grouped[row.weekday].append(
             {
                 'subject_id': row.subject_id,
@@ -252,10 +278,13 @@ def get_week(db: Session, now: datetime | None = None) -> dict[str, object]:
                 'matched': content is not None,
                 'title': row.title,
                 'title_alt': row.title_alt or '',
-                'cover_url': (content.cover_url if content and content.cover_url else row.cover_url) or '',
+                'cover_url': asset_urls.get(row.subject_id) or content_cover or row.cover_url or '',
                 'bangumi_url': row.bangumi_url,
             },
         )
+
+    for day_items in grouped.values():
+        day_items.sort(key=lambda item: not bool(item['matched']))
 
     state = db.query(AiringCalendarSyncState).filter(AiringCalendarSyncState.id == 1).first()
     status = state.status if state else 'pending'

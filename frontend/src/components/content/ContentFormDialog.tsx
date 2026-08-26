@@ -125,7 +125,7 @@ export function ContentFormDialog({
   initialBangumiTitleAlt,
 }: ContentFormDialogProps) {
   useLockBodyScroll(open)
-  const toast = useToastStore.getState()
+  const addToast = useToastStore(state => state.addToast)
   const isEditMode = contentId != null
   // 必须放在 if (!open) return null 之前（hook 无条件调用）
   const maskProps = useMaskClose(() => {
@@ -164,9 +164,9 @@ export function ContentFormDialog({
     setLoading(true)
     ;(api.getContent(contentId!) as Promise<ContentItem & { tags?: TagResponse[] }>)
       .then(item => setForm(toForm(item)))
-      .catch(() => toast.addToast('error', '加载内容失败'))
+      .catch(() => addToast('error', '加载内容失败'))
       .finally(() => setLoading(false))
-  }, [open, contentId, isEditMode, toast])
+  }, [open, contentId, isEditMode, addToast])
 
   // ── Prefill a new anime from an exact weekly-calendar Bangumi subject ──
   useEffect(() => {
@@ -186,7 +186,7 @@ export function ContentFormDialog({
       })
       .catch(() => {
         if (cancelled) return
-        toast.addToast('warning', 'Bangumi 信息获取失败，请手动搜索或补充内容')
+        addToast('warning', 'Bangumi 信息获取失败，请手动搜索或补充内容')
         setForm(fallback)
       })
       .finally(() => {
@@ -195,7 +195,7 @@ export function ContentFormDialog({
     return () => {
       cancelled = true
     }
-  }, [open, isEditMode, initialBangumiSubjectId, initialBangumiTitle, initialBangumiTitleAlt, toast])
+  }, [open, isEditMode, initialBangumiSubjectId, initialBangumiTitle, initialBangumiTitleAlt, addToast])
 
   // ── Debounced Bangumi search ──
   const doSearch = useCallback(async (q: string) => {
@@ -211,12 +211,12 @@ export function ContentFormDialog({
       setResults((res.items || []) as BangumiItem[])
       setShowDropdown(true)
     } catch {
-      toast.addToast('error', '搜索失败，请稍后再试')
+      addToast('error', '搜索失败，请稍后再试')
       setResults([])
     } finally {
       setSearching(false)
     }
-  }, [toast])
+  }, [addToast])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -268,7 +268,7 @@ export function ContentFormDialog({
     setShowDropdown(false)
     setResults([])
     setQuery('')
-    toast.addToast('success', `已填入「${item.name_cn || item.name}」的信息`)
+    addToast('success', `已填入「${item.name_cn || item.name}」的信息`)
 
     // Fetch full details to get tags + summary (search API doesn't return them)
     try {
@@ -289,7 +289,7 @@ export function ContentFormDialog({
   const handleRefetch = async () => {
     const searchTerm = query.trim() || form.title.trim()
     if (!searchTerm) {
-      toast.addToast('warning', '请输入搜索关键词')
+      addToast('warning', '请输入搜索关键词')
       return
     }
     setSearching(true)
@@ -331,12 +331,12 @@ export function ContentFormDialog({
           }
           return next
         })
-        toast.addToast('success', `已从 Bangumi 更新「${bangumiItem.name_cn || bangumiItem.name}」`)
+        addToast('success', `已从 Bangumi 更新「${bangumiItem.name_cn || bangumiItem.name}」`)
       } else {
-        toast.addToast('error', '未在 Bangumi 找到匹配条目')
+        addToast('error', '未在 Bangumi 找到匹配条目')
       }
     } catch {
-      toast.addToast('error', '获取失败')
+      addToast('error', '获取失败')
     } finally {
       setSearching(false)
     }
@@ -348,13 +348,13 @@ export function ContentFormDialog({
     setDeleting(true)
     try {
       await api.deleteContent(contentId)
-      toast.addToast('success', '已删除')
+      addToast('success', '已删除')
       onClose()
       // 若详情弹窗还开着（编辑弹窗从详情打开），一并关闭
       useUIStore.getState().closeDetail()
     } catch (err: any) {
       // 显示真实错误原因（403 无权限 / 429 限流等），避免「到底删没删」的困惑
-      toast.addToast('error', err.message || '删除失败')
+      addToast('error', err.message || '删除失败')
     } finally {
       setDeleting(false)
       setConfirmDelete(false)
@@ -366,7 +366,7 @@ export function ContentFormDialog({
   // ── Submit ──
   const handleSubmit = async () => {
     if (!form.title.trim()) {
-      toast.addToast('warning', '标题不能为空')
+      addToast('warning', '标题不能为空')
       return
     }
 
@@ -398,7 +398,7 @@ export function ContentFormDialog({
           updatePayload.source_url = `https://bangumi.tv/subject/${form.bgm_id}`
         }
         await api.updateContent(contentId!, updatePayload)
-        toast.addToast('success', '更新成功')
+        addToast('success', '更新成功')
       } else {
         const isFromBangumi = !!form.bgm_id
         await api.createContent({
@@ -409,13 +409,13 @@ export function ContentFormDialog({
           source_url: isFromBangumi ? `https://bangumi.tv/subject/${form.bgm_id}` : '',
           is_public: true,
         })
-        toast.addToast('success', `已添加「${form.title.trim()}」`)
+        addToast('success', `已添加「${form.title.trim()}」`)
       }
 
       onSaved?.()
       onClose()
     } catch {
-      toast.addToast('error', isEditMode ? '更新失败' : '添加失败')
+      addToast('error', isEditMode ? '更新失败' : '添加失败')
     } finally {
       setSaving(false)
     }

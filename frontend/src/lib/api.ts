@@ -1,4 +1,5 @@
 import { useToastStore } from '@/stores/toast-store'
+import { normalizeAiringWeek } from '@/lib/airing'
 import type {
   AiringCalendarWeek,
   AnimeResourceResponse,
@@ -15,6 +16,13 @@ import type {
 
 const API_BASE = '/api/v1'
 const CONTENT_LIST_TIMEOUT_MS = 15_000
+const AIRING_WEEK_CACHE_KEY = 'moreani-airing-week-v2'
+
+interface AiringWeekCacheRecord {
+  week: AiringCalendarWeek
+  cachedAt: number
+  etag: string | null
+}
 
 export class ApiError extends Error {
   readonly status: number
@@ -37,6 +45,12 @@ interface RequestSignal {
   signal: AbortSignal
   didTimeout: () => boolean
   cleanup: () => void
+}
+
+type ResponseObserver = (response: Response) => void
+
+interface ApiRequestInit extends RequestInit {
+  suppressErrorToast?: boolean
 }
 
 function createRequestSignal(externalSignal: AbortSignal | null | undefined, timeoutMs?: number): RequestSignal {
@@ -66,16 +80,32 @@ function createRequestSignal(externalSignal: AbortSignal | null | undefined, tim
   }
 }
 
-async function request<T>(path: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
-  const requestSignal = createRequestSignal(options?.signal, timeoutMs)
+async function request<T>(
+  path: string,
+  options?: ApiRequestInit,
+  timeoutMs?: number,
+  fallbackForNotModified?: T,
+  observeResponse?: ResponseObserver,
+): Promise<T> {
+  const { suppressErrorToast = false, ...fetchOptions } = options ?? {}
+  const requestSignal = createRequestSignal(fetchOptions.signal, timeoutMs)
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      ...options,
+      headers: { 'Content-Type': 'application/json', ...fetchOptions.headers },
+      ...fetchOptions,
       signal: requestSignal.signal,
     })
+
+    observeResponse?.(res)
+
+    if (res.status === 304) {
+      if (fallbackForNotModified === undefined) {
+        throw new ApiError('缓存已失效', 304)
+      }
+      return fallbackForNotModified
+    }
 
     if (!res.ok) {
       let errorMessage = '请求失败'
@@ -98,18 +128,20 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs?: numbe
         errorMessage = `HTTP ${res.status}`
       }
 
-      // Show toast for specific errors
-      const toast = useToastStore.getState()
-      if (res.status === 429) {
-        toast.addToast('warning', errorMessage, 5000)
-      } else if (res.status === 401) {
-        toast.addToast('error', '请先登录', 3000)
-      } else if (res.status === 403) {
-        toast.addToast('error', '没有权限', 3000)
-      } else if (res.status === 500) {
-        toast.addToast('error', '服务器错误，请稍后再试', 5000)
-      } else {
-        toast.addToast('error', errorMessage, 3000)
+      if (!suppressErrorToast) {
+        // Show toast for specific errors
+        const toast = useToastStore.getState()
+        if (res.status === 429) {
+          toast.addToast('warning', errorMessage, 5000)
+        } else if (res.status === 401) {
+          toast.addToast('error', '请先登录', 3000)
+        } else if (res.status === 403) {
+          toast.addToast('error', '没有权限', 3000)
+        } else if (res.status === 500) {
+          toast.addToast('error', '服务器错误，请稍后再试', 5000)
+        } else {
+          toast.addToast('error', errorMessage, 3000)
+        }
       }
 
       throw new ApiError(errorMessage, res.status)
@@ -128,6 +160,33 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs?: numbe
     throw error
   } finally {
     requestSignal.cleanup()
+  }
+}
+
+function readAiringWeekCache(): AiringWeekCacheRecord | null {
+  try {
+    const raw = sessionStorage.getItem(AIRING_WEEK_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const record = parsed as Record<string, unknown>
+    if (!record.week || typeof record.week !== 'object' || typeof record.cachedAt !== 'number') return null
+    return {
+      week: normalizeAiringWeek(record.week as AiringCalendarWeek),
+      cachedAt: record.cachedAt,
+      etag: typeof record.etag === 'string' ? record.etag : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeAiringWeekCache(week: AiringCalendarWeek, etag: string | null): void {
+  try {
+    const record: AiringWeekCacheRecord = { week, cachedAt: Date.now(), etag }
+    sessionStorage.setItem(AIRING_WEEK_CACHE_KEY, JSON.stringify(record))
+  } catch {
+    // sessionStorage 不可用时仍依赖 React Query 的内存缓存。
   }
 }
 
@@ -164,7 +223,25 @@ export const api = {
     return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
-  getAiringWeek: (options?: RequestInit) => request<AiringCalendarWeek>('/airing/week', options),
+  getAiringWeek: (options?: RequestInit) => {
+    const cached = readAiringWeekCache()
+    const headers = new Headers(options?.headers)
+    if (cached?.etag) headers.set('If-None-Match', cached.etag)
+    let etag = cached?.etag ?? null
+    return request<AiringCalendarWeek>(
+      '/airing/week',
+      { ...options, headers },
+      undefined,
+      cached?.week,
+      response => {
+        etag = response.headers.get('ETag') ?? etag
+      },
+    ).then(week => {
+      const normalizedWeek = normalizeAiringWeek(week)
+      writeAiringWeekCache(normalizedWeek, etag)
+      return normalizedWeek
+    })
+  },
   getContent: (id: number) => request<unknown>(`/content/${id}`),
   getAnimeResources: (id: number, params?: { source?: 'mikan' | 'animegarden'; page?: number; size?: number }) => {
     const query = new URLSearchParams()
@@ -273,13 +350,16 @@ export const api = {
     request<{ id: number; name: string }>('/tag', { method: 'POST', body: JSON.stringify({ name }) }),
 
   // Bangumi
-  searchBangumi: (q: string) => request<{ items: unknown[] }>(`/bangumi/search?q=${encodeURIComponent(q)}`),
+  searchBangumi: (q: string) => request<{ items: unknown[] }>(
+    `/bangumi/search?q=${encodeURIComponent(q)}`,
+    { suppressErrorToast: true },
+  ),
   importBangumi: (bgm_id: number) =>
     request<{ id: number }>(`/bangumi/import/${bgm_id}`, { method: 'POST' }),
   getBangumiDetail: (bgm_id: number) =>
-    request<Record<string, unknown>>(`/bangumi/detail/${bgm_id}`),
+    request<Record<string, unknown>>(`/bangumi/detail/${bgm_id}`, { suppressErrorToast: true }),
   getBangumiScore: (bgm_id: number) =>
-    request<{ score: number }>(`/bangumi/score/${bgm_id}`),
+    request<{ score: number }>(`/bangumi/score/${bgm_id}`, { suppressErrorToast: true }),
 
   // User
   getUser: (id: number) => request<unknown>(`/user/${id}`),

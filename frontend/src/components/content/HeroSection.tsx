@@ -62,7 +62,13 @@ export function HeroSection({
     >
       <div className="flex flex-col md:flex-row md:h-[600px]">
         <div className="md:w-2/5 aspect-[3/4] md:aspect-auto overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
-          <CoverImage src={content.cover_url} alt={content.title} imgClassName="group-hover:scale-[1.03] transition-transform duration-600 ease-out" />
+          <CoverImage
+            src={content.cover_url}
+            alt={content.title}
+            loading="eager"
+            fetchPriority="high"
+            imgClassName="group-hover:scale-[1.03] transition-transform duration-600 ease-out"
+          />
         </div>
 
         <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center overflow-hidden">

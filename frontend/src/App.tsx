@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
@@ -116,6 +116,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
 }
 
 function GlobalDialogs() {
+  const queryClient = useQueryClient()
   const {
     detailContentId,
     addAnimeOpen,
@@ -130,6 +131,7 @@ function GlobalDialogs() {
 
   const handleRefresh = () => {
     loadFavorites()
+    void queryClient.invalidateQueries({ queryKey: ['airing-week'] })
     useRefreshStore.getState().triggerRefresh()
   }
 

@@ -1,4 +1,5 @@
-import { render, waitFor } from '@testing-library/react'
+import { render as rtlRender, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -22,6 +23,15 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+function renderHomePage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(
+    <QueryClientProvider client={queryClient}>
+      <HomePage />
+    </QueryClientProvider>,
+  )
+}
+
 describe('HomePage 推荐数据', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -32,7 +42,7 @@ describe('HomePage 推荐数据', () => {
   })
 
   it('HomePage 与 HeroBrand 共用一次推荐请求', async () => {
-    const { getByTestId } = render(<HomePage />)
+    const { getByTestId } = renderHomePage()
     await waitFor(() => expect(getByTestId('hero-brand')).toHaveTextContent('12'))
     expect(api.getRecommendations).toHaveBeenCalledTimes(1)
   })
@@ -43,7 +53,7 @@ describe('HomePage 推荐数据', () => {
     ]))
     vi.mocked(api.getRecommendations).mockResolvedValueOnce({ items: [] })
 
-    const { getAllByTestId } = render(<HomePage />)
+    const { getAllByTestId } = renderHomePage()
     await waitFor(() => expect(getAllByTestId('hero-brand').at(-1)).toHaveTextContent('1'))
     expect(api.getRecommendations).toHaveBeenCalledTimes(1)
   })

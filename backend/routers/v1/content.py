@@ -36,9 +36,12 @@ def _to_response(
     stats_map: dict[int, dict],
     recent_map: dict[int, list[dict]],
     user_ratings_map: dict[int, object],
+    cover_url: str | None = None,
 ) -> ContentItemResponse:
     """只组装已批量加载的数据；此函数不得访问数据库。"""
     resp = ContentItemResponse.model_validate(item)
+    if cover_url is not None:
+        resp.cover_url = cover_url
     stats = stats_map.get(
         item.id,
         {'avg_score': None, 'avg_recommend': None, 'rating_count': 0, 'review_count': 0},
@@ -67,7 +70,8 @@ def _build_responses(
     stats_map = rating_svc.get_rating_stats_map(db, content_ids)
     recent_map = rating_svc.get_recent_reviews_map(db, content_ids, limit=6)
     user_ratings_map = rating_svc.get_user_ratings_map(db, user_id, content_ids)
-    return [_to_response(item, stats_map, recent_map, user_ratings_map) for item in items]
+    cover_urls = covers_svc.get_content_cover_url_map(db, items)
+    return [_to_response(item, stats_map, recent_map, user_ratings_map, cover_urls.get(item.id)) for item in items]
 
 
 @router.get('', response_model=ContentListResponse)
@@ -312,7 +316,7 @@ def create_content(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     # 确认添加后才下载封面到本地（搜索仅预览不下载；失败降级外链）
-    covers_svc.localize_cover(item, body.cover_url)
+    covers_svc.localize_cover(item, body.cover_url, db)
     db.commit()
     item = content_svc.get_content_by_id(db, item.id)
     return _build_responses(db, [item], user.id)[0]
@@ -339,7 +343,7 @@ def update_content(
     updated = content_svc.update_content(db, item, **update_data)
     # 更新时若换了外链封面 → 下载到本地（失败降级）
     if 'cover_url' in update_data:
-        covers_svc.localize_cover(updated, updated.cover_url)
+        covers_svc.localize_cover(updated, updated.cover_url, db)
         db.commit()
     updated = content_svc.get_content_by_id(db, updated.id)
     return _build_responses(db, [updated], user.id)[0]

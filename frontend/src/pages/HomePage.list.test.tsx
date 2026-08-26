@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as rtlRender, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -57,6 +58,15 @@ function content(id: number, title: string, contentType: ContentItem['content_ty
 }
 
 const requests: RecordedListRequest[] = []
+
+function renderHomePage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(
+    <QueryClientProvider client={queryClient}>
+      <HomePage />
+    </QueryClientProvider>,
+  )
+}
 
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: () => ({ user: testState.user }),
@@ -137,7 +147,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('刷新期间旧分页响应不能覆盖新列表，也不会留下永久 loading', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
 
     requests[0].deferred.resolve({ items: [content(1, '旧列表')], total: 40, page: 1, size: 20 })
@@ -164,7 +174,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('分页失败后关闭底部 loading 并保留已有列表', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
     requests[0].deferred.resolve({ items: [content(1, '已有列表')], total: 40, page: 1, size: 20 })
     await waitFor(() => expect(view.getByText('已有列表')).toBeInTheDocument())
@@ -179,7 +189,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('首批请求失败后可以点击重试', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
     requests[0].deferred.reject(new Error('network failure'))
 
@@ -193,7 +203,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('筛选搜索可以一键清空并立即恢复未筛选列表', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
     requests[0].deferred.resolve({ items: [content(1, '已有列表')], total: 1, page: 1, size: 20 })
     await waitFor(() => expect(view.getByText('已有列表')).toBeInTheDocument())
@@ -213,7 +223,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('切换 Tab 后旧首批响应不能写入新列表', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
 
     fireEvent.click(view.getByRole('button', { name: '其他' }))
@@ -230,7 +240,7 @@ describe('HomePage 内容列表请求', () => {
 
   it('中文组合输入期间不请求，完成后 300ms 只提交完整关键词', async () => {
     vi.useFakeTimers()
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     expect(requests).toHaveLength(1)
 
     const searchInput = view.getByPlaceholderText('搜索番剧、标签...')
@@ -256,7 +266,7 @@ describe('HomePage 内容列表请求', () => {
   })
 
   it('中文组合输入期间按 Enter 不提交半成品，完成后 Enter 立即提交', async () => {
-    const view = render(<HomePage />)
+    const view = renderHomePage()
     await waitFor(() => expect(requests).toHaveLength(1))
 
     const searchInput = view.getByPlaceholderText('搜索番剧、标签...')
