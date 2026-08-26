@@ -31,6 +31,11 @@ describe('内容查询参数', () => {
     expect(next).toMatchObject({ season: '2026-07', rated_by: '42', favorited: 'favorited' })
   })
 
+  it('搜索关键词会去除首尾空白，纯空白不会生成 q 参数', () => {
+    expect(buildContentListParams({ ...filters, searchQuery: '  星空  ' }, 1, 20).q).toBe('星空')
+    expect(buildContentListParams({ ...filters, searchQuery: '   ' }, 1, 20).q).toBeUndefined()
+  })
+
   it('旧请求晚返回时不能通过请求门覆盖新筛选结果', async () => {
     const gate = new LatestRequestGate()
     let displayed = ''

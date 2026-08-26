@@ -58,7 +58,7 @@ class InviteCode(Base):
 
 
 class ContentItem(Base):
-    """Unified content model for anime, movie, game, software, website, book."""
+    """Unified content model for anime, anime movie, movie, game, software, website, book."""
 
     __tablename__ = 'content_items'
 
@@ -261,3 +261,37 @@ class NotificationRead(Base):
     read_at = Column(DateTime, default=_utcnow, nullable=False)
 
     __table_args__ = (UniqueConstraint('notification_id', 'user_id', name='uq_notification_read'),)
+
+
+class AiringCalendarItem(Base):
+    """A Bangumi weekly anime calendar item persisted by the daily sync."""
+
+    __tablename__ = 'airing_calendar_items'
+
+    id = Column(Integer, primary_key=True, index=True)
+    subject_id = Column(Integer, nullable=False, index=True)
+    weekday = Column(Integer, nullable=False, index=True)  # 1=Monday ... 7=Sunday
+    title = Column(String(200), nullable=False)
+    title_alt = Column(String(200), nullable=True, default='')
+    cover_url = Column(String(500), nullable=True, default='')
+    bangumi_url = Column(String(500), nullable=False)
+    active = Column(Boolean, nullable=False, default=True, index=True)
+    last_seen_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (UniqueConstraint('subject_id', 'weekday', name='uq_airing_calendar_subject_weekday'),)
+
+
+class AiringCalendarSyncState(Base):
+    """Singleton status row for the daily Bangumi calendar sync."""
+
+    __tablename__ = 'airing_calendar_sync_state'
+
+    id = Column(Integer, primary_key=True)
+    last_attempt_at = Column(DateTime, nullable=True)
+    last_success_at = Column(DateTime, nullable=True)
+    status = Column(String(20), nullable=False, default='pending')  # success/failed/pending
+    error_message = Column(Text, nullable=True)
+    item_count = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

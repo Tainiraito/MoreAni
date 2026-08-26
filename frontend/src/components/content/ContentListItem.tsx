@@ -1,7 +1,7 @@
 import type { ContentItem } from '@/types'
 
 const TYPE_LABELS: Record<string, string> = {
-  anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
+  anime: '番剧', anime_movie: '动画电影', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
 }
 
 interface ContentListItemProps {

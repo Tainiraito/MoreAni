@@ -26,6 +26,36 @@ PROXY = (
 REQUEST_TIMEOUT = 6.0
 
 
+class BangumiError(RuntimeError):
+    """Raised when a Bangumi request cannot be completed or decoded."""
+
+
+async def fetch_calendar() -> list[dict[str, Any]]:
+    """Fetch Bangumi's weekly anime calendar using direct-then-proxy fallback."""
+    url = f'{BANGUMI_API_BASE}/calendar'
+    proxies = [None] if not PROXY else [None, PROXY]
+    last_error: Exception | None = None
+
+    for proxy in proxies:
+        try:
+            async with httpx.AsyncClient(
+                timeout=REQUEST_TIMEOUT,
+                proxy=proxy,
+                trust_env=False,
+            ) as client:
+                response = await client.get(url, headers=HEADERS)
+                response.raise_for_status()
+                payload = response.json()
+            if not isinstance(payload, list):
+                raise BangumiError('Bangumi 周历响应格式不正确')
+            return payload
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError, BangumiError) as exc:
+            last_error = exc
+            logger.warning('Bangumi calendar failed via %s: %s', proxy or 'direct', exc)
+
+    raise BangumiError('Bangumi 周历暂时不可用') from last_error
+
+
 async def search_subjects(
     keyword: str,
     subject_type: int = 2,

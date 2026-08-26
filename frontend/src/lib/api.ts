@@ -1,5 +1,6 @@
 import { useToastStore } from '@/stores/toast-store'
 import type {
+  AiringCalendarWeek,
   AnimeResourceResponse,
   Announcement,
   AvatarCrop,
@@ -13,6 +14,7 @@ import type {
 } from '@/types'
 
 const API_BASE = '/api/v1'
+const CONTENT_LIST_TIMEOUT_MS = 15_000
 
 export class ApiError extends Error {
   readonly status: number
@@ -24,57 +26,109 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
-  })
+export class ApiTimeoutError extends Error {
+  constructor() {
+    super('请求超时')
+    this.name = 'ApiTimeoutError'
+  }
+}
 
-  if (!res.ok) {
-    let errorMessage = '请求失败'
+interface RequestSignal {
+  signal: AbortSignal
+  didTimeout: () => boolean
+  cleanup: () => void
+}
 
-    try {
-      const err = await res.json()
-      const detail = err.detail
-      if (typeof detail === 'string') {
-        errorMessage = detail
-      } else if (Array.isArray(detail)) {
-        // FastAPI 422 validation error: [{ loc, msg, type }, ...] — must flatten to string
-        const msgs = detail
-          .map((d: { msg?: unknown }) => (typeof d?.msg === 'string' ? d.msg : ''))
-          .filter(Boolean)
-        errorMessage = msgs.length > 0 ? msgs.join('；') : `HTTP ${res.status}`
-      } else {
+function createRequestSignal(externalSignal: AbortSignal | null | undefined, timeoutMs?: number): RequestSignal {
+  const controller = new AbortController()
+  let timedOut = false
+  const timeoutId = timeoutMs === undefined
+    ? undefined
+    : setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
+  const abortFromExternal = () => controller.abort()
+
+  if (externalSignal?.aborted) {
+    abortFromExternal()
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternal, { once: true })
+  }
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    cleanup: () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      externalSignal?.removeEventListener('abort', abortFromExternal)
+    },
+  }
+}
+
+async function request<T>(path: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
+  const requestSignal = createRequestSignal(options?.signal, timeoutMs)
+
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      ...options,
+      signal: requestSignal.signal,
+    })
+
+    if (!res.ok) {
+      let errorMessage = '请求失败'
+
+      try {
+        const err = await res.json()
+        const detail = err.detail
+        if (typeof detail === 'string') {
+          errorMessage = detail
+        } else if (Array.isArray(detail)) {
+          // FastAPI 422 validation error: [{ loc, msg, type }, ...] — must flatten to string
+          const msgs = detail
+            .map((d: { msg?: unknown }) => (typeof d?.msg === 'string' ? d.msg : ''))
+            .filter(Boolean)
+          errorMessage = msgs.length > 0 ? msgs.join('；') : `HTTP ${res.status}`
+        } else {
+          errorMessage = `HTTP ${res.status}`
+        }
+      } catch {
         errorMessage = `HTTP ${res.status}`
       }
-    } catch {
-      errorMessage = `HTTP ${res.status}`
+
+      // Show toast for specific errors
+      const toast = useToastStore.getState()
+      if (res.status === 429) {
+        toast.addToast('warning', errorMessage, 5000)
+      } else if (res.status === 401) {
+        toast.addToast('error', '请先登录', 3000)
+      } else if (res.status === 403) {
+        toast.addToast('error', '没有权限', 3000)
+      } else if (res.status === 500) {
+        toast.addToast('error', '服务器错误，请稍后再试', 5000)
+      } else {
+        toast.addToast('error', errorMessage, 3000)
+      }
+
+      throw new ApiError(errorMessage, res.status)
     }
 
-    // Show toast for specific errors
-    const toast = useToastStore.getState()
-    if (res.status === 429) {
-      toast.addToast('warning', errorMessage, 5000)
-    } else if (res.status === 401) {
-      toast.addToast('error', '请先登录', 3000)
-    } else if (res.status === 403) {
-      toast.addToast('error', '没有权限', 3000)
-    } else if (res.status === 500) {
-      toast.addToast('error', '服务器错误，请稍后再试', 5000)
-    } else if (res.status >= 400) {
-      toast.addToast('error', errorMessage, 3000)
+    // Handle 204 No Content (e.g., DELETE requests)
+    if (res.status === 204) {
+      return undefined as T
     }
 
-    throw new ApiError(errorMessage, res.status)
+    return res.json()
+  } catch (error) {
+    if (requestSignal.didTimeout()) {
+      throw new ApiTimeoutError()
+    }
+    throw error
+  } finally {
+    requestSignal.cleanup()
   }
-
-  // Handle 204 No Content (e.g., DELETE requests)
-  if (res.status === 204) {
-    return undefined as T
-  }
-
-  return res.json()
 }
 
 export const api = {
@@ -99,7 +153,7 @@ export const api = {
   // Content
   listContent: (params?: Record<string, string>, options?: RequestInit) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<PaginatedResponse<ContentItem>>(`/content${q}`, options)
+    return request<PaginatedResponse<ContentItem>>(`/content${q}`, options, CONTENT_LIST_TIMEOUT_MS)
   },
   getRecommendations: (
     params: { type?: string; size: number; excludeIds?: number[] },
@@ -110,6 +164,7 @@ export const api = {
     return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
+  getAiringWeek: (options?: RequestInit) => request<AiringCalendarWeek>('/airing/week', options),
   getContent: (id: number) => request<unknown>(`/content/${id}`),
   getAnimeResources: (id: number, params?: { source?: 'mikan' | 'animegarden'; page?: number; size?: number }) => {
     const query = new URLSearchParams()

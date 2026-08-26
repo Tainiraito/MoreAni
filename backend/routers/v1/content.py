@@ -171,6 +171,7 @@ def list_seasons(db: Session = Depends(get_db)) -> dict:
             func.count(ContentItem.id).label('cnt'),
         )
         .filter(
+            ContentItem.content_type.in_(content_svc.ANIME_CONTENT_TYPES),
             ContentItem.release_date.isnot(None),
             ContentItem.release_date != '',
             ContentItem.deleted_at.is_(None),

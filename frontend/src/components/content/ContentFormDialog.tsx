@@ -48,6 +48,7 @@ interface ContentFormData {
 
 const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: 'anime', label: '番剧' },
+  { value: 'anime_movie', label: '动画电影' },
   { value: 'movie', label: '电影' },
   { value: 'game', label: '游戏' },
   { value: 'software', label: '软件' },
@@ -109,9 +110,20 @@ interface ContentFormDialogProps {
   open: boolean
   onClose: () => void
   onSaved?: () => void  // callback after successful create/update
+  initialBangumiSubjectId?: number
+  initialBangumiTitle?: string
+  initialBangumiTitleAlt?: string
 }
 
-export function ContentFormDialog({ contentId, open, onClose, onSaved }: ContentFormDialogProps) {
+export function ContentFormDialog({
+  contentId,
+  open,
+  onClose,
+  onSaved,
+  initialBangumiSubjectId,
+  initialBangumiTitle,
+  initialBangumiTitleAlt,
+}: ContentFormDialogProps) {
   useLockBodyScroll(open)
   const toast = useToastStore.getState()
   const isEditMode = contentId != null
@@ -155,6 +167,35 @@ export function ContentFormDialog({ contentId, open, onClose, onSaved }: Content
       .catch(() => toast.addToast('error', '加载内容失败'))
       .finally(() => setLoading(false))
   }, [open, contentId, isEditMode, toast])
+
+  // ── Prefill a new anime from an exact weekly-calendar Bangumi subject ──
+  useEffect(() => {
+    if (!open || isEditMode || !initialBangumiSubjectId) return
+    let cancelled = false
+    const fallback = {
+      ...emptyForm(),
+      title: initialBangumiTitle ?? '',
+      title_alt: initialBangumiTitleAlt ?? '',
+    }
+    setForm(fallback)
+    setLoading(true)
+    api.getBangumiDetail(initialBangumiSubjectId)
+      .then(detail => {
+        if (cancelled) return
+        setForm(bangumiToForm(detail as unknown as BangumiItem))
+      })
+      .catch(() => {
+        if (cancelled) return
+        toast.addToast('warning', 'Bangumi 信息获取失败，请手动搜索或补充内容')
+        setForm(fallback)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, isEditMode, initialBangumiSubjectId, initialBangumiTitle, initialBangumiTitleAlt, toast])
 
   // ── Debounced Bangumi search ──
   const doSearch = useCallback(async (q: string) => {

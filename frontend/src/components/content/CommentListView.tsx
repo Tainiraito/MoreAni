@@ -11,11 +11,11 @@ interface CommentListViewProps {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
+  anime: '番剧', anime_movie: '动画电影', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  anime: '#FB71A7', movie: '#00B894', game: '#E17055', software: '#D4A017', website: '#4DA6FF', book: '#E85D5D',
+  anime: '#FB71A7', anime_movie: '#FB71A7', movie: '#00B894', game: '#E17055', software: '#D4A017', website: '#4DA6FF', book: '#E85D5D',
 }
 
 /** 评论列表视图：每行左侧番剧信息，右侧朋友们的评分评论集合（气泡样式） */

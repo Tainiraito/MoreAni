@@ -16,6 +16,8 @@ JWT 认证 · Bangumi API 集成 · 图片代理（绕过 CORP 限制）
 ```bash
 cd backend
 source venv/bin/activate
+# 开发环境开启 Bangumi 周历每日后台同步；不设置时接口仍可读取已有本地快照
+export MOREANI_AIRING_CALENDAR_WORKER=true
 uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 

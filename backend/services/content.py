@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from models import ContentItem, ContentTag, Rating, Tag, UserContentStatus
 
+ANIME_CONTENT_TYPES = ('anime', 'anime_movie')
+OTHER_CONTENT_TYPES = ('movie', 'game', 'software', 'website', 'book')
+
 
 def get_content_by_id(db: Session, content_id: int) -> ContentItem | None:
     """Get a single content item by ID (excludes soft-deleted)."""
@@ -57,7 +60,12 @@ def list_content(
     )
 
     if content_type:
-        query = query.filter(ContentItem.content_type == content_type)
+        if content_type == 'anime':
+            query = query.filter(ContentItem.content_type.in_(ANIME_CONTENT_TYPES))
+        elif content_type == 'other':
+            query = query.filter(ContentItem.content_type.in_(OTHER_CONTENT_TYPES))
+        else:
+            query = query.filter(ContentItem.content_type == content_type)
 
     if tag:
         query = query.join(ContentTag).join(Tag).filter(Tag.name == tag)

@@ -3,16 +3,18 @@ import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useRefreshStore } from '@/stores/refresh-store'
-import { api } from '@/lib/api'
+import { ApiTimeoutError, api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { HeroBrand } from '@/components/layout/HeroBrand'
 import { AnimeCard } from '@/components/content/AnimeCard'
 import { CommentListView } from '@/components/content/CommentListView'
+import { OtherContentList } from '@/components/content/OtherContentList'
+import { WeeklyAiringPanel } from '@/components/content/WeeklyAiringPanel'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { HeroSection } from '@/components/content/HeroSection'
 import { LayoutGrid, List } from 'lucide-react'
-import type { ContentItem, ContentType } from '@/types'
+import type { AiringCalendarWeek, ContentItem } from '@/types'
 import {
   buildContentListParams,
   getRecommendationSize,
@@ -21,7 +23,9 @@ import {
 } from '@/lib/content-query'
 
 const PAGE_SIZE = 20
+const SEARCH_DEBOUNCE_MS = 300
 const RECOMMENDATION_CACHE_PREFIX = 'moreani-recommendations-v1'
+type HomeTab = 'anime' | 'calendar' | 'other'
 
 function recommendationCacheKey(userId: number | null): string {
   return `${RECOMMENDATION_CACHE_PREFIX}:${userId ?? 'guest'}`
@@ -49,10 +53,11 @@ function writeRecommendationCache(userId: number | null, items: ContentItem[]): 
 
 export function HomePage() {
   const { user } = useAuthStore()
+  const userId = user?.id
   const { openDetail, openAddAnime } = useUIStore()
   const { isFavorited, toggleFavorite } = useFavoriteStore()
   const refreshKey = useRefreshStore(s => s.refreshKey)
-  const [activeType, setActiveType] = useState<ContentType | 'all'>('anime')
+  const [activeTab, setActiveTab] = useState<HomeTab>('anime')
   const [items, setItems] = useState<ContentItem[]>([])
   const [hero, setHero] = useState<ContentItem | null>(null)
   const [scrollRecommendations, setScrollRecommendations] = useState<ContentItem[]>(() => readRecommendationCache(user?.id ?? null))
@@ -64,13 +69,29 @@ export function HomePage() {
   const recommendationSizeRef = useRef(recommendationSize)
   recommendationSizeRef.current = recommendationSize
   const [loading, setLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
+  const [listRetryKey, setListRetryKey] = useState(0)
   const [progress, setProgress] = useState(0)
   const heroIdRef = useRef<number | null>(null)
   const listRequestGate = useRef(new LatestRequestGate())
+  const paginationRequestGate = useRef(new LatestRequestGate())
+  const listQueryVersionRef = useRef(0)
+  const listLoadingRef = useRef(true)
+  const pageRef = useRef(1)
+  const hasMoreRef = useRef(true)
+  const paginationControllerRef = useRef<AbortController | null>(null)
+  const lastListContextRef = useRef<{ activeTab: HomeTab; userId: number } | null>(null)
+  const airingRequestGate = useRef(new LatestRequestGate())
+  const [airingWeek, setAiringWeek] = useState<AiringCalendarWeek | null>(null)
+  const [airingLoading, setAiringLoading] = useState(false)
+  const [airingError, setAiringError] = useState<string | null>(null)
+  const [airingLoaded, setAiringLoaded] = useState(false)
 
   // Search and filter state
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const searchCompositionRef = useRef(false)
+  const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [myFilter, setMyFilter] = useState<'' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited'>('')
   const [sortBy, setSortBy] = useState('updated_desc')
   // 放送季度筛选（2026-01 = 2026年1月番）；用户筛选（看该用户评分/评论过的番）
@@ -111,7 +132,6 @@ export function HomePage() {
   }
 
   // Infinite scroll pagination state
-  const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
@@ -224,35 +244,89 @@ export function HomePage() {
   // Hero 每次轮换都从全量公开番剧中重新随机抽取；不维护固定 Hero 池。
   const heroFavorited = hero ? isFavorited(hero.id) : false
 
-  // Debounce search input：停顿 500ms 才触发搜索（避免每敲一个字符都调接口）；
-  // 按 Enter 立即触发
+  const clearSearchDebounce = useCallback(() => {
+    if (searchDebounceTimerRef.current === null) return
+    clearTimeout(searchDebounceTimerRef.current)
+    searchDebounceTimerRef.current = null
+  }, [])
+
+  const commitSearchQuery = useCallback((value: string) => {
+    const normalizedQuery = value.trim()
+    clearSearchDebounce()
+    setSearchQuery(previous => previous === normalizedQuery ? previous : normalizedQuery)
+  }, [clearSearchDebounce])
+
+  const scheduleSearchQuery = useCallback((value: string) => {
+    clearSearchDebounce()
+    searchDebounceTimerRef.current = setTimeout(() => {
+      searchDebounceTimerRef.current = null
+      if (searchCompositionRef.current) return
+      commitSearchQuery(value)
+    }, SEARCH_DEBOUNCE_MS)
+  }, [clearSearchDebounce, commitSearchQuery])
+
+  // 防抖搜索：组合输入期间只更新输入框，不提交未完成的拼音/候选词。
   useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput), 500)
-    return () => clearTimeout(timer)
-  }, [searchInput])
+    if (searchCompositionRef.current) return
+    scheduleSearchQuery(searchInput)
+    return clearSearchDebounce
+  }, [clearSearchDebounce, scheduleSearchQuery, searchInput])
+
+  const handleSearchCompositionStart = () => {
+    searchCompositionRef.current = true
+    clearSearchDebounce()
+  }
+
+  const handleSearchCompositionEnd = (event: React.CompositionEvent<HTMLInputElement>) => {
+    searchCompositionRef.current = false
+    scheduleSearchQuery(event.currentTarget.value)
+  }
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      setSearchQuery(searchInput)
-    }
+    if (e.key !== 'Enter') return
+    if (searchCompositionRef.current || e.nativeEvent.isComposing || e.keyCode === 229) return
+    commitSearchQuery(searchInput)
   }
 
   const contentQuery = useMemo(() => ({
-    activeType,
+    activeType: activeTab === 'other' ? 'other' as const : 'anime' as const,
     searchQuery,
     myFilter,
     sortBy,
-    seasonFilter,
+    seasonFilter: activeTab === 'anime' ? seasonFilter : '',
     userFilter,
-  }), [activeType, searchQuery, myFilter, sortBy, seasonFilter, userFilter])
+  }), [activeTab, searchQuery, myFilter, sortBy, seasonFilter, userFilter])
+
+  const listQueryRef = useRef({ activeTab, contentQuery })
+  listQueryRef.current = { activeTab, contentQuery }
 
   // 加载当前 tab 的内容（重置分页）
   useEffect(() => {
-    if (!user) return
+    const queryVersion = listQueryVersionRef.current + 1
+    listQueryVersionRef.current = queryVersion
+    paginationRequestGate.current.begin()
+    paginationControllerRef.current?.abort()
+    paginationControllerRef.current = null
+    isLoadingMoreRef.current = false
+    setLoadingMore(false)
 
+    if (userId === undefined || activeTab === 'calendar') {
+      listLoadingRef.current = false
+      setLoading(false)
+      return
+    }
+
+    const contextChanged = lastListContextRef.current !== null
+      && (lastListContextRef.current.activeTab !== activeTab || lastListContextRef.current.userId !== userId)
+    if (contextChanged) setItems([])
+    lastListContextRef.current = { activeTab, userId }
+
+    listLoadingRef.current = true
     setLoading(true)
-    setPage(1)
+    setListError(null)
+    pageRef.current = 1
     setHasMore(true)
+    hasMoreRef.current = true
     setTotalCount(0)
 
     const requestId = listRequestGate.current.begin()
@@ -261,36 +335,94 @@ export function HomePage() {
 
     api.listContent(params, { signal: controller.signal })
       .then(res => {
-        if (!listRequestGate.current.isCurrent(requestId)) return
+        if (!listRequestGate.current.isCurrent(requestId) || queryVersion !== listQueryVersionRef.current) return
         const list = res.items || []
         setItems(list)
         setTotalCount(res.total || 0)
         setHasMore(list.length < (res.total || 0))
+        hasMoreRef.current = list.length < (res.total || 0)
       })
-      .catch(() => {
-        if (controller.signal.aborted || !listRequestGate.current.isCurrent(requestId)) return
-        setItems([])
+      .catch(error => {
+        if (
+          controller.signal.aborted
+          || !listRequestGate.current.isCurrent(requestId)
+          || queryVersion !== listQueryVersionRef.current
+        ) return
+        setListError(error instanceof ApiTimeoutError ? '列表加载超时，请重试' : '列表加载失败，请重试')
         setHasMore(false)
+        hasMoreRef.current = false
       })
       .finally(() => {
-        if (listRequestGate.current.isCurrent(requestId)) setLoading(false)
+        if (listRequestGate.current.isCurrent(requestId) && queryVersion === listQueryVersionRef.current) {
+          listLoadingRef.current = false
+          setLoading(false)
+        }
       })
     return () => controller.abort()
-  }, [contentQuery, user, refreshKey])
+  }, [activeTab, contentQuery, userId, refreshKey, listRetryKey])
+
+  useEffect(() => {
+    if (userId === undefined) {
+      setAiringWeek(null)
+      setAiringLoaded(false)
+      return
+    }
+    setAiringWeek(null)
+    setAiringLoaded(false)
+    setAiringError(null)
+  }, [userId])
+
+  useEffect(() => {
+    if (userId === undefined || activeTab !== 'calendar' || airingLoaded) return
+    const requestId = airingRequestGate.current.begin()
+    const controller = new AbortController()
+    setAiringLoading(true)
+    setAiringError(null)
+
+    api.getAiringWeek({ signal: controller.signal })
+      .then(response => {
+        if (!airingRequestGate.current.isCurrent(requestId)) return
+        setAiringWeek(response)
+        setAiringLoaded(true)
+      })
+      .catch(error => {
+        if (controller.signal.aborted || !airingRequestGate.current.isCurrent(requestId)) return
+        setAiringError(error instanceof Error ? error.message : '周历加载失败')
+        setAiringLoaded(true)
+      })
+      .finally(() => {
+        if (airingRequestGate.current.isCurrent(requestId)) setAiringLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [activeTab, airingLoaded, userId])
 
   // 加载更多（下一页）
   const loadMore = useCallback(async () => {
-    if (isLoadingMoreRef.current || !hasMore || loading) return
+    const currentQuery = listQueryRef.current
+    if (
+      currentQuery.activeTab === 'calendar'
+      || isLoadingMoreRef.current
+      || !hasMoreRef.current
+      || listLoadingRef.current
+    ) return
     isLoadingMoreRef.current = true
     setLoadingMore(true)
 
-    const nextPage = page + 1
-    const requestId = listRequestGate.current.begin()
-    const params = buildContentListParams(contentQuery, nextPage, PAGE_SIZE)
+    const queryVersion = listQueryVersionRef.current
+    const nextPage = pageRef.current + 1
+    const requestId = paginationRequestGate.current.begin()
+    const controller = new AbortController()
+    paginationControllerRef.current = controller
+    const params = buildContentListParams(currentQuery.contentQuery, nextPage, PAGE_SIZE)
 
     try {
-      const res = await api.listContent(params)
-      if (!listRequestGate.current.isCurrent(requestId)) return
+      const res = await api.listContent(params, { signal: controller.signal })
+      if (
+        controller.signal.aborted
+        || !paginationRequestGate.current.isCurrent(requestId)
+        || queryVersion !== listQueryVersionRef.current
+      ) return
       const list = res.items || []
       setTotalCount(res.total)
       // 防御：追加前去重（分页偶发重叠时避免重复 key）
@@ -298,16 +430,20 @@ export function HomePage() {
         const seen = new Set(prev.map(i => i.id))
         const next = [...prev, ...list.filter(i => !seen.has(i.id))]
         setHasMore(next.length < res.total)
+        hasMoreRef.current = next.length < res.total
         return next
       })
-      setPage(nextPage)
+      pageRef.current = nextPage
     } catch {
       // ignore load-more errors
     } finally {
-      setLoadingMore(false)
-      isLoadingMoreRef.current = false
+      if (paginationControllerRef.current === controller) {
+        paginationControllerRef.current = null
+        setLoadingMore(false)
+        isLoadingMoreRef.current = false
+      }
     }
-  }, [page, hasMore, loading, contentQuery])
+  }, [])
 
   // 滚动监听：接近底部 300px 时触发 loadMore
   useEffect(() => {
@@ -321,6 +457,10 @@ export function HomePage() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [loadMore])
+
+  const handleRetryList = useCallback(() => {
+    setListRetryKey(value => value + 1)
+  }, [])
 
   // 换一个精选（手动或自动触发）
   const handleRefreshHero = useCallback(() => {
@@ -365,7 +505,7 @@ export function HomePage() {
     return <HeroBrand items={scrollRecommendations} />
   }
 
-  const animeItems = items.filter(i => i.content_type === 'anime')
+  const animeItems = items.filter(i => i.content_type === 'anime' || i.content_type === 'anime_movie')
 
   return (
     <PageMain>
@@ -391,21 +531,18 @@ export function HomePage() {
           className="flex gap-6 overflow-x-auto mb-4 -mx-6 px-6"
           style={{ borderBottom: '1px solid var(--border-line)' }}
         >
-          {(['anime', 'movie', 'game', 'software', 'website', 'book'] as const).map(val => {
-            const labels: Record<string, string> = { anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍' }
-            const isActive = activeType === val
-            const isDisabled = val !== 'anime'
+          {(['anime', 'calendar', 'other'] as const).map(val => {
+            const labels: Record<HomeTab, string> = { anime: '番剧', calendar: '新番周历', other: '其他' }
+            const isActive = activeTab === val
             return (
               <button
                 key={val}
-                onClick={() => !isDisabled && setActiveType(val)}
-                disabled={isDisabled}
-                className="relative min-h-[3.75rem] whitespace-nowrap pb-3 text-lg font-semibold transition-colors duration-150"
+                type="button"
+                onClick={() => setActiveTab(val)}
+                className="relative min-h-[3.75rem] cursor-pointer whitespace-nowrap pb-3 text-lg font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 style={{
-                  color: isActive ? '#FB71A7' : isDisabled ? 'var(--text-muted)' : 'var(--text-muted)',
+                  color: isActive ? '#FB71A7' : 'var(--text-muted)',
                   borderBottom: isActive ? '2px solid #FB71A7' : '2px solid transparent',
-                  opacity: isDisabled ? 0.4 : 1,
-                  cursor: isDisabled ? 'not-allowed' : 'pointer',
                 }}
               >
                 {labels[val]}
@@ -415,7 +552,7 @@ export function HomePage() {
         </div>
 
         {/* 搜索、筛选、排序 */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        {activeTab !== 'calendar' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
           <div className="relative flex-1 max-w-xs">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
@@ -425,20 +562,28 @@ export function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <Input
-              placeholder="搜索番剧、标签..."
+              placeholder={activeTab === 'other' ? '搜索其他内容、标签...' : '搜索番剧、标签...'}
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
+              onCompositionStart={handleSearchCompositionStart}
+              onCompositionEnd={handleSearchCompositionEnd}
               onKeyDown={handleSearchKeyDown}
+              clearable
+              onClear={() => {
+                searchCompositionRef.current = false
+                setSearchInput('')
+                commitSearchQuery('')
+              }}
               className="pl-9 text-sm"
             />
           </div>
-          <Select
+          {activeTab === 'anime' && <Select
             value={seasonFilter}
             onChange={setSeasonFilter}
             className="w-[128px]"
             placeholder="放送季度"
             options={[{ value: '', label: '全部季度' }, ...seasonOptions]}
-          />
+          />}
           <Select
             value={userFilter}
             onChange={setUserFilter}
@@ -480,9 +625,9 @@ export function HomePage() {
             ]}
           />
           {/* 仅管理员显示新增按钮（普通用户无权限，避免操作后报错）；super_admin 同样有权限 */}
-          {(user?.role === 'admin' || user?.role === 'super_admin') && (
+          {activeTab === 'anime' && (user?.role === 'admin' || user?.role === 'super_admin') && (
             <button
-              onClick={openAddAnime}
+              onClick={() => openAddAnime()}
               className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
               style={{
                 background: '#FB71A7',
@@ -496,7 +641,7 @@ export function HomePage() {
             </button>
           )}
           {/* 视图切换（组合式：评论列表 / 卡片网格） */}
-          <div
+          {activeTab === 'anime' && <div
             className="flex items-center ml-1 rounded-lg overflow-hidden"
             style={{ border: '1px solid var(--border-line)' }}
           >
@@ -525,12 +670,38 @@ export function HomePage() {
             >
               <LayoutGrid size={14} />
             </button>
-          </div>
-        </div>
+          </div>}
+        </div>}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-32">
+        {activeTab === 'calendar' ? (
+          <WeeklyAiringPanel
+            week={airingWeek}
+            loading={airingLoading}
+            error={airingError}
+            onOpenContent={openDetail}
+            onAddAnime={item => openAddAnime({
+              bangumiId: item.subject_id,
+              title: item.title,
+              titleAlt: item.title_alt,
+            })}
+            isFavorited={isFavorited}
+            onToggleFavorite={toggleFavorite}
+          />
+        ) : loading && items.length === 0 ? (
+          <div className="flex items-center justify-center py-32" role="status" aria-label="列表加载中">
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+          </div>
+        ) : listError && items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-32" role="alert">
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{listError}</p>
+            <button
+              type="button"
+              onClick={handleRetryList}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: '#FB71A7' }}
+            >
+              重试
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="flex items-center justify-center py-32">
@@ -540,7 +711,25 @@ export function HomePage() {
           </div>
         ) : (
           <>
-            {animeItems.length > 0 && (
+            {loading && (
+              <div className="mb-4 flex items-center justify-center py-2" role="status" aria-label="列表刷新中">
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>正在更新列表...</p>
+              </div>
+            )}
+            {listError && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-lg px-3 py-2" role="alert" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{listError}</p>
+                <button type="button" onClick={handleRetryList} className="shrink-0 text-xs font-medium hover:opacity-80" style={{ color: '#FB71A7' }}>重试</button>
+              </div>
+            )}
+            {activeTab === 'other' ? (
+              <section className="mt-8">
+                <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} onToggleFavorite={toggleFavorite} />
+                {loadingMore && <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p></div>}
+                {!hasMore && items.length > 0 && <div className="flex items-center justify-center py-8"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>已显示全部 {totalCount} 条内容</p></div>}
+              </section>
+            ) : (
+            animeItems.length > 0 && (
               <section className="mt-8">
                 {viewMode === 'list' ? (
                   <CommentListView
@@ -565,7 +754,7 @@ export function HomePage() {
                 )}
                 {/* 无限滚动加载状态 */}
                 {loadingMore && (
-                  <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多">
                     <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
                   </div>
                 )}
@@ -577,6 +766,7 @@ export function HomePage() {
                   </div>
                 )}
               </section>
+            )
             )}
           </>
         )}

@@ -119,7 +119,7 @@ class ContentItemCreate(BaseModel):
     title_alt: str = ''
     cover_url: str = ''
     description: str = ''
-    content_type: Literal['anime', 'movie', 'game', 'software', 'website', 'book']
+    content_type: Literal['anime', 'anime_movie', 'movie', 'game', 'software', 'website', 'book']
     episodes: int = 0
     status: str = ''
     release_date: str = ''
@@ -139,7 +139,7 @@ class ContentItemUpdate(BaseModel):
     title_alt: str | None = None
     cover_url: str | None = None
     description: str | None = None
-    content_type: Literal['anime', 'movie', 'game', 'software', 'website', 'book'] | None = None
+    content_type: Literal['anime', 'anime_movie', 'movie', 'game', 'software', 'website', 'book'] | None = None
     episodes: int | None = None
     status: str | None = None
     release_date: str | None = None
@@ -219,6 +219,38 @@ class ContentListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class AiringCalendarItemResponse(BaseModel):
+    """One persisted Bangumi calendar item with optional local-content match."""
+
+    subject_id: int
+    content_id: int | None = None
+    matched: bool = False
+    title: str
+    title_alt: str = ''
+    cover_url: str = ''
+    bangumi_url: str
+
+
+class AiringCalendarDayResponse(BaseModel):
+    """One weekday in the current local week."""
+
+    date: str
+    weekday: int
+    label: str
+    is_today: bool
+    items: list[AiringCalendarItemResponse] = Field(default_factory=list)
+
+
+class AiringCalendarWeekResponse(BaseModel):
+    """Persisted weekly Bangumi calendar response."""
+
+    timezone: str
+    week_start: str
+    last_synced_at: datetime | None = None
+    sync_status: Literal['success', 'failed', 'pending']
+    days: list[AiringCalendarDayResponse]
 
 
 class RecommendationResponse(BaseModel):

@@ -629,6 +629,8 @@ export function AnimeResourceDialog({
                     <Input
                       value={resourceQuery}
                       onChange={event => setResourceQuery(event.target.value)}
+                      clearable
+                      onClear={() => setResourceQuery('')}
                       placeholder="筛选资源名称"
                       aria-label="筛选资源名称"
                       className="pl-9"

@@ -10,8 +10,8 @@ from models import ContentItem
 
 
 def subject_id_for_content(content: ContentItem) -> int | None:
-    """Return a valid Bangumi subject ID for an anime content item."""
-    if content.content_type != 'anime' or content.source_type != 'bangumi':
+    """Return a valid Bangumi subject ID for an anime-like content item."""
+    if content.content_type not in {'anime', 'anime_movie'} or content.source_type != 'bangumi':
         return None
     try:
         subject_id = int(content.source_id)

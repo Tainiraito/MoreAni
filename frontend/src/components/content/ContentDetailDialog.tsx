@@ -16,6 +16,7 @@ import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
   anime: { label: '番剧', icon: Play, color: 'var(--type-anime)' },
+  anime_movie: { label: '动画电影', icon: Film, color: '#FB71A7' },
   movie: { label: '电影', icon: Film, color: 'var(--type-movie)' },
   game: { label: '游戏', icon: Gamepad2, color: 'var(--type-game)' },
   software: { label: '软件', icon: Monitor, color: 'var(--type-software)' },
@@ -401,7 +402,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                     Bangumi
                   </a>
                 )}
-                {user && content.content_type === 'anime' && (
+                {user && (content.content_type === 'anime' || content.content_type === 'anime_movie') && (
                   <button
                     type="button"
                     onClick={() => setResourceOpen(true)}

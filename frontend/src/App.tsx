@@ -119,6 +119,7 @@ function GlobalDialogs() {
   const {
     detailContentId,
     addAnimeOpen,
+    addAnimePreset,
     editContentId,
     settingsOpen,
     adminOpen,
@@ -140,7 +141,14 @@ function GlobalDialogs() {
       />
       <Suspense fallback={null}>
         {addAnimeOpen && (
-          <ContentFormDialog open onClose={closeAddAnime} onSaved={handleRefresh} />
+          <ContentFormDialog
+            open
+            onClose={closeAddAnime}
+            onSaved={handleRefresh}
+            initialBangumiSubjectId={addAnimePreset?.bangumiId}
+            initialBangumiTitle={addAnimePreset?.title}
+            initialBangumiTitleAlt={addAnimePreset?.titleAlt}
+          />
         )}
         {!!editContentId && (
           <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleRefresh} />
