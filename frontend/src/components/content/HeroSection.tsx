@@ -3,11 +3,12 @@ import { Star, Users, Play, Heart, RefreshCw } from 'lucide-react'
 import { CoverImage } from '@/components/ui/CoverImage'
 
 const TYPE_LABELS: Record<string, string> = {
-  anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
+  anime: '番剧', anime_movie: '动画电影', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
 }
 
 const TYPE_COLORS: Record<string, string> = {
   anime: 'bg-type-anime/10 text-type-anime',
+  anime_movie: 'bg-type-anime/10 text-type-anime',
   movie: 'bg-type-movie/10 text-type-movie',
   game: 'bg-type-game/10 text-type-game',
   software: 'bg-type-software/10 text-type-software',
@@ -61,7 +62,13 @@ export function HeroSection({
     >
       <div className="flex flex-col md:flex-row md:h-[600px]">
         <div className="md:w-2/5 aspect-[3/4] md:aspect-auto overflow-hidden relative" style={{ background: 'var(--bg-card-warm)' }}>
-          <CoverImage src={content.cover_url} alt={content.title} imgClassName="group-hover:scale-[1.03] transition-transform duration-600 ease-out" />
+          <CoverImage
+            src={content.cover_url}
+            alt={content.title}
+            loading="eager"
+            fetchPriority="high"
+            imgClassName="group-hover:scale-[1.03] transition-transform duration-600 ease-out"
+          />
         </div>
 
         <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center overflow-hidden">

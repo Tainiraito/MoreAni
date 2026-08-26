@@ -2,6 +2,8 @@ import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const apiProxyTarget = process.env.MOREANI_DEV_API_PROXY || 'http://localhost:8080'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -11,7 +13,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': apiProxyTarget,
     },
   },
   test: {

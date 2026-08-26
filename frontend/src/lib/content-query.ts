@@ -1,7 +1,7 @@
 import type { ContentItem, ContentType } from '@/types'
 
 export interface ContentQueryFilters {
-  activeType: ContentType | 'all'
+  activeType: ContentType | 'other' | 'all'
   searchQuery: string
   myFilter: '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited'
   sortBy: string
@@ -19,7 +19,8 @@ export function buildContentListParams(
     size: String(size),
     type: filters.activeType,
   }
-  if (filters.searchQuery) params.q = filters.searchQuery
+  const searchQuery = filters.searchQuery.trim()
+  if (searchQuery) params.q = searchQuery
   if (filters.myFilter === 'rated' || filters.myFilter === 'unrated') params.rated = filters.myFilter
   if (filters.myFilter === 'reviewed' || filters.myFilter === 'unreviewed') params.reviewed = filters.myFilter
   if (filters.myFilter === 'favorited' || filters.myFilter === 'unfavorited') params.favorited = filters.myFilter

@@ -170,6 +170,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes calendar-action-rise {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes scale-in-center {
   from { opacity: 0; transform: translateX(-50%) scale(0.95); }
   to { opacity: 1; transform: translateX(-50%) scale(1); }
@@ -187,6 +191,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Animation classes */
 .animate-fade-in {
   animation: fade-in 200ms ease-out;
+}
+
+.animate-calendar-action-rise {
+  animation: calendar-action-rise 220ms ease-out both;
+}
+
+.animate-calendar-action-rise-delay {
+  animation-delay: 55ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-calendar-action-rise,
+  .animate-calendar-action-rise-delay {
+    animation: none;
+  }
 }
 
 .animate-scale-in {

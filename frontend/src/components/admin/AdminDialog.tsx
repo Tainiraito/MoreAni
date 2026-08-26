@@ -228,6 +228,11 @@ function UserManageTab() {
             value={q}
             onChange={e => setQ(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, q) }}
+            clearable
+            onClear={() => {
+              setQ('')
+              void loadUsers(1, '')
+            }}
             placeholder="搜索账号 / 昵称…"
             className="pl-9 h-9 text-sm"
           />
@@ -462,6 +467,11 @@ function InviteManageTab() {
             value={q}
             onChange={e => setQ(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') loadInvites(1, q) }}
+            clearable
+            onClear={() => {
+              setQ('')
+              void loadInvites(1, '')
+            }}
             placeholder="搜索邀请码…"
             className="pl-9 h-9 text-sm"
           />

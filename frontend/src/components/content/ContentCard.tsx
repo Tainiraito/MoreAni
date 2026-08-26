@@ -3,11 +3,12 @@ import { secureUrl } from '@/lib/image-url'
 import type { ContentItem } from '@/types'
 
 const TYPE_LABELS: Record<string, string> = {
-  anime: '番剧', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
+  anime: '番剧', anime_movie: '动画电影', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
 }
 
 const TYPE_COLORS: Record<string, string> = {
   anime: 'bg-type-anime/10 text-type-anime',
+  anime_movie: 'bg-type-anime/10 text-type-anime',
   movie: 'bg-type-movie/10 text-type-movie',
   game: 'bg-type-game/10 text-type-game',
   software: 'bg-type-software/10 text-type-software',

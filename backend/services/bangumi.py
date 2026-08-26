@@ -26,6 +26,63 @@ PROXY = (
 REQUEST_TIMEOUT = 6.0
 
 
+class BangumiError(RuntimeError):
+    """Raised when a Bangumi request cannot be completed or decoded."""
+
+
+class BangumiNotFoundError(BangumiError):
+    """Raised when Bangumi confirms that a subject does not exist."""
+
+
+async def _fetch_json(
+    url: str,
+    *,
+    operation: str,
+    params: dict[str, Any] | None = None,
+) -> Any:
+    """Fetch JSON through direct access and then the configured explicit proxy.
+
+    ``trust_env=False`` is required here: otherwise httpx may silently pick up
+    an unrelated ALL_PROXY/SOCKS proxy before the explicit fallback is tried.
+    """
+    proxies = [None] if not PROXY else [None, PROXY]
+    last_error: Exception | None = None
+
+    for proxy in proxies:
+        try:
+            async with httpx.AsyncClient(
+                timeout=REQUEST_TIMEOUT,
+                proxy=proxy,
+                trust_env=False,
+            ) as client:
+                response = await client.get(url, params=params, headers=HEADERS)
+                if response.status_code == 404:
+                    raise BangumiNotFoundError(f'Bangumi subject not found during {operation}')
+                response.raise_for_status()
+                return response.json()
+        except BangumiNotFoundError:
+            raise
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError, ImportError) as exc:
+            last_error = exc
+            logger.warning(
+                'Bangumi %s failed via %s: %s',
+                operation,
+                proxy or 'direct',
+                exc,
+            )
+
+    raise BangumiError(f'Bangumi {operation} temporarily unavailable') from last_error
+
+
+async def fetch_calendar() -> list[dict[str, Any]]:
+    """Fetch Bangumi's weekly anime calendar using direct-then-proxy fallback."""
+    url = f'{BANGUMI_API_BASE}/calendar'
+    payload = await _fetch_json(url, operation='calendar')
+    if not isinstance(payload, list):
+        raise BangumiError('Bangumi 周历响应格式不正确')
+    return payload
+
+
 async def search_subjects(
     keyword: str,
     subject_type: int = 2,
@@ -43,19 +100,12 @@ async def search_subjects(
         'type': subject_type,
     }
 
-    # 直连失败回退代理（WSL2 网络环境）
-    for proxy in (None, PROXY):
-        try:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, proxy=proxy) as client:
-                resp = await client.get(url, params=params, headers=HEADERS)
-                resp.raise_for_status()
-                data = resp.json()
-            break
-        except (httpx.HTTPError, httpx.TimeoutException) as e:
-            logger.warning('Bangumi search failed via %s: %s', proxy or 'direct', e)
-            data = None
-    if not data:
+    try:
+        data = await _fetch_json(url, operation='search', params=params)
+    except BangumiNotFoundError:
         return {'total': 0, 'items': []}
+    if not isinstance(data, dict):
+        raise BangumiError('Bangumi search response format is invalid')
 
     # API returns {"results": N, "list": [...]}
     results = []
@@ -87,19 +137,12 @@ async def get_subject_detail(bgm_id: int) -> dict[str, Any] | None:
     """
     url = f'{BANGUMI_API_BASE}/v0/subjects/{bgm_id}'
 
-    # 直连失败回退代理（WSL2 网络环境）
-    for proxy in (None, PROXY):
-        try:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT, proxy=proxy) as client:
-                resp = await client.get(url, headers=HEADERS)
-                resp.raise_for_status()
-                data = resp.json()
-            break
-        except (httpx.HTTPError, httpx.TimeoutException) as e:
-            logger.warning('Bangumi detail failed for %d via %s: %s', bgm_id, proxy or 'direct', e)
-            data = None
-    if not data:
+    try:
+        data = await _fetch_json(url, operation=f'detail/{bgm_id}')
+    except BangumiNotFoundError:
         return None
+    if not isinstance(data, dict):
+        raise BangumiError('Bangumi detail response format is invalid')
 
     images = data.get('images', {}) or {}
     rating_info = data.get('rating', {}) or {}

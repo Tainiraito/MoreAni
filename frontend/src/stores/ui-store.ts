@@ -8,12 +8,19 @@ export interface ResourceFocus {
   resourceKey?: string
 }
 
+export interface AddAnimePreset {
+  bangumiId: number
+  title?: string
+  titleAlt?: string
+}
+
 interface UIState {
   detailOpen: boolean
   detailContentId: number | null
   authOpen: boolean
   settingsOpen: boolean
   addAnimeOpen: boolean
+  addAnimePreset: AddAnimePreset | null
   editContentId: number | null
   resourceFocus: ResourceFocus | null
   openDetail: (id: number) => void
@@ -27,7 +34,7 @@ interface UIState {
   adminOpen: boolean
   openAdmin: () => void
   closeAdmin: () => void
-  openAddAnime: () => void
+  openAddAnime: (preset?: AddAnimePreset) => void
   closeAddAnime: () => void
   openEditContent: (id: number) => void
   closeEditContent: () => void
@@ -39,6 +46,7 @@ export const useUIStore = create<UIState>((set) => ({
   authOpen: false,
   settingsOpen: false,
   addAnimeOpen: false,
+  addAnimePreset: null,
   editContentId: null,
   resourceFocus: null,
 
@@ -53,8 +61,8 @@ export const useUIStore = create<UIState>((set) => ({
   adminOpen: false,
   openAdmin: () => set({ adminOpen: true }),
   closeAdmin: () => set({ adminOpen: false }),
-  openAddAnime: () => set({ addAnimeOpen: true }),
-  closeAddAnime: () => set({ addAnimeOpen: false }),
+  openAddAnime: (preset) => set({ addAnimeOpen: true, addAnimePreset: preset ?? null }),
+  closeAddAnime: () => set({ addAnimeOpen: false, addAnimePreset: null }),
   openEditContent: (id) => set({ editContentId: id }),
   closeEditContent: () => set({ editContentId: null }),
 }))

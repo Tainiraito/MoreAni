@@ -141,7 +141,7 @@ def build_content_entry(e: dict) -> dict | None:
 
     # 类型映射
     type_raw = e['type_raw']
-    type_map = {'番剧': 'anime', '动画电影': 'movie', '电影': 'movie', '游戏': 'game'}
+    type_map = {'番剧': 'anime', '动画电影': 'anime_movie', '电影': 'movie', '游戏': 'game'}
     ctype = None
     for key, val in type_map.items():
         if key in type_raw:

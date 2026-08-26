@@ -68,10 +68,13 @@ def test_request_classification_skips_health_and_options():
     options.scope['method'] = 'OPTIONS'
     asset = _request(client_host='testclient', path='/api/covers/1.jpg')
     asset.scope['method'] = 'GET'
+    image_proxy = _request(client_host='testclient', path='/api/v1/proxy/image')
+    image_proxy.scope['method'] = 'GET'
 
     assert middleware._select_rule(health) == (None, None)
     assert middleware._select_rule(options) == (None, None)
     assert middleware._select_rule(asset)[0] == 'asset'
+    assert middleware._select_rule(image_proxy)[0] == 'image'
 
 
 def test_login_failures_lock_only_the_same_identifier_and_ip(client, make_user, monkeypatch):

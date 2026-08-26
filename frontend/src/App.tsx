@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
@@ -116,9 +116,11 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
 }
 
 function GlobalDialogs() {
+  const queryClient = useQueryClient()
   const {
     detailContentId,
     addAnimeOpen,
+    addAnimePreset,
     editContentId,
     settingsOpen,
     adminOpen,
@@ -129,6 +131,7 @@ function GlobalDialogs() {
 
   const handleRefresh = () => {
     loadFavorites()
+    void queryClient.invalidateQueries({ queryKey: ['airing-week'] })
     useRefreshStore.getState().triggerRefresh()
   }
 
@@ -140,7 +143,14 @@ function GlobalDialogs() {
       />
       <Suspense fallback={null}>
         {addAnimeOpen && (
-          <ContentFormDialog open onClose={closeAddAnime} onSaved={handleRefresh} />
+          <ContentFormDialog
+            open
+            onClose={closeAddAnime}
+            onSaved={handleRefresh}
+            initialBangumiSubjectId={addAnimePreset?.bangumiId}
+            initialBangumiTitle={addAnimePreset?.title}
+            initialBangumiTitleAlt={addAnimePreset?.titleAlt}
+          />
         )}
         {!!editContentId && (
           <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleRefresh} />

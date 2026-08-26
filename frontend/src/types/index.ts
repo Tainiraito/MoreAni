@@ -1,4 +1,4 @@
-export type ContentType = 'anime' | 'movie' | 'game' | 'software' | 'website' | 'book'
+export type ContentType = 'anime' | 'anime_movie' | 'movie' | 'game' | 'software' | 'website' | 'book'
 
 export type WatchStatus = 'want' | 'watching' | 'watched' | 'dropped'
 
@@ -98,6 +98,32 @@ export interface PaginatedResponse<T> {
   total: number
   page: number
   size: number
+}
+
+export interface AiringCalendarItem {
+  subject_id: number
+  content_id: number | null
+  matched: boolean
+  title: string
+  title_alt: string
+  cover_url: string
+  bangumi_url: string
+}
+
+export interface AiringCalendarDay {
+  date: string
+  weekday: number
+  label: string
+  is_today: boolean
+  items: AiringCalendarItem[]
+}
+
+export interface AiringCalendarWeek {
+  timezone: string
+  week_start: string
+  last_synced_at: string | null
+  sync_status: 'success' | 'failed' | 'pending'
+  days: AiringCalendarDay[]
 }
 
 export interface ResourceParty {
