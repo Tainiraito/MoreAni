@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore, type NotificationFilter } from '@/stores/notification-store'
 import { useUIStore } from '@/stores/ui-store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import { formatDateTime } from '@/lib/utils'
 import type { NotificationItem } from '@/types'
 
@@ -51,8 +52,8 @@ function NotificationLoadingSkeleton() {
 
 export function NotificationPanel() {
   const { user } = useAuthStore()
-  const { openDetailResource } = useUIStore()
-  const { open, filter, items, loading, setFilter, closePanel, markRead, markAllRead } = useNotificationStore()
+  const { openDetailResource, openDetail } = useUIStore()
+  const { open, filter, items, loading, markingAll, setFilter, closePanel, markRead, markAllRead, isMarkingRead } = useNotificationStore()
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   if (!open) return null
@@ -74,6 +75,15 @@ export function NotificationPanel() {
         return
       }
     }
+    if (item.kind === 'content_activity') {
+      const rawContentId = item.payload?.content_id
+      const contentId = typeof rawContentId === 'number' ? rawContentId : Number(rawContentId)
+      if (Number.isFinite(contentId) && contentId > 0) {
+        closePanel()
+        openDetail(contentId)
+        return
+      }
+    }
     if (isExpandableAnnouncement(item)) {
       setExpandedId(current => current === item.id ? null : item.id)
     } else {
@@ -88,8 +98,8 @@ export function NotificationPanel() {
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>通知中心</h2>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => void markAllRead()} className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] hover:bg-[rgba(251,113,167,0.08)] hover:opacity-80" style={{ color: '#FB71A7' }}>
-            <CheckCheck size={12} /> 当前分类已读
+          <button type="button" onClick={() => void markAllRead()} disabled={markingAll} aria-busy={markingAll || undefined} className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[11px] hover:bg-[rgba(251,113,167,0.08)] hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50" style={{ color: '#FB71A7' }}>
+            {markingAll ? <LoadingIcon size={12} /> : <CheckCheck size={12} />} 当前分类已读
           </button>
         </div>
       </div>
@@ -127,6 +137,8 @@ export function NotificationPanel() {
                   type="button"
                   key={item.id}
                   onClick={() => handleClick(item)}
+                  disabled={isMarkingRead(item.id)}
+                  aria-busy={isMarkingRead(item.id) || undefined}
                   aria-expanded={expandable ? expanded : undefined}
                   className="block w-full cursor-pointer rounded-xl p-3 text-left transition-colors hover:opacity-90"
                   style={{ background: item.is_read ? 'var(--bg-card-warm)' : 'rgba(251,113,167,0.08)', border: `1px solid ${item.is_read ? 'var(--border-line)' : 'rgba(251,113,167,0.28)'}` }}
@@ -143,7 +155,7 @@ export function NotificationPanel() {
                       {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />} {expanded ? '收起公告' : '展开公告'}
                     </span>
                   )}
-                  <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>{formatDateTime(item.created_at)}{item.kind === 'resource_update' ? ' · 资源更新' : ''}</p>
+                  <p className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>{isMarkingRead(item.id) && <LoadingIcon size={10} />}{formatDateTime(item.created_at)}{item.kind === 'resource_update' ? ' · 资源更新' : item.kind === 'content_activity' ? ' · 番剧动态' : ''}</p>
                 </button>
               )
             })}

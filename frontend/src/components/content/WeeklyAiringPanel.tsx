@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ExternalLink, Heart, LayoutGrid, List, Plus } from 'lucide-react'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { AiringCalendarDay, AiringCalendarWeek } from '@/types'
 
 type AiringCalendarEntry = AiringCalendarDay['items'][number]
@@ -14,6 +15,7 @@ interface WeeklyAiringPanelProps {
   onAddAnime: (item: AiringCalendarEntry) => void
   isFavorited: (id: number) => boolean
   onToggleFavorite: (id: number) => void
+  isFavoritePending?: (id: number) => boolean
 }
 
 function todayWeekday(): number {
@@ -103,10 +105,12 @@ function CalendarCornerBadge({
   item,
   isFavorited,
   onToggleFavorite,
+  isFavoritePending,
 }: {
   item: AiringCalendarEntry
   isFavorited: boolean
   onToggleFavorite: (id: number) => void
+  isFavoritePending?: boolean
 }) {
   if (!item.matched) {
     return (
@@ -130,10 +134,12 @@ function CalendarCornerBadge({
         event.stopPropagation()
         onToggleFavorite(item.content_id as number)
       }}
+      disabled={isFavoritePending}
+      aria-busy={isFavoritePending || undefined}
       className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-md transition-colors hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
       style={{ background: 'var(--bg-card)', border: isFavorited ? '2px solid #FB71A7' : '1px solid var(--border-line)', color: isFavorited ? '#FB71A7' : 'var(--text-muted)' }}
     >
-      <Heart size={14} fill={isFavorited ? 'currentColor' : 'none'} />
+      {isFavoritePending ? <LoadingIcon size={14} /> : <Heart size={14} fill={isFavorited ? 'currentColor' : 'none'} />}
     </button>
   )
 }
@@ -190,6 +196,7 @@ function AiringCard({
   onAddAnime,
   isFavorited,
   onToggleFavorite,
+  isFavoritePending,
   actionsOpen,
   onActionsOpenChange,
 }: {
@@ -198,6 +205,7 @@ function AiringCard({
   onAddAnime: (item: AiringCalendarEntry) => void
   isFavorited: (id: number) => boolean
   onToggleFavorite: (id: number) => void
+  isFavoritePending?: (id: number) => boolean
   actionsOpen: boolean
   onActionsOpenChange: (open: boolean) => void
 }) {
@@ -212,6 +220,7 @@ function AiringCard({
               item={item}
               isFavorited={item.matched && item.content_id != null ? isFavorited(item.content_id) : false}
               onToggleFavorite={onToggleFavorite}
+              isFavoritePending={item.matched && item.content_id != null ? isFavoritePending?.(item.content_id) : false}
             />
           </div>
         ) : (
@@ -306,7 +315,7 @@ function AiringListRow({ item, onOpenContent, onAddAnime }: { item: AiringCalend
   )
 }
 
-export function WeeklyAiringPanel({ week, loading, error, onOpenContent, onAddAnime, isFavorited, onToggleFavorite }: WeeklyAiringPanelProps) {
+export function WeeklyAiringPanel({ week, loading, error, onOpenContent, onAddAnime, isFavorited, onToggleFavorite, isFavoritePending }: WeeklyAiringPanelProps) {
   const [selectedWeekday, setSelectedWeekday] = useState(todayWeekday)
   const [view, setView] = useState<CalendarView>('grid')
   const [openActionSubjectId, setOpenActionSubjectId] = useState<number | null>(null)
@@ -388,6 +397,7 @@ export function WeeklyAiringPanel({ week, loading, error, onOpenContent, onAddAn
               onAddAnime={onAddAnime}
               isFavorited={isFavorited}
               onToggleFavorite={onToggleFavorite}
+              isFavoritePending={isFavoritePending}
               actionsOpen={openActionSubjectId === item.subject_id}
               onActionsOpenChange={open => setOpenActionSubjectId(open ? item.subject_id : null)}
             />

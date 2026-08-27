@@ -20,6 +20,31 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
     cover_url: '',
     bangumi_url: 'https://bgm.tv/subject/1002',
   }
+  const createdContent = {
+    id: 88,
+    title: '精确周历番剧',
+    title_alt: 'Unmatched Weekly Anime',
+    cover_url: '',
+    description: '通过周历 subject_id 获取的简介',
+    content_type: 'anime',
+    episodes: 12,
+    status: 'active',
+    release_date: '2026-04-01',
+    platform: 'TV',
+    source_type: 'bangumi',
+    source_id: '1002',
+    source_url: 'https://bangumi.tv/subject/1002',
+    metadata: {},
+    is_public: true,
+    created_by: 7,
+    created_at: '2026-08-27T00:00:00Z',
+    updated_at: '2026-08-27T00:00:00Z',
+    avg_score: 0,
+    rating_count: 0,
+    review_count: 0,
+    tags: [],
+    recent_reviews: [],
+  }
   let createPayload: Record<string, unknown> | null = null
   let detailShouldFail = false
 
@@ -47,6 +72,14 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
     if (path === '/api/v1/content' && request.method() === 'POST') {
       createPayload = request.postDataJSON() as Record<string, unknown>
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 88 }) })
+      return
+    }
+    if (path === '/api/v1/content/88') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(createdContent) })
+      return
+    }
+    if (path.endsWith('/rating/content/88')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0 }) })
       return
     }
     if (path === '/api/v1/content') {
@@ -145,6 +178,9 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
     source_id: '1002',
     source_url: 'https://bangumi.tv/subject/1002',
   }))
+  await expect(page.getByRole('heading', { name: '精确周历番剧' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭详情' }).click()
+  await expect(page.getByRole('heading', { name: '精确周历番剧' })).toHaveCount(0)
 
   detailShouldFail = true
   await page.getByRole('button', { name: '打开 未关联周历番剧 的操作' }).first().click()

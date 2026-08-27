@@ -17,6 +17,8 @@ interface NotificationState {
   privateUnread: number
   loading: boolean
   refreshing: boolean
+  markingReadIds: number[]
+  markingAll: boolean
   setFilter: (filter: NotificationFilter) => void
   openPanel: () => Promise<void>
   closePanel: () => void
@@ -25,6 +27,7 @@ interface NotificationState {
   refresh: () => Promise<void>
   markRead: (notification: NotificationItem) => Promise<void>
   markAllRead: () => Promise<void>
+  isMarkingRead: (id: number) => boolean
 }
 
 interface NotificationCacheEntry {
@@ -82,6 +85,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   privateUnread: 0,
   loading: false,
   refreshing: false,
+  markingReadIds: [],
+  markingAll: false,
 
   setFilter: (filter) => {
     if (get().filter === filter) return
@@ -93,9 +98,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     syncNotificationCacheUser()
     set({ open: true })
     const activeFilter = get().filter
-    void get().loadNotifications(activeFilter)
-    void get().loadUnreadCount(true)
-    if (useAuthStore.getState().user) void get().refresh()
+    await Promise.all([
+      get().loadNotifications(activeFilter),
+      get().loadUnreadCount(true),
+      useAuthStore.getState().user ? get().refresh() : Promise.resolve(),
+    ])
   },
 
   closePanel: () => set({ open: false }),
@@ -200,47 +207,52 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markRead: async (notification) => {
-    if (notification.is_read) return
-    set(state => ({
-      items: state.items.map(item => item.id === notification.id ? { ...item, is_read: true } : item),
-      unreadCount: Math.max(0, state.unreadCount - 1),
-      publicUnread: notification.scope === 'public' ? Math.max(0, state.publicUnread - 1) : state.publicUnread,
-      privateUnread: notification.scope === 'private' ? Math.max(0, state.privateUnread - 1) : state.privateUnread,
-    }))
-    const cached = notificationCache.get(notification.scope)
-    if (cached) {
-      cached.items = cached.items.map(item => item.id === notification.id ? { ...item, is_read: true } : item)
-    }
-    if (!useAuthStore.getState().user && notification.scope === 'public') {
-      const ids = anonymousReadIds()
-      ids.add(notification.id)
-      saveAnonymousReadIds(ids)
-      return
-    }
+    if (notification.is_read || get().markingReadIds.includes(notification.id)) return
+    set(state => ({ markingReadIds: [...state.markingReadIds, notification.id] }))
     try {
+      set(state => ({
+        items: state.items.map(item => item.id === notification.id ? { ...item, is_read: true } : item),
+        unreadCount: Math.max(0, state.unreadCount - 1),
+        publicUnread: notification.scope === 'public' ? Math.max(0, state.publicUnread - 1) : state.publicUnread,
+        privateUnread: notification.scope === 'private' ? Math.max(0, state.privateUnread - 1) : state.privateUnread,
+      }))
+      const cached = notificationCache.get(notification.scope)
+      if (cached) {
+        cached.items = cached.items.map(item => item.id === notification.id ? { ...item, is_read: true } : item)
+      }
+      if (!useAuthStore.getState().user && notification.scope === 'public') {
+        const ids = anonymousReadIds()
+        ids.add(notification.id)
+        saveAnonymousReadIds(ids)
+        return
+      }
       await api.markNotificationRead(notification.id)
     } catch {
       await get().loadUnreadCount()
+    } finally {
+      set(state => ({ markingReadIds: state.markingReadIds.filter(id => id !== notification.id) }))
     }
   },
 
   markAllRead: async () => {
+    if (get().markingAll) return
+    set({ markingAll: true })
     const filter = get().filter
-    if (!useAuthStore.getState().user) {
-      const ids = anonymousReadIds()
-      get().items.filter(item => item.scope === filter).forEach(item => ids.add(item.id))
-      saveAnonymousReadIds(ids)
-      set(state => ({
-        items: state.items.map(item => item.scope === filter ? { ...item, is_read: true } : item),
-        unreadCount: filter === 'public' ? Math.max(0, state.unreadCount - state.publicUnread) : Math.max(0, state.unreadCount - state.privateUnread),
-        publicUnread: filter === 'public' ? 0 : state.publicUnread,
-        privateUnread: filter === 'private' ? 0 : state.privateUnread,
-      }))
-      const cached = notificationCache.get(filter)
-      if (cached) cached.items = cached.items.map(item => ({ ...item, is_read: true }))
-      return
-    }
     try {
+      if (!useAuthStore.getState().user) {
+        const ids = anonymousReadIds()
+        get().items.filter(item => item.scope === filter).forEach(item => ids.add(item.id))
+        saveAnonymousReadIds(ids)
+        set(state => ({
+          items: state.items.map(item => item.scope === filter ? { ...item, is_read: true } : item),
+          unreadCount: filter === 'public' ? Math.max(0, state.unreadCount - state.publicUnread) : Math.max(0, state.unreadCount - state.privateUnread),
+          publicUnread: filter === 'public' ? 0 : state.publicUnread,
+          privateUnread: filter === 'private' ? 0 : state.privateUnread,
+        }))
+        const cached = notificationCache.get(filter)
+        if (cached) cached.items = cached.items.map(item => ({ ...item, is_read: true }))
+        return
+      }
       await api.markAllNotificationsRead(filter)
       set(state => ({
         items: state.items.map(item => item.scope === filter ? { ...item, is_read: true } : item),
@@ -250,6 +262,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       await get().loadUnreadCount()
     } catch {
       // request helper 已经提示错误。
+    } finally {
+      set({ markingAll: false })
     }
   },
+
+  isMarkingRead: (id: number) => get().markingReadIds.includes(id),
 }))

@@ -108,11 +108,11 @@ test('首次打开后台管理不刷新页面并正确显示公告内容', async
   await page.getByRole('button', { name: '新建通知' }).click()
   await page.getByText('留空立即发布').click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.mouse.click(100, 100)
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.getByText('选择日期').click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.mouse.click(100, 100)
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })

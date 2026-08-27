@@ -2,12 +2,14 @@ import { Star, Users, MessageCircle, Heart } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { CoverImage } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 
 interface CommentListViewProps {
   items: ContentItem[]
   onSelect: (id: number) => void
   isFavorited?: (id: number) => boolean
   onToggleFavorite?: (id: number) => void
+  isFavoritePending?: (id: number) => boolean
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -19,7 +21,7 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 /** 评论列表视图：每行左侧番剧信息，右侧朋友们的评分/评论动态（气泡样式） */
-export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite }: CommentListViewProps) {
+export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite, isFavoritePending }: CommentListViewProps) {
   if (items.length === 0) {
     return (
       <div className="flex items-center justify-center py-32">
@@ -54,6 +56,8 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                     e.stopPropagation()
                     onToggleFavorite(item.id)
                   }}
+                  disabled={isFavoritePending?.(item.id)}
+                  aria-busy={isFavoritePending?.(item.id) || undefined}
                   className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-150 hover:scale-110"
                   style={{
                     background: isFavorited?.(item.id) ? '#FB71A7' : 'rgba(255, 255, 255, 0.9)',
@@ -62,11 +66,13 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                   }}
                   title={isFavorited?.(item.id) ? '取消收藏' : '收藏'}
                 >
-                  <Heart
-                    size={13}
-                    fill={isFavorited?.(item.id) ? 'white' : 'none'}
-                    color={isFavorited?.(item.id) ? 'white' : 'var(--text-muted)'}
-                  />
+                  {isFavoritePending?.(item.id) ? <LoadingIcon size={13} /> : (
+                    <Heart
+                      size={13}
+                      fill={isFavorited?.(item.id) ? 'white' : 'none'}
+                      color={isFavorited?.(item.id) ? 'white' : 'var(--text-muted)'}
+                    />
+                  )}
                 </button>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ContentFormDialog } from '@/components/content/ContentFormDialog'
@@ -25,10 +25,12 @@ describe('ContentFormDialog 周历导入', () => {
       tags: ['奇幻', '冒险'],
     })
     const createContent = vi.spyOn(api, 'createContent').mockResolvedValue({ id: 88 })
+    const onSaved = vi.fn()
     const view = render(
       <ContentFormDialog
         open
         onClose={vi.fn()}
+        onSaved={onSaved}
         initialBangumiSubjectId={1002}
         initialBangumiTitle="周历番剧"
         initialBangumiTitleAlt="Weekly Anime"
@@ -51,6 +53,30 @@ describe('ContentFormDialog 周历导入', () => {
       source_id: '1002',
       source_url: 'https://bangumi.tv/subject/1002',
     }))
+    expect(onSaved).toHaveBeenCalledWith({ contentId: 88, operation: 'created' })
+  })
+
+  it('添加模式仅显示两种类型，并支持封面失败后手动重新加载', async () => {
+    const view = render(<ContentFormDialog open onClose={vi.fn()} />)
+    const typeButton = view.getByRole('button', { name: '类型' })
+    fireEvent.click(typeButton)
+    expect(view.getByRole('option', { name: '番剧' })).toBeInTheDocument()
+    expect(view.getByRole('option', { name: '动画电影' })).toBeInTheDocument()
+    expect(view.queryByRole('option', { name: '电影' })).not.toBeInTheDocument()
+    fireEvent.click(view.getByRole('option', { name: '番剧' }))
+
+    const coverInput = view.getByPlaceholderText('https://...')
+    fireEvent.change(coverInput, { target: { value: 'https://img.example/cover.jpg' } })
+    const image = await view.findByAltText('封面预览')
+    fireEvent.error(image)
+    expect(view.getByText('封面加载失败，请重试')).toBeInTheDocument()
+
+    const retryButton = view.getByRole('button', { name: '重新加载' })
+    expect(retryButton).not.toBeDisabled()
+    const failedSrc = image.getAttribute('src')
+    fireEvent.click(retryButton)
+    expect(retryButton).toBeDisabled()
+    expect(view.getByAltText('封面预览').getAttribute('src')).not.toBe(failedSrc)
   })
 
   it('Bangumi 详情失败时保留周历标题并继续打开弹窗', async () => {

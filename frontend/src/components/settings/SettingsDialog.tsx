@@ -12,6 +12,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog'
 import { X, Pencil } from 'lucide-react'
 import type { AvatarCrop } from '@/types'
@@ -46,6 +47,7 @@ export function SettingsDialog() {
   const [editingNickname, setEditingNickname] = useState(false)
   const [nickname, setNickname] = useState('')
   const [nicknameError, setNicknameError] = useState('')
+  const [nicknameSaving, setNicknameSaving] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
   const [cropFile, setCropFile] = useState<File | null>(null)
@@ -130,6 +132,8 @@ export function SettingsDialog() {
       setNicknameError('昵称没有变化')
       return
     }
+    if (nicknameSaving) return
+    setNicknameSaving(true)
     try {
       const updated = await api.updateNickname(value)
       setUser({ ...user!, ...updated, role: updated.role as 'user' | 'admin' | 'super_admin' })
@@ -137,6 +141,8 @@ export function SettingsDialog() {
       cancelEditNickname()
     } catch (err: any) {
       setNicknameError(err.message || '昵称修改失败')
+    } finally {
+      setNicknameSaving(false)
     }
   }
 
@@ -167,6 +173,7 @@ export function SettingsDialog() {
   }
 
   const handleAvatarDelete = async () => {
+    if (avatarUploading || !user?.avatar_url) return
     setAvatarUploading(true)
     setAvatarError('')
     try {
@@ -229,9 +236,12 @@ export function SettingsDialog() {
                   </button>
                   <button
                     type="button"
-                    onClick={e => { e.stopPropagation(); handleAvatarDelete() }}
-                    className="text-[10px] text-white px-1.5 py-0.5 rounded hover:bg-white/25 transition-colors"
+                    onClick={e => { e.stopPropagation(); void handleAvatarDelete() }}
+                    disabled={avatarUploading}
+                    aria-busy={avatarUploading || undefined}
+                    className="inline-flex items-center gap-1 text-[10px] text-white px-1.5 py-0.5 rounded hover:bg-white/25 transition-colors disabled:opacity-50"
                   >
+                    {avatarUploading && <LoadingIcon size={11} />}
                     删除
                   </button>
                 </div>
@@ -258,7 +268,7 @@ export function SettingsDialog() {
                   className="h-8 flex-1 text-sm"
                   autoFocus
                 />
-                <Button type="submit" className="h-8 px-3 text-xs">保存</Button>
+                <Button type="submit" loading={nicknameSaving} className="h-8 px-3 text-xs">保存</Button>
                 <button
                   type="button"
                   onClick={cancelEditNickname}
@@ -386,10 +396,11 @@ export function SettingsDialog() {
                 <button
                   onClick={() => loadActivity(activityPage + 1)}
                   disabled={activityLoading}
-                  className="w-full py-1.5 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+                  aria-busy={activityLoading || undefined}
+                  className="inline-flex w-full items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all duration-150 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                   style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
                 >
-                  {activityLoading ? '加载中...' : `加载更多（${activity.length}/${activityTotal}）`}
+                  {activityLoading ? <><LoadingIcon size={13} /> 加载中...</> : `加载更多（${activity.length}/${activityTotal}）`}
                 </button>
               )}
             </div>
@@ -447,6 +458,7 @@ function PasswordChangeModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (loading) return
 
     if (newPassword.length < 6) {
       setError('新密码至少 6 位')

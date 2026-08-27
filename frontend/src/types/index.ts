@@ -181,7 +181,7 @@ export interface ResourceSubscription {
 }
 
 export type NotificationScope = 'public' | 'private'
-export type NotificationKind = 'announcement' | 'resource_update' | 'system'
+export type NotificationKind = 'announcement' | 'resource_update' | 'content_activity' | 'system'
 
 export interface NotificationItem {
   id: number

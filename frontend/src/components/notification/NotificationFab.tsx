@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 
 import { NotificationPanel } from '@/components/notification/NotificationPanel'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore } from '@/stores/notification-store'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 
 export function NotificationCenter() {
   const { user } = useAuthStore()
@@ -12,6 +13,7 @@ export function NotificationCenter() {
   const openPanel = useNotificationStore(state => state.openPanel)
   const closePanel = useNotificationStore(state => state.closePanel)
   const loadUnreadCount = useNotificationStore(state => state.loadUnreadCount)
+  const [opening, setOpening] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -31,6 +33,20 @@ export function NotificationCenter() {
     return () => window.clearInterval(timer)
   }, [loadUnreadCount, user?.id])
 
+  const handleToggle = async () => {
+    if (open) {
+      closePanel()
+      return
+    }
+    if (opening) return
+    setOpening(true)
+    try {
+      await openPanel()
+    } finally {
+      setOpening(false)
+    }
+  }
+
   return (
     <>
       <div ref={containerRef} className="relative">
@@ -38,11 +54,13 @@ export function NotificationCenter() {
           type="button"
           aria-label="打开通知"
           aria-expanded={open}
-          onClick={() => open ? closePanel() : void openPanel()}
-          className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+          onClick={() => void handleToggle()}
+          disabled={opening}
+          aria-busy={opening || undefined}
+          className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
           style={{ color: open ? '#FB71A7' : 'var(--text-secondary)' }}
         >
-          <Bell size={17} />
+          {opening ? <LoadingIcon size={17} /> : <Bell size={17} />}
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 min-w-4 rounded-full px-1 text-center text-[9px] font-bold leading-4" style={{ background: '#ef4444', color: 'white', border: '2px solid var(--bg-card)' }}>
               {unreadCount > 99 ? '99+' : unreadCount}

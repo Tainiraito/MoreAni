@@ -12,6 +12,7 @@ import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
 import { CollapsibleText } from '@/components/ui/CollapsibleText'
 import { AnimeResourceDialog } from '@/components/content/AnimeResourceDialog'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
@@ -41,10 +42,11 @@ interface Review {
 
 interface ContentDetailDialogProps {
   isFavorited?: boolean
+  isFavoritePending?: boolean
   onToggleFavorite?: (id: number) => void
 }
 
-export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: ContentDetailDialogProps) {
+export function ContentDetailDialog({ isFavorited = false, isFavoritePending = false, onToggleFavorite }: ContentDetailDialogProps) {
   const { detailOpen, detailContentId, closeDetail, openEditContent, resourceFocus, clearResourceFocus } = useUIStore()
   const maskProps = useMaskClose(closeDetail)
   useLockBodyScroll(detailOpen)
@@ -60,6 +62,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   const [allReviews, setAllReviews] = useState<Review[]>([])
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
+  const [savingRating, setSavingRating] = useState(false)
+  const [deletingRating, setDeletingRating] = useState(false)
   const [editing, setEditing] = useState(false)
   const [resourceOpen, setResourceOpen] = useState(false)
   const previousDetailKey = useRef<string | null>(null)
@@ -139,6 +143,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
     if (!content || !user) return
     // 允许「只打分不评论」和「只评论不打分」；两者都空才阻止
     if (score <= 0 && !reviewText.trim()) return
+    if (savingRating || deletingRating) return
+    setSavingRating(true)
     try {
       await api.upsertRating({
         content_id: content.id,
@@ -151,11 +157,14 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
       addToast('success', '评分已保存')
     } catch (err: any) {
       addToast('error', err.message || '保存失败')
+    } finally {
+      setSavingRating(false)
     }
   }
 
   const handleDeleteRating = async () => {
-    if (!myRatingId) return
+    if (!myRatingId || deletingRating || savingRating) return
+    setDeletingRating(true)
     try {
       await api.deleteRating(myRatingId)
       setScore(0)
@@ -175,6 +184,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
       addToast('success', '评分已删除')
     } catch {
       addToast('error', '删除失败')
+    } finally {
+      setDeletingRating(false)
     }
   }
 
@@ -184,7 +195,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
   }
 
   const handleFetchBangumiScore = async () => {
-    if (!content) return
+    if (!content || bangumiLoading) return
     setBangumiLoading(true)
     try {
       let bgmId = content.source_id ? parseInt(content.source_id) : null
@@ -245,6 +256,8 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
           {user && (
             <button
               onClick={handleToggleFavorite}
+              disabled={isFavoritePending}
+              aria-busy={isFavoritePending || undefined}
               className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
               style={{
                 background: isFavorited ? '#FB71A7' : 'var(--bg-card)',
@@ -264,7 +277,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                 }
               }}
             >
-              <Heart size={14} fill={isFavorited ? 'white' : 'none'} />
+              {isFavoritePending ? <LoadingIcon size={14} /> : <Heart size={14} fill={isFavorited ? 'white' : 'none'} />}
             </button>
           )}
           {user && content && (
@@ -290,6 +303,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
           )}
           <button
             onClick={closeDetail}
+            aria-label="关闭详情"
             className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
             style={{
               background: 'var(--bg-card)',
@@ -533,6 +547,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                           <button
                             onClick={handleFetchBangumiScore}
                             disabled={bangumiLoading}
+                            aria-busy={bangumiLoading || undefined}
                             className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80 disabled:opacity-50"
                             style={{
                               background: 'var(--bg-card)',
@@ -541,7 +556,7 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                             }}
                           >
                             {bangumiLoading ? (
-                              <div className="animate-spin w-3 h-3 border rounded-full" style={{ borderColor: 'var(--border-line)', borderTopColor: '#FB71A7' }} />
+                              <LoadingIcon size={12} />
                             ) : (
                               <ExternalLink size={10} />
                             )}
@@ -552,10 +567,12 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                           <>
                             <button
                               onClick={handleDeleteRating}
-                              className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80"
+                              disabled={deletingRating || savingRating}
+                              aria-busy={deletingRating || undefined}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                               style={{ background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}
                             >
-                              <Trash2 size={10} />
+                              {deletingRating ? <LoadingIcon size={12} /> : <Trash2 size={10} />}
                               删除
                             </button>
                             <button
@@ -620,9 +637,12 @@ export function ContentDetailDialog({ isFavorited = false, onToggleFavorite }: C
                     {/* 保存（score=0 也可保存：只写评论不打分） */}
                     <button
                       onClick={handleSave}
-                      className="mt-2 w-full py-2 text-sm font-semibold rounded-lg transition-all duration-200 hover:opacity-80"
+                      disabled={savingRating || deletingRating || (score <= 0 && !reviewText.trim())}
+                      aria-busy={savingRating || undefined}
+                      className="mt-2 inline-flex w-full items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all duration-200 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ background: '#FB71A7', color: 'white', border: 'none' }}
                     >
+                      {savingRating && <LoadingIcon size={15} />}
                       保存
                     </button>
                   </div>

@@ -14,6 +14,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import { formatAnnouncementTime } from '@/components/admin/announcement-utils'
 import { formatDate, toLocalDateTimeInput, toUtcISOString } from '@/lib/utils'
 import { X, Search, Plus, Pencil, Trash2, Shield, Users, KeyRound, Megaphone } from 'lucide-react'
@@ -135,10 +136,14 @@ function UserManageTab() {
   const [form, setForm] = useState<AdminUserForm>({ username: '', nickname: '', password: '', role: 'user' })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null)
   const PAGE_SIZE = 15
   const initialLoadRef = useRef(false)
+  const loadingUsersRef = useRef(false)
 
   const loadUsers = async (p = 1, search = q) => {
+    if (loadingUsersRef.current) return
+    loadingUsersRef.current = true
     setLoading(true)
     try {
       const data = await api.adminListUsers({ page: String(p), size: String(PAGE_SIZE), ...(search ? { q: search } : {}) })
@@ -149,6 +154,7 @@ function UserManageTab() {
       useToastStore.getState().addToast('error', err.message || '加载用户失败')
     } finally {
       setLoading(false)
+      loadingUsersRef.current = false
     }
   }
 
@@ -178,6 +184,7 @@ function UserManageTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     setFormError('')
     if (!form.username.trim()) { setFormError('账号不能为空'); return }
     if (!editing && form.password.length < 6) { setFormError('密码至少 6 位'); return }
@@ -208,6 +215,8 @@ function UserManageTab() {
   }
 
   const handleDelete = async (u: User) => {
+    if (deletingUserId !== null) return
+    setDeletingUserId(u.id)
     try {
       await api.adminDeleteUser(u.id)
       useToastStore.getState().addToast('success', `已删除 ${u.nickname}`)
@@ -216,6 +225,8 @@ function UserManageTab() {
     } catch (err: any) {
       setConfirmDelete(null)
       useToastStore.getState().addToast('error', err.message || '删除失败')
+    } finally {
+      setDeletingUserId(null)
     }
   }
 
@@ -293,10 +304,12 @@ function UserManageTab() {
         {users.length < total && (
           <button
             onClick={() => loadUsers(page + 1, q)}
-            className="w-full py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+            disabled={loading}
+            aria-busy={loading || undefined}
+            className="inline-flex w-full items-center justify-center gap-1.5 py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
           >
-            {loading ? '加载中...' : `加载更多（${users.length}/${total}）`}
+            {loading ? <><LoadingIcon size={13} /> 加载中...</> : `加载更多（${users.length}/${total}）`}
           </button>
         )}
       </div>
@@ -355,7 +368,7 @@ function UserManageTab() {
               将同时删除其全部评分、评论和收藏，且不可恢复
             </p>
             <div className="flex gap-2 mt-4">
-              <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
+              <Button onClick={() => void handleDelete(confirmDelete)} loading={deletingUserId === confirmDelete.id} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
               <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
             </div>
           </div>
@@ -381,10 +394,14 @@ function InviteManageTab() {
   const [form, setForm] = useState<InviteForm>({ code: '', max_uses: '1', expires_at: '' })
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deletingInviteId, setDeletingInviteId] = useState<number | null>(null)
   const PAGE_SIZE = 20
   const initialLoadRef = useRef(false)
+  const loadingInvitesRef = useRef(false)
 
   const loadInvites = async (p = 1, search = q) => {
+    if (loadingInvitesRef.current) return
+    loadingInvitesRef.current = true
     setLoading(true)
     try {
       const data = await api.adminListInvites({ page: String(p), size: String(PAGE_SIZE), ...(search ? { q: search } : {}) })
@@ -395,6 +412,7 @@ function InviteManageTab() {
       useToastStore.getState().addToast('error', err.message || '加载邀请码失败')
     } finally {
       setLoading(false)
+      loadingInvitesRef.current = false
     }
   }
 
@@ -424,6 +442,7 @@ function InviteManageTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     setFormError('')
     if (!form.code.trim() && !editing) { /* 留空自动生成 */ }
     const payload: Record<string, string> = { code: form.code.trim(), max_uses: form.max_uses || '1' }
@@ -447,6 +466,8 @@ function InviteManageTab() {
   }
 
   const handleDelete = async (i: InviteCode) => {
+    if (deletingInviteId !== null) return
+    setDeletingInviteId(i.id)
     try {
       await api.adminDeleteInvite(i.id)
       useToastStore.getState().addToast('success', `已删除邀请码 ${i.code}`)
@@ -455,6 +476,8 @@ function InviteManageTab() {
     } catch (err: any) {
       setConfirmDelete(null)
       useToastStore.getState().addToast('error', err.message || '删除失败')
+    } finally {
+      setDeletingInviteId(null)
     }
   }
 
@@ -539,10 +562,12 @@ function InviteManageTab() {
         {invites.length < total && (
           <button
             onClick={() => loadInvites(page + 1, q)}
-            className="w-full py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80"
+            disabled={loading}
+            aria-busy={loading || undefined}
+            className="inline-flex w-full items-center justify-center gap-1.5 py-2 text-xs rounded-lg transition-all duration-150 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: '#FB71A7', border: '1px dashed rgba(251, 113, 167, 0.4)' }}
           >
-            {loading ? '加载中...' : `加载更多（${invites.length}/${total}）`}
+            {loading ? <><LoadingIcon size={13} /> 加载中...</> : `加载更多（${invites.length}/${total}）`}
           </button>
         )}
       </div>
@@ -592,7 +617,7 @@ function InviteManageTab() {
               删除后该邀请码无法再用于注册
             </p>
             <div className="flex gap-2 mt-4">
-              <Button onClick={() => handleDelete(confirmDelete)} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
+              <Button onClick={() => void handleDelete(confirmDelete)} loading={deletingInviteId === confirmDelete.id} className="flex-1" style={{ background: 'var(--accent-coral)', color: 'white' }}>删除</Button>
               <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">取消</Button>
             </div>
           </div>
@@ -638,9 +663,13 @@ function AnnouncementManageTab() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<number | null>(null)
   const initialLoadRef = useRef(false)
+  const loadingAnnouncementsRef = useRef(false)
 
   const loadAnnouncements = async () => {
+    if (loadingAnnouncementsRef.current) return
+    loadingAnnouncementsRef.current = true
     setLoading(true)
     try {
       const response = await api.adminListAnnouncements({ page: '1', size: '50' })
@@ -649,6 +678,7 @@ function AnnouncementManageTab() {
       useToastStore.getState().addToast('error', err.message || '加载公共通知失败')
     } finally {
       setLoading(false)
+      loadingAnnouncementsRef.current = false
     }
   }
 
@@ -680,6 +710,7 @@ function AnnouncementManageTab() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
     if (!form.title.trim() || !form.body.trim()) {
       setFormError('标题和正文不能为空')
       return
@@ -717,12 +748,16 @@ function AnnouncementManageTab() {
   }
 
   const handleDelete = async (announcement: Announcement) => {
+    if (deletingAnnouncementId !== null) return
+    setDeletingAnnouncementId(announcement.id)
     try {
       await api.adminDeleteAnnouncement(announcement.id)
       useToastStore.getState().addToast('success', '公共通知已删除')
       await loadAnnouncements()
     } catch (err: any) {
       useToastStore.getState().addToast('error', err.message || '删除失败')
+    } finally {
+      setDeletingAnnouncementId(null)
     }
   }
 
@@ -754,7 +789,7 @@ function AnnouncementManageTab() {
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <button type="button" onClick={() => openEdit(announcement)} className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--text-muted)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} title="编辑"><Pencil size={13} /></button>
-                <button type="button" onClick={() => void handleDelete(announcement)} className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} title="删除"><Trash2 size={13} /></button>
+                <button type="button" onClick={() => void handleDelete(announcement)} disabled={deletingAnnouncementId === announcement.id} aria-busy={deletingAnnouncementId === announcement.id || undefined} className="flex h-7 w-7 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50" style={{ color: 'var(--accent-coral)', background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} title="删除">{deletingAnnouncementId === announcement.id ? <LoadingIcon size={13} /> : <Trash2 size={13} />}</button>
               </div>
             </div>
           </div>
