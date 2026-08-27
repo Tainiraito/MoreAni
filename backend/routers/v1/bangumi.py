@@ -1,6 +1,6 @@
 """Bangumi router — search and import anime from Bangumi API."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
@@ -12,6 +12,7 @@ from schemas import (
 )
 from services import bangumi as bangumi_svc
 from services import content as content_svc
+from services import covers as covers_svc
 
 router = APIRouter(prefix='/bangumi', tags=['bangumi'])
 
@@ -52,6 +53,7 @@ async def search_bangumi(
 @router.post('/import/{bgm_id}', response_model=BangumiImportResponse)
 async def import_from_bangumi(
     bgm_id: int,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BangumiImportResponse:
@@ -93,6 +95,13 @@ async def import_from_bangumi(
         source_url=f'https://bangumi.tv/subject/{bgm_id}',
         created_by=user.id,
         tag_names=tag_names,
+    )
+    background_tasks.add_task(
+        covers_svc.localize_cover_in_background,
+        content.id,
+        content.cover_url,
+        'bangumi',
+        str(bgm_id),
     )
 
     return BangumiImportResponse(content_id=content.id, status='created')

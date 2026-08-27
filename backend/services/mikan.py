@@ -7,6 +7,7 @@ import hashlib
 import logging
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -40,27 +41,70 @@ class MikanError(RuntimeError):
 
 def _proxy() -> str | None:
     """Return an explicit HTTP(S) proxy without implicitly enabling SOCKS."""
-    value = (
-        os.getenv('MIKAN_PROXY')
-        or os.getenv('HTTPS_PROXY')
-        or os.getenv('https_proxy')
-        or os.getenv('HTTP_PROXY')
-        or os.getenv('http_proxy')
-    )
-    if value and value.lower().startswith(('http://', 'https://')):
-        return value
+    for name in (
+        'MIKAN_PROXY',
+        'MOREANI_MIKAN_PROXY',
+        'MOREANI_HTTPS_PROXY',
+        'MOREANI_HTTP_PROXY',
+        'HTTPS_PROXY',
+        'https_proxy',
+        'HTTP_PROXY',
+        'http_proxy',
+    ):
+        value = os.getenv(name, '').strip()
+        if value.lower().startswith(('http://', 'https://')):
+            return value
     return None
 
 
+MIKAN_PROXY = _proxy()
+MIKAN_REQUEST_ORDER = os.getenv('MIKAN_REQUEST_ORDER', 'proxy_first').strip().lower()
+if MIKAN_REQUEST_ORDER not in {'proxy_first', 'direct_first'}:
+    MIKAN_REQUEST_ORDER = 'proxy_first'
+
+
+def _request_routes() -> list[tuple[str, str | None]]:
+    """Return Mikan request routes in proxy-first order by default."""
+    if not MIKAN_PROXY:
+        return [('direct', None)]
+    proxy_route = ('proxy', MIKAN_PROXY)
+    direct_route = ('direct', None)
+    return [proxy_route, direct_route] if MIKAN_REQUEST_ORDER == 'proxy_first' else [direct_route, proxy_route]
+
+
+_clients: dict[str, httpx.AsyncClient] = {}
+_clients_lock = threading.Lock()
+
+
+def _client_for(proxy: str | None) -> httpx.AsyncClient:
+    """Return a process-shared Mikan client for one explicit route."""
+    key = proxy or 'direct'
+    with _clients_lock:
+        client = _clients.get(key)
+        if client is None or client.is_closed:
+            client = httpx.AsyncClient(
+                timeout=MIKAN_TIMEOUT,
+                proxy=proxy,
+                trust_env=False,
+                follow_redirects=True,
+                headers={'User-Agent': 'MoreAni/2.0 resource lookup'},
+            )
+            _clients[key] = client
+        return client
+
+
 def _client() -> httpx.AsyncClient:
-    """Create an HTTP client with explicit proxy handling."""
-    return httpx.AsyncClient(
-        timeout=MIKAN_TIMEOUT,
-        proxy=_proxy(),
-        trust_env=False,
-        follow_redirects=True,
-        headers={'User-Agent': 'MoreAni/2.0 resource lookup'},
-    )
+    """Return the configured primary Mikan client for compatibility."""
+    return _client_for(MIKAN_PROXY)
+
+
+async def close_mikan_clients() -> None:
+    """Close shared Mikan clients during application shutdown."""
+    with _clients_lock:
+        clients = list(_clients.values())
+        _clients.clear()
+    if clients:
+        await asyncio.gather(*(client.aclose() for client in clients), return_exceptions=True)
 
 
 def _absolute_url(href: str, base_url: str = MIKAN_BASE_URL) -> str:
@@ -486,36 +530,60 @@ _refresh_tasks: dict[int, asyncio.Task[None]] = {}
 async def _get(url: str, client: httpx.AsyncClient | None = None) -> str:
     """Fetch a Mikan page or RSS feed as text."""
     try:
-        if client is not None:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.text
-        async with _client() as owned_client:
-            response = await owned_client.get(url)
-            response.raise_for_status()
-            return response.text
+        request_client = client or _client()
+        response = await request_client.get(url)
+        response.raise_for_status()
+        return response.text
     except (httpx.HTTPError, httpx.TimeoutException) as exc:
         raise MikanError('Mikan 暂时无法访问') from exc
 
 
-async def _get_path(path: str, client: httpx.AsyncClient | None = None) -> tuple[str, str]:
-    """Fetch a relative path from the primary Mikan host and its mirror."""
+def _ordered_bases(route: str) -> list[str]:
+    """Return Mikan hosts with the temporarily failed primary host deprioritized."""
     bases = [MIKAN_BASE_URL]
     if MIKAN_FALLBACK_BASE_URL and MIKAN_FALLBACK_BASE_URL not in bases:
         bases.append(MIKAN_FALLBACK_BASE_URL)
     now = asyncio.get_running_loop().time()
-    if len(bases) > 1 and _base_failures.get(bases[0], 0) > now:
+    if len(bases) > 1 and _base_failures.get(f'{route}:{bases[0]}', 0) > now:
         bases.reverse()
+    return bases
+
+
+async def _get_path_with_client(
+    path: str,
+    client: httpx.AsyncClient,
+    route: str,
+) -> tuple[str, str]:
+    """Fetch a relative path from Mikan hosts through one route."""
+    bases = _ordered_bases(route)
     last_error: MikanError | None = None
     for base_url in bases:
         try:
             result = await _get(f'{base_url}{path}', client)
-            _base_failures.pop(base_url, None)
+            _base_failures.pop(f'{route}:{base_url}', None)
             return result, base_url
         except MikanError as exc:
-            _base_failures[base_url] = asyncio.get_running_loop().time() + BASE_FAILURE_COOLDOWN_SECONDS
+            _base_failures[f'{route}:{base_url}'] = asyncio.get_running_loop().time() + BASE_FAILURE_COOLDOWN_SECONDS
             last_error = exc
-            logger.warning('Mikan request failed via %s', base_url)
+            logger.warning('Mikan request failed via %s route=%s', base_url, route)
+    raise last_error or MikanError('Mikan 暂时无法访问')
+
+
+async def _get_path(path: str, client: httpx.AsyncClient | None = None) -> tuple[str, str]:
+    """Fetch a relative path with proxy-first route and host fallback."""
+    if client is not None:
+        return await _get_path_with_client(path, client, 'injected')
+
+    last_error: MikanError | None = None
+    for route, proxy in _request_routes():
+        try:
+            client = _client_for(proxy)
+            return await _get_path_with_client(path, client, route)
+        except (ImportError, ValueError) as exc:
+            last_error = MikanError('Mikan 代理配置无效')
+            logger.warning('Mikan client initialization failed route=%s error=%s', route, type(exc).__name__)
+        except MikanError as exc:
+            last_error = exc
     raise last_error or MikanError('Mikan 暂时无法访问')
 
 
@@ -532,7 +600,7 @@ def _season_month(release_date: str) -> tuple[str, str] | None:
 async def _validate_candidates(
     subject_id: int,
     candidates: list[dict[str, Any]],
-    client: httpx.AsyncClient,
+    client: httpx.AsyncClient | None = None,
 ) -> dict[str, Any] | None:
     """Validate candidate detail pages with at most three active requests."""
     semaphore = asyncio.Semaphore(3)
@@ -583,61 +651,54 @@ async def _resolve_and_fetch(subject_id: int, title: str, title_alt: str, releas
     discovery_error: MikanError | None = None
     queries = tuple(dict.fromkeys(query for query in (title_alt, title) if _clean_text(query)))
 
-    async with _client() as client:
-        for query in queries:
-            try:
-                html, base_url = await _get_path(
-                    f'/Home/Search?searchstr={quote(_clean_text(query))}',
-                    client,
+    for query in queries:
+        try:
+            html, base_url = await _get_path(f'/Home/Search?searchstr={quote(_clean_text(query))}')
+        except MikanError as exc:
+            discovery_error = exc
+            logger.warning('Mikan title discovery failed for %s via %s', subject_id, query)
+            continue
+        new_candidates: list[dict[str, Any]] = []
+        for candidate in _search_candidates(html, base_url):
+            if candidate['url'] not in seen_urls and len(candidates) < MAX_CANDIDATES:
+                candidates.append(candidate)
+                seen_urls.add(candidate['url'])
+                new_candidates.append(candidate)
+        if new_candidates:
+            matched = await _validate_candidates(subject_id, new_candidates)
+            if matched:
+                logger.info(
+                    'Mikan lookup subject=%s method=title elapsed=%.3fs',
+                    subject_id,
+                    time.perf_counter() - started_at,
                 )
+                return matched
+
+    # 搜索页面通常已经足够，只有两个标题都没有候选时才回退季番接口。
+    if not candidates:
+        season = _season_month(release_date)
+        if season:
+            year, month = season
+            try:
+                html, base_url = await _get_path(f'/Home/BangumiCoverFlowByDayOfWeek?year={year}&seasonStr={month}')
+                new_candidates = []
+                for candidate in _season_candidates(html, base_url, (title, title_alt)):
+                    if candidate['url'] not in seen_urls and len(candidates) < MAX_CANDIDATES:
+                        candidates.append(candidate)
+                        seen_urls.add(candidate['url'])
+                        new_candidates.append(candidate)
+                if new_candidates:
+                    matched = await _validate_candidates(subject_id, new_candidates)
+                    if matched:
+                        logger.info(
+                            'Mikan lookup subject=%s method=season elapsed=%.3fs',
+                            subject_id,
+                            time.perf_counter() - started_at,
+                        )
+                        return matched
             except MikanError as exc:
                 discovery_error = exc
-                logger.warning('Mikan title discovery failed for %s via %s', subject_id, query)
-                continue
-            new_candidates: list[dict[str, Any]] = []
-            for candidate in _search_candidates(html, base_url):
-                if candidate['url'] not in seen_urls and len(candidates) < MAX_CANDIDATES:
-                    candidates.append(candidate)
-                    seen_urls.add(candidate['url'])
-                    new_candidates.append(candidate)
-            if new_candidates:
-                matched = await _validate_candidates(subject_id, new_candidates, client)
-                if matched:
-                    logger.info(
-                        'Mikan lookup subject=%s method=title elapsed=%.3fs',
-                        subject_id,
-                        time.perf_counter() - started_at,
-                    )
-                    return matched
-
-        # 搜索页面通常已经足够，只有两个标题都没有候选时才回退季番接口。
-        if not candidates:
-            season = _season_month(release_date)
-            if season:
-                year, month = season
-                try:
-                    html, base_url = await _get_path(
-                        f'/Home/BangumiCoverFlowByDayOfWeek?year={year}&seasonStr={month}',
-                        client,
-                    )
-                    new_candidates = []
-                    for candidate in _season_candidates(html, base_url, (title, title_alt)):
-                        if candidate['url'] not in seen_urls and len(candidates) < MAX_CANDIDATES:
-                            candidates.append(candidate)
-                            seen_urls.add(candidate['url'])
-                            new_candidates.append(candidate)
-                    if new_candidates:
-                        matched = await _validate_candidates(subject_id, new_candidates, client)
-                        if matched:
-                            logger.info(
-                                'Mikan lookup subject=%s method=season elapsed=%.3fs',
-                                subject_id,
-                                time.perf_counter() - started_at,
-                            )
-                            return matched
-                except MikanError as exc:
-                    discovery_error = exc
-                    logger.warning('Mikan seasonal discovery failed for %s', subject_id)
+                logger.warning('Mikan seasonal discovery failed for %s', subject_id)
 
     if discovery_error and not candidates:
         raise discovery_error

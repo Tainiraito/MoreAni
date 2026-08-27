@@ -35,13 +35,29 @@ WEBP_QUALITY = 82
 ALLOWED_IMAGE_FORMATS = {'JPEG', 'PNG', 'WEBP', 'GIF'}
 ALLOWED_IMAGE_DOMAINS = ('lain.bgm.tv', 'bgm.tv', 'bangumi.tv')
 HEADERS = {'User-Agent': 'MoreAni/2.0 (https://moreani.lovelysia.top)'}
-PROXY = (
-    os.environ.get('HTTPS_PROXY')
-    or os.environ.get('https_proxy')
-    or os.environ.get('HTTP_PROXY')
-    or os.environ.get('http_proxy')
-    or 'http://192.168.31.45:7890'
-)
+
+
+def _configured_proxy() -> str | None:
+    """Return the explicit cover proxy without consulting ALL_PROXY."""
+    for name in (
+        'MOREANI_COVER_PROXY',
+        'MOREANI_HTTPS_PROXY',
+        'MOREANI_HTTP_PROXY',
+        'HTTPS_PROXY',
+        'https_proxy',
+        'HTTP_PROXY',
+        'http_proxy',
+    ):
+        value = os.environ.get(name, '').strip()
+        if value.lower().startswith(('http://', 'https://')):
+            return value
+    return None
+
+
+PROXY = _configured_proxy()
+REQUEST_ORDER = os.environ.get('MOREANI_COVER_REQUEST_ORDER', 'proxy_first').strip().lower()
+if REQUEST_ORDER not in {'proxy_first', 'direct_first'}:
+    REQUEST_ORDER = 'proxy_first'
 SUBJECT_LOCKS: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
@@ -222,14 +238,22 @@ def _asset_path(subject_id: int) -> Path:
     return get_covers_dir() / 'bangumi' / f'{subject_id}.webp'
 
 
+def _request_proxies() -> list[str | None]:
+    """Return cover download routes in the configured order."""
+    if not PROXY:
+        return [None]
+    if REQUEST_ORDER == 'direct_first':
+        return [None, PROXY]
+    return [PROXY, None]
+
+
 def _download_sync_bytes(url: str) -> tuple[bytes, str | None]:
-    """Download one cover synchronously with direct-then-proxy fallback."""
+    """Download one cover synchronously with proxy-first fallback."""
     if not _is_allowed_url(url):
         raise CoverDownloadError('封面域名不在允许列表')
     timeout = httpx.Timeout(15.0, connect=5.0, pool=5.0)
     last_error: Exception | None = None
-    proxies: list[str | None] = [None] if not PROXY else [None, PROXY]
-    for proxy in proxies:
+    for proxy in _request_proxies():
         try:
             with httpx.Client(timeout=timeout, proxy=proxy, follow_redirects=False, trust_env=False) as client:
                 fetch_url = url
@@ -447,6 +471,40 @@ def localize_cover(item: ContentItem, cover_url: str | None, db: Session | None 
         return cover_url
 
 
+def localize_cover_in_background(
+    content_id: int,
+    cover_url: str | None,
+    expected_source_type: str,
+    expected_source_id: str,
+) -> None:
+    """在独立数据库会话中本地化封面，避免阻塞内容保存请求。"""
+    if not cover_url or cover_url.startswith('/api/covers/'):
+        return
+
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        item = db.query(ContentItem).filter(ContentItem.id == content_id, ContentItem.deleted_at.is_(None)).first()
+        if item is None:
+            return
+        if (
+            item.cover_url != cover_url
+            or (item.source_type or '') != expected_source_type
+            or (item.source_id or '') != expected_source_id
+        ):
+            logger.info('cover localization skipped stale content=%d', content_id)
+            return
+
+        localize_cover(item, cover_url, db)
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.warning('cover localization task failed content=%d: %s', content_id, type(exc).__name__)
+    finally:
+        db.close()
+
+
 def get_asset_url_map(db: Session, subject_ids: set[int]) -> dict[int, str]:
     """批量读取当前可用的 Bangumi 资产，避免周历卡片 N+1 查询。"""
     if not subject_ids:
@@ -518,9 +576,10 @@ async def prefetch_airing_covers(db: Session, records: list[dict[str, object]]) 
 
     semaphore = asyncio.Semaphore(_env_int('MOREANI_AIRING_COVER_CONCURRENCY', 4))
     timeout = httpx.Timeout(15.0, connect=5.0, pool=5.0)
-    clients = [httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False)]
-    if PROXY:
-        clients.append(httpx.AsyncClient(timeout=timeout, follow_redirects=False, proxy=PROXY, trust_env=False))
+    clients = [
+        httpx.AsyncClient(timeout=timeout, follow_redirects=False, proxy=proxy, trust_env=False)
+        for proxy in _request_proxies()
+    ]
 
     async def download(subject_id: int, source_url: str) -> tuple[int, str, EncodedCover | None, str | None]:
         async with semaphore, SUBJECT_LOCKS[subject_id]:
@@ -582,7 +641,10 @@ async def prefetch_airing_covers(db: Session, records: list[dict[str, object]]) 
     db.commit()
     logger.info(
         'airing cover prefetch finished: total=%d skipped=%d downloaded=%d failed=%d',
-        stats['total'], stats['skipped'], stats['downloaded'], stats['failed'],
+        stats['total'],
+        stats['skipped'],
+        stats['downloaded'],
+        stats['failed'],
     )
     return stats
 
@@ -634,8 +696,7 @@ def cleanup_orphan_cover_assets(
     retention = retention_days or _env_int('MOREANI_COVER_ORPHAN_RETENTION_DAYS', 365)
     cutoff = _utcnow_naive().timestamp() - retention * 86400
     active_subjects = {
-        str(row.subject_id)
-        for row in db.query(AiringCalendarItem).filter(AiringCalendarItem.active.is_(True)).all()
+        str(row.subject_id) for row in db.query(AiringCalendarItem).filter(AiringCalendarItem.active.is_(True)).all()
     }
     referenced_subjects = {
         str(row.source_id)
