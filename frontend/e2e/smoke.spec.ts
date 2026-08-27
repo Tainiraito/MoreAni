@@ -1,4 +1,17 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+
+async function revealHeaderControl(page: Page, control: Locator): Promise<void> {
+  await page.evaluate(() => {
+    document.body.style.minHeight = '200vh'
+  })
+  await expect.poll(async () => {
+    await page.evaluate(() => window.scrollTo(0, 200))
+    return control.evaluate(element => {
+      const bounds = element.getBoundingClientRect()
+      return bounds.bottom > 0 && bounds.top < window.innerHeight
+    })
+  }).toBe(true)
+}
 
 test('首页可以在 Chromium 中加载', async ({ page }) => {
   const pageErrors: string[] = []
@@ -65,11 +78,10 @@ test('顶部通知入口可以打开公共通知面板', async ({ page }, testIn
   })
 
   await page.goto('/')
-  await page.evaluate(() => {
-    document.body.style.minHeight = '200vh'
-    window.scrollTo(0, 200)
-  })
   const fab = page.getByRole('button', { name: '打开通知' })
+  await expect(fab).toBeAttached()
+  await revealHeaderControl(page, fab)
+  await expect(fab).toBeInViewport()
   await expect(fab).toBeVisible()
   await expect(fab.locator('span')).toHaveText('1')
   await fab.click()
@@ -205,11 +217,10 @@ test('私人番剧动态通知可以打开对应详情', async ({ page }) => {
   })
 
   await page.goto('/')
-  await page.evaluate(() => {
-    document.body.style.minHeight = '200vh'
-    window.scrollTo(0, 200)
-  })
   const fab = page.getByRole('button', { name: '打开通知' })
+  await expect(fab).toBeAttached()
+  await revealHeaderControl(page, fab)
+  await expect(fab).toBeInViewport()
   await fab.click()
   const panel = page.getByRole('dialog', { name: '通知中心' })
   await panel.getByRole('button', { name: '私人' }).click()
