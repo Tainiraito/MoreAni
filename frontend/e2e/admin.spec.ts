@@ -86,8 +86,13 @@ test('首次打开后台管理不刷新页面并正确显示公告内容', async
   page.on('framenavigated', frame => {
     if (frame === page.mainFrame()) navigations += 1
   })
+  await expect.poll(
+    () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+  ).toBeGreaterThan(80)
   await page.evaluate(() => window.scrollTo(0, 200))
-  await page.getByRole('button', { name: '打开用户菜单' }).click()
+  const userMenuButton = page.getByRole('button', { name: '打开用户菜单' })
+  await expect(userMenuButton).toBeInViewport()
+  await userMenuButton.click()
   await page.getByRole('button', { name: '后台管理' }).click()
 
   await expect(page.getByRole('heading', { name: '后台管理' })).toBeVisible()
