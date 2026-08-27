@@ -30,8 +30,8 @@ COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# 创建数据和日志目录
-RUN mkdir -p /app/data /var/log/nginx /var/log/app
+# 创建数据、日志和 Nginx 缓存目录；即使未挂载持久化缓存卷，镜像也能独立启动。
+RUN mkdir -p /app/data /var/cache/nginx/moreani /var/log/nginx /var/log/app
 
 EXPOSE 80 8000
 
