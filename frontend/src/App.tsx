@@ -129,20 +129,20 @@ function GlobalDialogs() {
     closeEditContent,
     openDetail,
   } = useUIStore()
-  const { isFavorited, isFavoritePending, toggleFavorite, loadFavorites } = useFavoriteStore()
+  const { isFavorited, isFavoritePending, toggleFavorite } = useFavoriteStore()
 
   const handleRefresh = () => {
-    loadFavorites()
     void queryClient.invalidateQueries({ queryKey: ['airing-week'] })
     useRefreshStore.getState().triggerRefresh()
   }
 
   const handleContentSaved = (event: ContentFormSavedEvent) => {
-    handleRefresh()
     if (event.operation === 'created' && addAnimePreset?.openDetailAfterSave) {
       closeAddAnime()
       openDetail(event.contentId)
     }
+    // 让表单先卸载，再触发列表刷新；刷新请求不会阻塞保存完成和弹窗关闭。
+    queueMicrotask(handleRefresh)
   }
 
   return (

@@ -60,6 +60,8 @@ def _configured_proxy() -> str | None:
         (
             value.strip()
             for value in (
+                os.getenv('MOREANI_HTTPS_PROXY'),
+                os.getenv('MOREANI_HTTP_PROXY'),
                 os.getenv('HTTPS_PROXY'),
                 os.getenv('https_proxy'),
                 os.getenv('HTTP_PROXY'),

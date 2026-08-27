@@ -161,7 +161,6 @@ export function ContentFormDialog({
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [selectingBangumiId, setSelectingBangumiId] = useState<number | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bangumiRequestInFlight = useRef(false)
 
@@ -282,7 +281,6 @@ export function ContentFormDialog({
       setShowDropdown(false)
       setConfirmDelete(false)
       setDeleting(false)
-      setSelectingBangumiId(null)
     }
   }, [open, isEditMode])
 
@@ -291,31 +289,14 @@ export function ContentFormDialog({
     setForm(prev => ({ ...prev, [key]: value }))
 
   // ── Bangumi auto-fill ──
-  const handleBangumiSelect = async (item: BangumiItem) => {
-    if (selectingBangumiId !== null || bangumiRequestInFlight.current) return
-    setSelectingBangumiId(item.bgm_id)
+  const handleBangumiSelect = (item: BangumiItem) => {
+    if (bangumiRequestInFlight.current) return
     const selectedForm = bangumiToForm(item)
     setForm(previous => isEditMode ? { ...selectedForm, content_type: previous.content_type } : selectedForm)
     setShowDropdown(false)
     setResults([])
     setQuery('')
     addToast('success', `已填入「${item.name_cn || item.name}」的信息`)
-
-    // Fetch full details to get tags + summary (search API doesn't return them)
-    try {
-      const detail = await api.getBangumiDetail(item.bgm_id) as { tags?: string[]; summary?: string }
-      if ((detail.tags && detail.tags.length > 0) || detail.summary) {
-        setForm(prev => ({
-          ...prev,
-          tags: detail.tags && detail.tags.length > 0 ? detail.tags!.join(', ') : prev.tags,
-          description: detail.summary || prev.description,
-        }))
-      }
-    } catch {
-      // Tags fetch failed — not critical
-    } finally {
-      setSelectingBangumiId(null)
-    }
   }
 
   // ── Re-fetch from Bangumi (edit mode) ──
@@ -570,8 +551,7 @@ export function ContentFormDialog({
                       <button
                         key={item.bgm_id}
                         type="button"
-                        disabled={selectingBangumiId !== null || saving || deleting}
-                        aria-busy={selectingBangumiId === item.bgm_id || undefined}
+                        disabled={saving || deleting}
                         className="w-full text-left flex gap-3 p-3 transition-all duration-200 hover:opacity-80 cursor-pointer"
                         style={{ borderBottom: '1px solid var(--border-line)' }}
                         onClick={() => handleBangumiSelect(item)}
@@ -611,7 +591,6 @@ export function ContentFormDialog({
                             {item.air_date && <span>{item.air_date}</span>}
                           </div>
                         </div>
-                        {selectingBangumiId === item.bgm_id && <LoadingIcon size={16} className="mt-2 shrink-0" />}
                       </button>
                     ))
                   ) : (

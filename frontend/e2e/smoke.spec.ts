@@ -16,7 +16,7 @@ test('首页可以在 Chromium 中加载', async ({ page }) => {
   expect(pageErrors).toEqual([])
 })
 
-test('顶部通知入口可以打开公共通知面板', async ({ page }) => {
+test('顶部通知入口可以打开公共通知面板', async ({ page }, testInfo) => {
   await page.route('**/api/v1/content/recommendations**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -78,6 +78,11 @@ test('顶部通知入口可以打开公共通知面板', async ({ page }) => {
   await expect(panel.getByLabel('通知加载中')).toBeVisible()
   await expect(panel.locator('[data-slot="skeleton"]')).toHaveCount(12)
   await expect(panel).toContainText('测试公告')
+  const viewportWidth = await page.evaluate(() => window.innerWidth)
+  const panelBounds = await panel.boundingBox()
+  expect(panelBounds).not.toBeNull()
+  expect(panelBounds!.x).toBeGreaterThanOrEqual(0)
+  expect(panelBounds!.x + panelBounds!.width).toBeLessThanOrEqual(viewportWidth)
   await expect(panel.getByText('展开公告')).toHaveCount(1)
   await expect(panel.getByRole('button', { name: /测试公告/ })).not.toHaveAttribute('aria-expanded', 'true')
   await panel.getByText('展开公告').click()
@@ -87,7 +92,7 @@ test('顶部通知入口可以打开公共通知面板', async ({ page }) => {
   await expect(panel.getByRole('button', { name: '全部' })).toHaveCount(0)
   expect((await panel.boundingBox())?.height).toBe(initialHeight)
   if (process.env.QA_SCREENSHOTS === '1') {
-    await page.screenshot({ path: '/tmp/moreani-notification-panel.png', fullPage: false })
+    await page.screenshot({ path: `/tmp/moreani-notification-panel-${testInfo.project.name}.png`, fullPage: false })
   }
   await panel.getByRole('button', { name: '私人' }).click()
   await expect(panel).toContainText('登录后可以关注字幕组并接收资源更新通知')
