@@ -224,7 +224,9 @@ def test_cover_url_change_and_corrupt_file_trigger_download(db, tmp_path, monkey
     asyncio.run(covers.prefetch_airing_covers(db, [{'subject_id': 1002, 'cover_url': 'https://lain.bgm.tv/old.jpg'}]))
     first_path = tmp_path / 'covers' / 'bangumi' / '1002.webp'
     first_path.write_bytes(b'broken')
-    second = asyncio.run(covers.prefetch_airing_covers(db, [{'subject_id': 1002, 'cover_url': 'https://lain.bgm.tv/new.jpg'}]))
+    second = asyncio.run(
+        covers.prefetch_airing_covers(db, [{'subject_id': 1002, 'cover_url': 'https://lain.bgm.tv/new.jpg'}])
+    )
 
     assert second['downloaded'] == 1
     assert calls == 2
@@ -265,7 +267,9 @@ def test_legacy_content_cover_is_reused_without_external_download(db, tmp_path, 
         raise AssertionError('legacy cover should not download from CDN')
 
     monkeypatch.setattr(covers, '_download_async_bytes', unexpected_download)
-    result = asyncio.run(covers.prefetch_airing_covers(db, [{'subject_id': 1004, 'cover_url': 'https://lain.bgm.tv/1004.jpg'}]))
+    result = asyncio.run(
+        covers.prefetch_airing_covers(db, [{'subject_id': 1004, 'cover_url': 'https://lain.bgm.tv/1004.jpg'}])
+    )
 
     assert result['downloaded'] == 1
     assert (tmp_path / 'covers' / 'bangumi' / '1004.webp').is_file()

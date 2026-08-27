@@ -169,9 +169,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
     if not content_ids:
         return {}
 
-    activity_condition = (Rating.score > 0) | (
-        Rating.review.isnot(None) & (Rating.review != '')
-    )
+    activity_condition = (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != ''))
     rows = (
         db.query(
             Rating.content_id,
@@ -233,8 +231,7 @@ def get_recent_reviews_map(
         .join(User, Rating.user_id == User.id)
         .filter(
             Rating.content_id.in_(content_ids),
-            (Rating.score > 0)
-            | (Rating.review.isnot(None) & (Rating.review != '')),
+            (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
         )
         .order_by(Rating.updated_at.desc())
         .all()

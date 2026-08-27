@@ -319,6 +319,4 @@ class CoverAsset(Base):
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
-    __table_args__ = (
-        UniqueConstraint('source_type', 'source_id', name='uq_cover_asset_source'),
-    )
+    __table_args__ = (UniqueConstraint('source_type', 'source_id', name='uq_cover_asset_source'),)
