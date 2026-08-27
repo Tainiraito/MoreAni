@@ -68,7 +68,7 @@ def delete_rating(db: Session, rating: Rating) -> None:
 def get_rating_stats(db: Session, content_id: int) -> dict:
     """Calculate rating statistics for a content item.
 
-    Returns dict with avg_score, avg_recommend, rating_count.
+    Returns dict with avg_score, avg_recommend, rating_count, review_count, and activity_count.
     score=0 means 'no rating' — excluded from average.
     """
     return get_rating_stats_map(db, [content_id]).get(
@@ -78,6 +78,7 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
             'avg_recommend': None,
             'rating_count': 0,
             'review_count': 0,
+            'activity_count': 0,
         },
     )
 
@@ -87,6 +88,9 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
     if not content_ids:
         return {}
 
+    activity_condition = (Rating.score > 0) | (
+        Rating.review.isnot(None) & (Rating.review != '')
+    )
     rows = (
         db.query(
             Rating.content_id,
@@ -101,6 +105,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
                     )
                 )
             ).label('review_count'),
+            func.count(case((activity_condition, Rating.id))).label('activity_count'),
         )
         .filter(Rating.content_id.in_(content_ids))
         .group_by(Rating.content_id)
@@ -112,6 +117,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
             'avg_recommend': round(float(row.avg_recommend), 1) if row.avg_recommend else None,
             'rating_count': row.rating_count or 0,
             'review_count': row.review_count or 0,
+            'activity_count': row.activity_count or 0,
         }
         for row in rows
     }
@@ -134,7 +140,7 @@ def get_recent_reviews_map(
     content_ids: list[int],
     limit: int = 3,
 ) -> dict[int, list[dict]]:
-    """Get recent N reviews for each content id (batch query, avoids N+1).
+    """Get recent N rating/review activities for each content id (batch query, avoids N+1).
 
     Returns {content_id: [ {nickname, avatar_id, score, review, created_at}, ... ]}
     """
@@ -146,8 +152,8 @@ def get_recent_reviews_map(
         .join(User, Rating.user_id == User.id)
         .filter(
             Rating.content_id.in_(content_ids),
-            Rating.review.isnot(None),
-            Rating.review != '',
+            (Rating.score > 0)
+            | (Rating.review.isnot(None) & (Rating.review != '')),
         )
         .order_by(Rating.updated_at.desc())
         .all()

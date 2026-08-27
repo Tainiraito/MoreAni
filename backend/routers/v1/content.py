@@ -44,12 +44,19 @@ def _to_response(
         resp.cover_url = cover_url
     stats = stats_map.get(
         item.id,
-        {'avg_score': None, 'avg_recommend': None, 'rating_count': 0, 'review_count': 0},
+        {
+            'avg_score': None,
+            'avg_recommend': None,
+            'rating_count': 0,
+            'review_count': 0,
+            'activity_count': 0,
+        },
     )
     resp.avg_score = stats['avg_score']
     resp.avg_recommend = stats['avg_recommend']
     resp.rating_count = stats['rating_count']
     resp.review_count = stats['review_count']
+    resp.activity_count = stats['activity_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
     resp.recent_reviews = [RecentReview(**r) for r in recent_map.get(item.id, [])]
     my_rating = user_ratings_map.get(item.id)

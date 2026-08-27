@@ -153,7 +153,7 @@ class ContentItemUpdate(BaseModel):
 
 
 class RecentReview(BaseModel):
-    """A recent review snippet shown in list views."""
+    """A recent rating or review activity shown in list views."""
 
     nickname: str = ''
     avatar_id: int = 0
@@ -203,6 +203,7 @@ class ContentItemResponse(BaseModel):
     avg_recommend: float | None = None
     rating_count: int | None = None
     review_count: int | None = None
+    activity_count: int | None = None
     tags: list[TagResponse] = []
     recent_reviews: list[RecentReview] = []
     # User-specific fields (only in list endpoint when authenticated)
