@@ -35,8 +35,11 @@ if (!('ResizeObserver' in window)) {
     private readonly handleResize = (): void => {
       this.callback([], this)
     }
+    private readonly callback: ResizeObserverCallback
 
-    constructor(private readonly callback: ResizeObserverCallback) {}
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback
+    }
 
     disconnect(): void {
       window.removeEventListener('resize', this.handleResize)

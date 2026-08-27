@@ -6,15 +6,20 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore } from '@/stores/notification-store'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 
+const FOREGROUND_REFRESH_DEDUP_WINDOW = 5_000
+
 export function NotificationCenter() {
   const { user } = useAuthStore()
   const open = useNotificationStore(state => state.open)
+  const filter = useNotificationStore(state => state.filter)
   const unreadCount = useNotificationStore(state => state.unreadCount)
   const openPanel = useNotificationStore(state => state.openPanel)
   const closePanel = useNotificationStore(state => state.closePanel)
   const loadUnreadCount = useNotificationStore(state => state.loadUnreadCount)
+  const loadNotifications = useNotificationStore(state => state.loadNotifications)
   const [opening, setOpening] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lastForegroundRefreshAt = useRef(0)
 
   useEffect(() => {
     if (!open) return
@@ -28,10 +33,29 @@ export function NotificationCenter() {
   }, [closePanel, open])
 
   useEffect(() => {
+    const refreshOnForeground = () => {
+      const now = Date.now()
+      if (now - lastForegroundRefreshAt.current < FOREGROUND_REFRESH_DEDUP_WINDOW) return
+      lastForegroundRefreshAt.current = now
+      void loadUnreadCount(true)
+      if (open) void loadNotifications(filter, true)
+    }
+
     void loadUnreadCount()
     const timer = window.setInterval(() => void loadUnreadCount(), 60_000)
-    return () => window.clearInterval(timer)
-  }, [loadUnreadCount, user?.id])
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshOnForeground()
+    }
+    const handleWindowFocus = () => refreshOnForeground()
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleWindowFocus)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleWindowFocus)
+    }
+  }, [filter, loadNotifications, loadUnreadCount, open, user?.id])
 
   const handleToggle = async () => {
     if (open) {
