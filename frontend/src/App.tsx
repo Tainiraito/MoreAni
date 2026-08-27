@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
 import { useUIStore } from '@/stores/ui-store'
 import { ApiError, api } from '@/lib/api'
+import type { ContentFormSavedEvent } from '@/components/content/ContentFormDialog'
 
 import { useRefreshStore } from '@/stores/refresh-store'
 
@@ -126,19 +127,29 @@ function GlobalDialogs() {
     adminOpen,
     closeAddAnime,
     closeEditContent,
+    openDetail,
   } = useUIStore()
-  const { isFavorited, toggleFavorite, loadFavorites } = useFavoriteStore()
+  const { isFavorited, isFavoritePending, toggleFavorite } = useFavoriteStore()
 
   const handleRefresh = () => {
-    loadFavorites()
     void queryClient.invalidateQueries({ queryKey: ['airing-week'] })
     useRefreshStore.getState().triggerRefresh()
+  }
+
+  const handleContentSaved = (event: ContentFormSavedEvent) => {
+    if (event.operation === 'created' && addAnimePreset?.openDetailAfterSave) {
+      closeAddAnime()
+      openDetail(event.contentId)
+    }
+    // 让表单先卸载，再触发列表刷新；刷新请求不会阻塞保存完成和弹窗关闭。
+    queueMicrotask(handleRefresh)
   }
 
   return (
     <>
       <ContentDetailDialog
         isFavorited={detailContentId ? isFavorited(detailContentId) : false}
+        isFavoritePending={detailContentId ? isFavoritePending(detailContentId) : false}
         onToggleFavorite={toggleFavorite}
       />
       <Suspense fallback={null}>
@@ -146,14 +157,14 @@ function GlobalDialogs() {
           <ContentFormDialog
             open
             onClose={closeAddAnime}
-            onSaved={handleRefresh}
+            onSaved={handleContentSaved}
             initialBangumiSubjectId={addAnimePreset?.bangumiId}
             initialBangumiTitle={addAnimePreset?.title}
             initialBangumiTitleAlt={addAnimePreset?.titleAlt}
           />
         )}
         {!!editContentId && (
-          <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleRefresh} />
+          <ContentFormDialog contentId={editContentId} open onClose={closeEditContent} onSaved={handleContentSaved} />
         )}
         {settingsOpen && <SettingsDialog />}
       </Suspense>

@@ -1,6 +1,7 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button-variants'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 
 interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -48,11 +49,10 @@ export function Button({
       )}
       style={dynamicStyles[variant || 'primary']}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? (
-        <span className="mr-2 animate-spin">⏳</span>
-      ) : null}
+      {loading ? <LoadingIcon size={16} className="mr-2" /> : null}
       {children}
     </button>
   )

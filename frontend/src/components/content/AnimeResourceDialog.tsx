@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { AnimeResource, ContentItem, ResourceSubscription } from '@/types'
 
 type ResourceSource = 'mikan' | 'animegarden'
@@ -604,8 +605,8 @@ export function AnimeResourceDialog({
           ) : state.error && resources.length === 0 ? (
             <div className="rounded-xl p-6 text-center" style={{ background: 'var(--bg-card-warm)' }}>
               <p className="text-sm" style={{ color: 'var(--accent-coral)' }}>{state.error}</p>
-              <button onClick={() => void loadSource(activeSource, 1, false)} className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-lg px-3 py-1.5 text-xs hover:bg-[rgba(251,113,167,0.08)]" style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)' }}>
-                <RefreshCw size={12} /> 重试
+              <button onClick={() => void loadSource(activeSource, 1, false)} disabled={state.loading} aria-busy={state.loading || undefined} className="mt-3 inline-flex cursor-pointer items-center gap-1 rounded-lg px-3 py-1.5 text-xs hover:bg-[rgba(251,113,167,0.08)] disabled:cursor-not-allowed disabled:opacity-50" style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)' }}>
+                {state.loading ? <LoadingIcon size={12} /> : <RefreshCw size={12} />} 重试
               </button>
             </div>
           ) : !state.matched ? (
@@ -687,7 +688,7 @@ export function AnimeResourceDialog({
               {state.error && resources.length > 0 && (
                 <div className="mb-4 flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs" style={{ color: 'var(--accent-coral)', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.18)' }}>
                   <span>部分资源加载失败，当前已显示已加载内容。</span>
-                  <button type="button" onClick={() => void loadSource(activeSource, state.page + 1, true)} className="shrink-0 cursor-pointer rounded-md px-2 py-1 hover:bg-[rgba(251,113,167,0.08)]" style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)' }}>继续重试</button>
+                  <button type="button" onClick={() => void loadSource(activeSource, state.page + 1, true)} disabled={state.loadingMore} aria-busy={state.loadingMore || undefined} className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-2 py-1 hover:bg-[rgba(251,113,167,0.08)] disabled:cursor-not-allowed disabled:opacity-50" style={{ color: '#FB71A7', border: '1px solid rgba(251,113,167,0.4)' }}>{state.loadingMore ? <LoadingIcon size={12} /> : null}继续重试</button>
                 </div>
               )}
 
@@ -709,11 +710,11 @@ export function AnimeResourceDialog({
                           <span className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{group.name}</span>
                           <span className="shrink-0 text-[11px]" style={{ color: 'var(--text-muted)' }}>{group.resources.length} 条</span>
                         </button>
-                        <button onClick={() => void handleToggleSubscription(group)} disabled={togglingKey === toggleKey} className={`mr-3 flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${subscription
+                        <button onClick={() => void handleToggleSubscription(group)} disabled={togglingKey === toggleKey} aria-busy={togglingKey === toggleKey || undefined} className={`mr-3 flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${subscription
                           ? 'border-[rgba(251,113,167,0.45)] text-[#FB71A7] hover:border-[#FB71A7] hover:bg-[rgba(251,113,167,0.08)]'
                           : 'border-[var(--border-line)] text-[var(--text-muted)] hover:border-[rgba(251,113,167,0.45)] hover:bg-[rgba(251,113,167,0.08)] hover:text-[#FB71A7]'
                           }`}>
-                          {subscription ? <BellOff size={12} /> : <Bell size={12} />}
+                          {togglingKey === toggleKey ? <LoadingIcon size={12} /> : subscription ? <BellOff size={12} /> : <Bell size={12} />}
                           {subscription ? '已关注' : '关注该字幕组'}
                         </button>
                       </div>

@@ -32,6 +32,8 @@ from routers.v1.tag import router as tag_router
 from routers.v1.user import router as user_router
 from services import covers as covers_svc
 from services.airing_calendar import run_worker as run_airing_calendar_worker
+from services.bangumi import close_bangumi_clients
+from services.mikan import close_mikan_clients
 from services.notifications import run_worker
 
 
@@ -63,6 +65,8 @@ async def lifespan(app: FastAPI):
             await worker_task
         if airing_task:
             await airing_task
+        await close_mikan_clients()
+        await close_bangumi_clients()
         await close_proxy_clients()
 
 

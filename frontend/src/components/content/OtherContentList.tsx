@@ -1,5 +1,6 @@
 import { CalendarDays, Heart, MessageCircle, Star } from 'lucide-react'
 import type { ContentItem } from '@/types'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 
 const TYPE_LABELS: Record<string, string> = {
   anime_movie: '动画电影',
@@ -14,6 +15,7 @@ interface OtherContentListProps {
   items: ContentItem[]
   onSelect: (id: number) => void
   isFavorited: (id: number) => boolean
+  isFavoritePending?: (id: number) => boolean
   onToggleFavorite: (id: number) => void
 }
 
@@ -22,7 +24,7 @@ function formatDate(value: string): string | null {
   return value.slice(0, 10).replaceAll('-', '/')
 }
 
-export function OtherContentList({ items, onSelect, isFavorited, onToggleFavorite }: OtherContentListProps) {
+export function OtherContentList({ items, onSelect, isFavorited, isFavoritePending, onToggleFavorite }: OtherContentListProps) {
   return (
     <ul data-testid="other-content-list" className="overflow-hidden rounded-xl" style={{ border: '1px solid var(--border-line)', background: 'var(--bg-card)' }}>
       {items.map(item => {
@@ -75,10 +77,12 @@ export function OtherContentList({ items, onSelect, isFavorited, onToggleFavorit
                 aria-pressed={favorited}
                 title={favorited ? '取消收藏' : '收藏'}
                 onClick={() => onToggleFavorite(item.id)}
+                disabled={isFavoritePending?.(item.id)}
+                aria-busy={isFavoritePending?.(item.id) || undefined}
                 className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 style={{ color: favorited ? '#FB71A7' : 'var(--text-muted)' }}
               >
-                <Heart size={16} fill={favorited ? 'currentColor' : 'none'} />
+                {isFavoritePending?.(item.id) ? <LoadingIcon size={16} /> : <Heart size={16} fill={favorited ? 'currentColor' : 'none'} />}
               </button>
             </div>
           </li>

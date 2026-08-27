@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { Avatar } from '@/components/ui/Avatar'
 import { NotificationCenter } from '@/components/notification/NotificationFab'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import { preloadAdminDialog } from '@/components/admin/admin-dialog-loader'
 import { User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
 
@@ -16,6 +17,7 @@ export function AppHeader() {
   const { theme, toggleTheme } = useTheme()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -39,6 +41,21 @@ export function AppHeader() {
   }, [menuOpen])
 
   const menuItemStyle = "w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2.5"
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await api.logout()
+    } catch {
+      // 即使远程登出失败，也清理本地会话。
+    } finally {
+      logout()
+      setMenuOpen(false)
+      setLoggingOut(false)
+      useToastStore.getState().addToast('success', '已退出登录')
+    }
+  }
 
   return (
     <header
@@ -172,18 +189,15 @@ export function AppHeader() {
 
                 {user ? (
                   <button
-                    onClick={async () => {
-                      setMenuOpen(false)
-                      try { await api.logout() } catch { /* ignore */ }
-                      logout()
-                      useToastStore.getState().addToast('success', '已退出登录')
-                    }}
-                    className={menuItemStyle}
+                    onClick={() => void handleLogout()}
+                    disabled={loggingOut}
+                    aria-busy={loggingOut || undefined}
+                    className={`${menuItemStyle} disabled:cursor-not-allowed disabled:opacity-60`}
                     style={{ color: 'var(--accent-coral)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251, 113, 167, 0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <LogOut size={16} />
+                    {loggingOut ? <LoadingIcon size={16} /> : <LogOut size={16} />}
                     退出登录
                   </button>
                 ) : (

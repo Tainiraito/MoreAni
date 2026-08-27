@@ -1,12 +1,16 @@
 """Rating service — CRUD, stats, recent activity for MoreAni v2."""
 
+import json
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from models import ContentItem, Rating, User
+from models import ContentItem, Notification, Rating, User, UserContentStatus
 from services.avatar import avatar_fields
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_rating(db: Session, user_id: int, content_id: int) -> Rating | None:
@@ -19,6 +23,79 @@ def _bump_content_updated_at(db: Session, content_id: int) -> None:
     content = db.query(ContentItem).filter(ContentItem.id == content_id).first()
     if content:
         content.updated_at = datetime.now(UTC)
+
+
+def _has_activity(score: int, review: str | None) -> bool:
+    """Return whether a rating contains a score or non-empty review."""
+    return score > 0 or bool((review or '').strip())
+
+
+def _notify_favorite_activity(db: Session, *, rating: Rating, actor_user_id: int) -> None:
+    """Notify users who marked the content as wanted about its first activity."""
+    try:
+        content = db.query(ContentItem).filter(ContentItem.id == rating.content_id).first()
+        actor = db.query(User).filter(User.id == actor_user_id).first()
+        if content is None or actor is None:
+            return
+
+        recipient_rows = (
+            db.query(UserContentStatus.user_id)
+            .filter(
+                UserContentStatus.content_id == rating.content_id,
+                UserContentStatus.status == 'want',
+                UserContentStatus.user_id != actor_user_id,
+            )
+            .distinct()
+            .all()
+        )
+        if not recipient_rows:
+            return
+
+        activity_types: list[str] = []
+        if rating.score > 0:
+            activity_types.append(f'评分 {(rating.score / 10):.1f}')
+        if (rating.review or '').strip():
+            activity_types.append('评论')
+        activity_label = '、'.join(activity_types)
+        payload = {
+            'content_id': rating.content_id,
+            'rating_id': rating.id,
+            'actor_user_id': actor_user_id,
+            'actor_nickname': actor.nickname,
+            'has_score': rating.score > 0,
+            'has_review': bool((rating.review or '').strip()),
+        }
+        dedupe_key = f'content_activity:{rating.id}'
+
+        for (recipient_user_id,) in recipient_rows:
+            existing = (
+                db.query(Notification)
+                .filter(
+                    Notification.recipient_user_id == recipient_user_id,
+                    Notification.dedupe_key == dedupe_key,
+                )
+                .first()
+            )
+            if existing:
+                continue
+            db.add(
+                Notification(
+                    scope='private',
+                    recipient_user_id=recipient_user_id,
+                    kind='content_activity',
+                    title=f'《{content.title}》有新的动态',
+                    body=f'{actor.nickname} 对《{content.title}》进行了{activity_label}',
+                    payload_json=json.dumps(payload, ensure_ascii=False),
+                    created_by=actor_user_id,
+                    is_published=True,
+                    published_at=datetime.now(UTC).replace(tzinfo=None),
+                    dedupe_key=dedupe_key,
+                )
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception('Failed to create content activity notifications for rating %s', rating.id)
 
 
 def upsert_rating(
@@ -36,6 +113,7 @@ def upsert_rating(
     Also bumps the parent content's updated_at so it sorts to top.
     """
     existing = get_user_rating(db, user_id, content_id)
+    was_active = existing is not None and _has_activity(existing.score, existing.review)
     if existing:
         existing.score = score
         existing.recommend = recommend
@@ -43,19 +121,22 @@ def upsert_rating(
         _bump_content_updated_at(db, content_id)
         db.commit()
         db.refresh(existing)
-        return existing
+        rating = existing
+    else:
+        rating = Rating(
+            user_id=user_id,
+            content_id=content_id,
+            score=score,
+            recommend=recommend,
+            review=review,
+        )
+        db.add(rating)
+        _bump_content_updated_at(db, content_id)
+        db.commit()
+        db.refresh(rating)
 
-    rating = Rating(
-        user_id=user_id,
-        content_id=content_id,
-        score=score,
-        recommend=recommend,
-        review=review,
-    )
-    db.add(rating)
-    _bump_content_updated_at(db, content_id)
-    db.commit()
-    db.refresh(rating)
+    if not was_active and _has_activity(rating.score, rating.review):
+        _notify_favorite_activity(db, rating=rating, actor_user_id=user_id)
     return rating
 
 
@@ -68,7 +149,7 @@ def delete_rating(db: Session, rating: Rating) -> None:
 def get_rating_stats(db: Session, content_id: int) -> dict:
     """Calculate rating statistics for a content item.
 
-    Returns dict with avg_score, avg_recommend, rating_count.
+    Returns dict with avg_score, avg_recommend, rating_count, review_count, and activity_count.
     score=0 means 'no rating' — excluded from average.
     """
     return get_rating_stats_map(db, [content_id]).get(
@@ -78,6 +159,7 @@ def get_rating_stats(db: Session, content_id: int) -> dict:
             'avg_recommend': None,
             'rating_count': 0,
             'review_count': 0,
+            'activity_count': 0,
         },
     )
 
@@ -87,6 +169,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
     if not content_ids:
         return {}
 
+    activity_condition = (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != ''))
     rows = (
         db.query(
             Rating.content_id,
@@ -101,6 +184,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
                     )
                 )
             ).label('review_count'),
+            func.count(case((activity_condition, Rating.id))).label('activity_count'),
         )
         .filter(Rating.content_id.in_(content_ids))
         .group_by(Rating.content_id)
@@ -112,6 +196,7 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
             'avg_recommend': round(float(row.avg_recommend), 1) if row.avg_recommend else None,
             'rating_count': row.rating_count or 0,
             'review_count': row.review_count or 0,
+            'activity_count': row.activity_count or 0,
         }
         for row in rows
     }
@@ -134,7 +219,7 @@ def get_recent_reviews_map(
     content_ids: list[int],
     limit: int = 3,
 ) -> dict[int, list[dict]]:
-    """Get recent N reviews for each content id (batch query, avoids N+1).
+    """Get recent N rating/review activities for each content id (batch query, avoids N+1).
 
     Returns {content_id: [ {nickname, avatar_id, score, review, created_at}, ... ]}
     """
@@ -146,8 +231,7 @@ def get_recent_reviews_map(
         .join(User, Rating.user_id == User.id)
         .filter(
             Rating.content_id.in_(content_ids),
-            Rating.review.isnot(None),
-            Rating.review != '',
+            (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
         )
         .order_by(Rating.updated_at.desc())
         .all()

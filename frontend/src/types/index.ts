@@ -33,6 +33,7 @@ export interface ContentItem {
   avg_recommend?: number
   rating_count?: number
   review_count?: number
+  activity_count?: number
   my_rating?: Rating | null
   my_status?: WatchStatus | null
   my_score?: number | null
@@ -180,7 +181,7 @@ export interface ResourceSubscription {
 }
 
 export type NotificationScope = 'public' | 'private'
-export type NotificationKind = 'announcement' | 'resource_update' | 'system'
+export type NotificationKind = 'announcement' | 'resource_update' | 'content_activity' | 'system'
 
 export interface NotificationItem {
   id: number

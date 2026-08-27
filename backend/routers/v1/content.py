@@ -2,7 +2,7 @@
 
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_current_user_optional, get_db
@@ -44,12 +44,19 @@ def _to_response(
         resp.cover_url = cover_url
     stats = stats_map.get(
         item.id,
-        {'avg_score': None, 'avg_recommend': None, 'rating_count': 0, 'review_count': 0},
+        {
+            'avg_score': None,
+            'avg_recommend': None,
+            'rating_count': 0,
+            'review_count': 0,
+            'activity_count': 0,
+        },
     )
     resp.avg_score = stats['avg_score']
     resp.avg_recommend = stats['avg_recommend']
     resp.rating_count = stats['rating_count']
     resp.review_count = stats['review_count']
+    resp.activity_count = stats['activity_count']
     resp.tags = [TagResponse.model_validate(t) for t in item.tags]
     resp.recent_reviews = [RecentReview(**r) for r in recent_map.get(item.id, [])]
     my_rating = user_ratings_map.get(item.id)
@@ -72,6 +79,23 @@ def _build_responses(
     user_ratings_map = rating_svc.get_user_ratings_map(db, user_id, content_ids)
     cover_urls = covers_svc.get_content_cover_url_map(db, items)
     return [_to_response(item, stats_map, recent_map, user_ratings_map, cover_urls.get(item.id)) for item in items]
+
+
+def _queue_cover_localization(
+    background_tasks: BackgroundTasks,
+    item: ContentItem,
+    cover_url: str | None,
+) -> None:
+    """安排封面本地化，保存接口只保留外链作为即时降级。"""
+    if not cover_url or cover_url.startswith('/api/covers/'):
+        return
+    background_tasks.add_task(
+        covers_svc.localize_cover_in_background,
+        item.id,
+        cover_url,
+        str(item.source_type or ''),
+        str(item.source_id or ''),
+    )
 
 
 @router.get('', response_model=ContentListResponse)
@@ -284,6 +308,7 @@ def get_content(
 @router.post('', response_model=ContentItemResponse, status_code=201)
 def create_content(
     body: ContentItemCreate,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ContentItemResponse:
@@ -315,9 +340,8 @@ def create_content(
         )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    # 确认添加后才下载封面到本地（搜索仅预览不下载；失败降级外链）
-    covers_svc.localize_cover(item, body.cover_url, db)
-    db.commit()
+    # 内容已由 service 提交；封面下载和压缩在响应发送后执行。
+    _queue_cover_localization(background_tasks, item, body.cover_url)
     item = content_svc.get_content_by_id(db, item.id)
     return _build_responses(db, [item], user.id)[0]
 
@@ -326,6 +350,7 @@ def create_content(
 def update_content(
     content_id: int,
     body: ContentItemUpdate,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ContentItemResponse:
@@ -341,10 +366,9 @@ def update_content(
 
     update_data = body.model_dump(exclude_unset=True)
     updated = content_svc.update_content(db, item, **update_data)
-    # 更新时若换了外链封面 → 下载到本地（失败降级）
+    # 更新时若换了外链封面 → 响应后再本地化（失败降级）
     if 'cover_url' in update_data:
-        covers_svc.localize_cover(updated, updated.cover_url, db)
-        db.commit()
+        _queue_cover_localization(background_tasks, updated, updated.cover_url)
     updated = content_svc.get_content_by_id(db, updated.id)
     return _build_responses(db, [updated], user.id)[0]
 

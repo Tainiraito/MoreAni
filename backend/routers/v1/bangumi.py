@@ -1,6 +1,6 @@
 """Bangumi router — search and import anime from Bangumi API."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
@@ -12,6 +12,7 @@ from schemas import (
 )
 from services import bangumi as bangumi_svc
 from services import content as content_svc
+from services import covers as covers_svc
 
 router = APIRouter(prefix='/bangumi', tags=['bangumi'])
 
@@ -52,6 +53,7 @@ async def search_bangumi(
 @router.post('/import/{bgm_id}', response_model=BangumiImportResponse)
 async def import_from_bangumi(
     bgm_id: int,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BangumiImportResponse:
@@ -94,6 +96,13 @@ async def import_from_bangumi(
         created_by=user.id,
         tag_names=tag_names,
     )
+    background_tasks.add_task(
+        covers_svc.localize_cover_in_background,
+        content.id,
+        content.cover_url,
+        'bangumi',
+        str(bgm_id),
+    )
 
     return BangumiImportResponse(content_id=content.id, status='created')
 
@@ -102,19 +111,13 @@ async def import_from_bangumi(
 async def get_bangumi_score(
     bgm_id: int,
 ) -> dict:
-    """Get real-time score from Bangumi API.
-
-    Returns the current score without caching.
-    """
+    """Get a short-lived cached score from Bangumi API."""
     try:
-        detail = await bangumi_svc.get_subject_detail(bgm_id)
+        score = await bangumi_svc.get_subject_score(bgm_id)
     except bangumi_svc.BangumiError as exc:
         raise HTTPException(status_code=502, detail='Bangumi 服务暂时不可用，请稍后重试') from exc
-    if not detail:
+    if score is None:
         raise HTTPException(status_code=404, detail='Bangumi subject not found')
-
-    # 注意：get_subject_detail 返回的是 rating_score，不是 rating.score
-    score = detail.get('rating_score', 0)
     return {'score': score}
 
 

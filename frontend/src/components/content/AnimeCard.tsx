@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Star, Users, Play, Heart } from 'lucide-react'
 import { CoverImage } from '@/components/ui/CoverImage'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { ContentItem } from '@/types'
 
 type CardMode = 'grid' | 'scroll'
@@ -9,11 +10,12 @@ interface AnimeCardProps {
   content: ContentItem
   mode?: CardMode
   isFavorited?: boolean
+  isFavoritePending?: boolean
   onSelect?: (id: number) => void
   onToggleFavorite?: (id: number) => void
 }
 
-export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelect, onToggleFavorite }: AnimeCardProps) {
+export function AnimeCard({ content, mode = 'grid', isFavorited = false, isFavoritePending = false, onSelect, onToggleFavorite }: AnimeCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const avgScore = content.avg_score && content.avg_score > 0
     ? (content.avg_score / 10).toFixed(1)
@@ -41,6 +43,8 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
         {onToggleFavorite && (
           <button
             onClick={handleFavoriteClick}
+            disabled={isFavoritePending}
+            aria-busy={isFavoritePending || undefined}
             className="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
               background: 'var(--bg-card)',
@@ -49,7 +53,7 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={14} fill={isFavorited ? '#FB71A7' : 'none'} />
+            {isFavoritePending ? <LoadingIcon size={14} /> : <Heart size={14} fill={isFavorited ? '#FB71A7' : 'none'} />}
           </button>
         )}
 
@@ -125,6 +129,8 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
         {onToggleFavorite && (
           <button
             onClick={handleFavoriteClick}
+            disabled={isFavoritePending}
+            aria-busy={isFavoritePending || undefined}
             className="absolute top-2 right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
             style={{
               background: 'var(--bg-card)',
@@ -133,7 +139,7 @@ export function AnimeCard({ content, mode = 'grid', isFavorited = false, onSelec
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
-            <Heart size={12} fill={isFavorited ? '#FB71A7' : 'none'} />
+            {isFavoritePending ? <LoadingIcon size={12} /> : <Heart size={12} fill={isFavorited ? '#FB71A7' : 'none'} />}
           </button>
         )}
 

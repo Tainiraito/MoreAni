@@ -86,8 +86,13 @@ test('首次打开后台管理不刷新页面并正确显示公告内容', async
   page.on('framenavigated', frame => {
     if (frame === page.mainFrame()) navigations += 1
   })
+  await expect.poll(
+    () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+  ).toBeGreaterThan(80)
   await page.evaluate(() => window.scrollTo(0, 200))
-  await page.getByRole('button', { name: '打开用户菜单' }).click()
+  const userMenuButton = page.getByRole('button', { name: '打开用户菜单' })
+  await expect(userMenuButton).toBeInViewport()
+  await userMenuButton.click()
   await page.getByRole('button', { name: '后台管理' }).click()
 
   await expect(page.getByRole('heading', { name: '后台管理' })).toBeVisible()
@@ -108,11 +113,11 @@ test('首次打开后台管理不刷新页面并正确显示公告内容', async
   await page.getByRole('button', { name: '新建通知' }).click()
   await page.getByText('留空立即发布').click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.mouse.click(100, 100)
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.getByText('选择日期').click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  await page.mouse.click(100, 100)
+  await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })

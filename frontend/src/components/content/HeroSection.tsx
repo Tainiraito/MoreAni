@@ -1,6 +1,7 @@
 import type { ContentItem } from '@/types'
 import { Star, Users, Play, Heart, RefreshCw } from 'lucide-react'
 import { CoverImage } from '@/components/ui/CoverImage'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 
 const TYPE_LABELS: Record<string, string> = {
   anime: '番剧', anime_movie: '动画电影', movie: '电影', game: '游戏', software: '软件', website: '网站', book: '书籍',
@@ -19,9 +20,11 @@ const TYPE_COLORS: Record<string, string> = {
 interface HeroSectionProps {
   content: ContentItem
   isFavorited?: boolean
+  isFavoritePending?: boolean
   onSelect: (id: number) => void
   onToggleFavorite?: () => void
   onRefresh?: () => void
+  isRefreshing?: boolean
   progress?: number
   autoRefreshMs?: number
 }
@@ -29,9 +32,11 @@ interface HeroSectionProps {
 export function HeroSection({
   content,
   isFavorited = false,
+  isFavoritePending = false,
   onSelect,
   onToggleFavorite,
   onRefresh,
+  isRefreshing = false,
   progress = 0,
   autoRefreshMs = 11000,
 }: HeroSectionProps) {
@@ -135,6 +140,8 @@ export function HeroSection({
             {onToggleFavorite && (
               <button
                 onClick={handleFavoriteClick}
+                disabled={isFavoritePending}
+                aria-busy={isFavoritePending || undefined}
                 className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 hover:opacity-80"
                 style={{
                   background: isFavorited ? '#FB71A7' : 'var(--bg-card-warm)',
@@ -142,7 +149,7 @@ export function HeroSection({
                   color: isFavorited ? 'white' : 'var(--text-primary)',
                 }}
               >
-                <Heart size={16} fill={isFavorited ? 'white' : 'none'} />
+                {isFavoritePending ? <LoadingIcon size={16} /> : <Heart size={16} fill={isFavorited ? 'white' : 'none'} />}
                 {isFavorited ? '已收藏' : '收藏'}
               </button>
             )}
@@ -150,6 +157,8 @@ export function HeroSection({
             {onRefresh && (
               <button
                 onClick={handleRefreshClick}
+                disabled={isRefreshing}
+                aria-busy={isRefreshing || undefined}
                 className="relative inline-flex items-center gap-1.5 px-6 py-2.5 text-sm font-semibold rounded-full overflow-hidden transition-all duration-200 hover:opacity-80"
                 style={{
                   background: 'var(--bg-card-warm)',
@@ -166,7 +175,7 @@ export function HeroSection({
                     transition: progress > 0 ? `width ${autoRefreshMs}ms linear` : 'none',
                   }}
                 />
-                <RefreshCw size={14} className="relative z-10" />
+                {isRefreshing ? <LoadingIcon size={14} className="relative z-10" /> : <RefreshCw size={14} className="relative z-10" />}
                 <span className="relative z-10">换一个</span>
               </button>
             )}

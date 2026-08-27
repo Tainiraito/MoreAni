@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Search, Star, Tv, Save, Trash2 } from 'lucide-react'
+import { X, Search, Star, Tv, Save, Trash2, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
@@ -9,6 +9,7 @@ import { secureUrl } from '@/lib/image-url'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { ContentItem, ContentType } from '@/types'
 
 /** Bangumi search result from API */
@@ -55,6 +56,8 @@ const CONTENT_TYPES: { value: ContentType; label: string }[] = [
   { value: 'website', label: '网站' },
   { value: 'book', label: '书籍' },
 ]
+
+const ADD_CONTENT_TYPES = CONTENT_TYPES.filter(type => type.value === 'anime' || type.value === 'anime_movie')
 
 function emptyForm(): ContentFormData {
   return {
@@ -105,11 +108,18 @@ function bangumiToForm(item: BangumiItem): ContentFormData {
   }
 }
 
+export type ContentFormOperation = 'created' | 'updated' | 'deleted'
+
+export interface ContentFormSavedEvent {
+  contentId: number
+  operation: ContentFormOperation
+}
+
 interface ContentFormDialogProps {
   contentId?: number | null  // null/undefined = add mode, number = edit mode
   open: boolean
   onClose: () => void
-  onSaved?: () => void  // callback after successful create/update
+  onSaved?: (event: ContentFormSavedEvent) => void
   initialBangumiSubjectId?: number
   initialBangumiTitle?: string
   initialBangumiTitleAlt?: string
@@ -142,6 +152,8 @@ export function ContentFormDialog({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [coverPreviewRetry, setCoverPreviewRetry] = useState(0)
+  const [coverPreviewState, setCoverPreviewState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
 
   // ── Bangumi search state ──
   const [query, setQuery] = useState('')
@@ -150,6 +162,7 @@ export function ContentFormDialog({
   const [searched, setSearched] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bangumiRequestInFlight = useRef(false)
 
   // ── Input style ──
   const inputStyle: React.CSSProperties = {
@@ -197,6 +210,16 @@ export function ContentFormDialog({
     }
   }, [open, isEditMode, initialBangumiSubjectId, initialBangumiTitle, initialBangumiTitleAlt, addToast])
 
+  useEffect(() => {
+    const coverUrl = form.cover_url.trim()
+    setCoverPreviewRetry(0)
+    setCoverPreviewState(coverUrl ? 'loading' : 'idle')
+  }, [form.cover_url])
+
+  const coverPreviewUrl = form.cover_url.trim()
+    ? `${secureUrl(form.cover_url.trim())}${form.cover_url.includes('?') ? '&' : '?'}preview_retry=${coverPreviewRetry}`
+    : ''
+
   // ── Debounced Bangumi search ──
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) {
@@ -204,6 +227,8 @@ export function ContentFormDialog({
       setSearched(false)
       return
     }
+    if (bangumiRequestInFlight.current) return
+    bangumiRequestInFlight.current = true
     setSearching(true)
     setSearched(true)
     try {
@@ -215,6 +240,7 @@ export function ContentFormDialog({
       setResults([])
     } finally {
       setSearching(false)
+      bangumiRequestInFlight.current = false
     }
   }, [addToast])
 
@@ -263,35 +289,25 @@ export function ContentFormDialog({
     setForm(prev => ({ ...prev, [key]: value }))
 
   // ── Bangumi auto-fill ──
-  const handleBangumiSelect = async (item: BangumiItem) => {
-    setForm(bangumiToForm(item))
+  const handleBangumiSelect = (item: BangumiItem) => {
+    if (bangumiRequestInFlight.current) return
+    const selectedForm = bangumiToForm(item)
+    setForm(previous => isEditMode ? { ...selectedForm, content_type: previous.content_type } : selectedForm)
     setShowDropdown(false)
     setResults([])
     setQuery('')
     addToast('success', `已填入「${item.name_cn || item.name}」的信息`)
-
-    // Fetch full details to get tags + summary (search API doesn't return them)
-    try {
-      const detail = await api.getBangumiDetail(item.bgm_id) as { tags?: string[]; summary?: string }
-      if ((detail.tags && detail.tags.length > 0) || detail.summary) {
-        setForm(prev => ({
-          ...prev,
-          tags: detail.tags && detail.tags.length > 0 ? detail.tags!.join(', ') : prev.tags,
-          description: detail.summary || prev.description,
-        }))
-      }
-    } catch {
-      // Tags fetch failed — not critical
-    }
   }
 
   // ── Re-fetch from Bangumi (edit mode) ──
   const handleRefetch = async () => {
+    if (bangumiRequestInFlight.current) return
     const searchTerm = query.trim() || form.title.trim()
     if (!searchTerm) {
       addToast('warning', '请输入搜索关键词')
       return
     }
+    bangumiRequestInFlight.current = true
     setSearching(true)
     try {
       // Try candidates in order: full title → alt title → stripped → alphanumeric prefix
@@ -339,15 +355,25 @@ export function ContentFormDialog({
       addToast('error', '获取失败')
     } finally {
       setSearching(false)
+      bangumiRequestInFlight.current = false
     }
+  }
+
+  const handleCoverRetry = () => {
+    if (!form.cover_url.trim() || coverPreviewState === 'loading') return
+    setCoverPreviewState('loading')
+    setCoverPreviewRetry(previous => previous + 1)
   }
 
   // ── Delete (soft delete) ──
   const handleDelete = async () => {
     if (!contentId) return
+    if (deleting) return
     setDeleting(true)
+    let deleted = false
     try {
       await api.deleteContent(contentId)
+      deleted = true
       addToast('success', '已删除')
       onClose()
       // 若详情弹窗还开着（编辑弹窗从详情打开），一并关闭
@@ -360,7 +386,7 @@ export function ContentFormDialog({
       setConfirmDelete(false)
     }
     // 删除成功后才刷新列表；不放进 try，避免刷新异常误报「删除失败」
-    onSaved?.()
+    if (deleted) onSaved?.({ contentId, operation: 'deleted' })
   }
 
   // ── Submit ──
@@ -370,6 +396,7 @@ export function ContentFormDialog({
       return
     }
 
+    if (saving) return
     setSaving(true)
     try {
       const tags = form.tags
@@ -389,6 +416,7 @@ export function ContentFormDialog({
         tags,
       }
 
+      let savedContentId = contentId ?? 0
       if (isEditMode) {
         const updatePayload: Record<string, unknown> = { ...payload }
         // 有 bgm_id（重新获取过/原本关联 Bangumi）→ 更新来源关联；无 → 不传 source 字段保留原值
@@ -401,7 +429,7 @@ export function ContentFormDialog({
         addToast('success', '更新成功')
       } else {
         const isFromBangumi = !!form.bgm_id
-        await api.createContent({
+        const created = await api.createContent({
           ...payload,
           status: 'active',
           source_type: isFromBangumi ? 'bangumi' : 'manual',
@@ -409,10 +437,11 @@ export function ContentFormDialog({
           source_url: isFromBangumi ? `https://bangumi.tv/subject/${form.bgm_id}` : '',
           is_public: true,
         })
+        savedContentId = created.id
         addToast('success', `已添加「${form.title.trim()}」`)
       }
 
-      onSaved?.()
+      onSaved?.({ contentId: savedContentId, operation: isEditMode ? 'updated' : 'created' })
       onClose()
     } catch {
       addToast('error', isEditMode ? '更新失败' : '添加失败')
@@ -497,12 +526,13 @@ export function ContentFormDialog({
                 </div>
                 <button
                   onClick={isEditMode ? handleRefetch : () => { if (query.trim()) doSearch(query) }}
-                  disabled={searching || (!isEditMode && !query.trim())}
+                  disabled={searching || saving || deleting || (!isEditMode && !query.trim())}
+                  aria-busy={searching || undefined}
                   className="h-9 px-3 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
                   style={{ background: '#FB71A7', color: 'white', border: 'none' }}
                 >
                   {searching ? (
-                    <div className="animate-spin w-3 h-3 border-2 border-white/30 border-t-white rounded-full" />
+                    <LoadingIcon size={14} />
                   ) : (
                     <Search size={14} />
                   )}
@@ -520,6 +550,8 @@ export function ContentFormDialog({
                     results.map(item => (
                       <button
                         key={item.bgm_id}
+                        type="button"
+                        disabled={saving || deleting}
                         className="w-full text-left flex gap-3 p-3 transition-all duration-200 hover:opacity-80 cursor-pointer"
                         style={{ borderBottom: '1px solid var(--border-line)' }}
                         onClick={() => handleBangumiSelect(item)}
@@ -573,13 +605,29 @@ export function ContentFormDialog({
             {/* ── Form Fields ── */}
             <div className="space-y-4">
               {/* Cover preview */}
-              {form.cover_url && (
-                <div className="w-full max-h-[200px] rounded-xl overflow-hidden" style={{ background: 'var(--bg-card-warm)' }}>
-                  <img
-                    src={secureUrl(form.cover_url)}
-                    alt="封面预览"
-                    className="w-full h-full max-h-[200px] object-cover"
-                  />
+              {form.cover_url.trim() && (
+                <div className="relative flex min-h-24 w-full items-center justify-center overflow-hidden rounded-xl" style={{ background: 'var(--bg-card-warm)' }}>
+                  {coverPreviewState !== 'error' && (
+                    <img
+                      key={coverPreviewUrl}
+                      src={coverPreviewUrl}
+                      alt="封面预览"
+                      className="w-full h-full max-h-[200px] object-cover"
+                      style={{ visibility: coverPreviewState === 'loaded' ? 'visible' : 'hidden' }}
+                      onLoad={() => setCoverPreviewState('loaded')}
+                      onError={() => setCoverPreviewState('error')}
+                    />
+                  )}
+                  {coverPreviewState === 'loading' && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <LoadingIcon size={16} /> 加载封面中
+                    </div>
+                  )}
+                  {coverPreviewState === 'error' && (
+                    <div className="flex items-center gap-2 py-8 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <Tv size={16} /> 封面加载失败，请重试
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -618,14 +666,27 @@ export function ContentFormDialog({
                 <span className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
                   封面 URL
                 </span>
-                <input
-                  type="text"
-                  value={form.cover_url}
-                  onChange={e => update('cover_url', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#FB71A7]/50 transition-shadow"
-                  style={inputStyle}
-                  placeholder="https://..."
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.cover_url}
+                    onChange={e => update('cover_url', e.target.value)}
+                    className="min-w-0 flex-1 px-3 py-2 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#FB71A7]/50 transition-shadow"
+                    style={inputStyle}
+                    placeholder="https://..."
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCoverRetry}
+                    disabled={!form.cover_url.trim() || coverPreviewState === 'loading' || saving || deleting}
+                    aria-busy={coverPreviewState === 'loading' || undefined}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-200 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-secondary)' }}
+                  >
+                    {coverPreviewState === 'loading' ? <LoadingIcon size={14} /> : <RefreshCw size={14} />}
+                    重新加载
+                  </button>
+                </div>
               </label>
 
               {/* Description */}
@@ -652,7 +713,7 @@ export function ContentFormDialog({
                   value={form.content_type}
                   onChange={v => update('content_type', v as ContentType)}
                   className="w-full"
-                  options={CONTENT_TYPES.map(t => ({ value: t.value, label: t.label }))}
+                  options={(isEditMode ? CONTENT_TYPES : ADD_CONTENT_TYPES).map(t => ({ value: t.value, label: t.label }))}
                 />
               </label>
 
@@ -720,12 +781,13 @@ export function ContentFormDialog({
             {isEditMode ? (
               <button
                 onClick={() => setConfirmDelete(true)}
-                disabled={deleting}
+                disabled={deleting || saving}
+                aria-busy={deleting || undefined}
                 className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm transition-all duration-200 hover:opacity-80 disabled:opacity-50"
                 style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444' }}
               >
                 {deleting ? (
-                  <div className="animate-spin w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full" />
+                  <LoadingIcon size={14} />
                 ) : (
                   <Trash2 size={14} />
                 )}
@@ -742,12 +804,13 @@ export function ContentFormDialog({
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={saving || deleting}
+                aria-busy={saving || undefined}
                 className="h-9 flex items-center gap-1.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-80 disabled:opacity-50"
                 style={{ background: '#FB71A7', color: 'white' }}
               >
                 {saving ? (
-                  <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                  <LoadingIcon size={14} />
                 ) : (
                   <Save size={14} />
                 )}
@@ -784,10 +847,11 @@ export function ContentFormDialog({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
+                  aria-busy={deleting || undefined}
                   className="h-9 flex items-center gap-1.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-80 disabled:opacity-50"
                   style={{ background: '#ef4444', color: 'white' }}
                 >
-                  {deleting ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : <Trash2 size={14} />}
+                  {deleting ? <LoadingIcon size={14} /> : <Trash2 size={14} />}
                   删除
                 </button>
               </div>

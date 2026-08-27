@@ -12,6 +12,7 @@ export interface AddAnimePreset {
   bangumiId: number
   title?: string
   titleAlt?: string
+  openDetailAfterSave?: boolean
 }
 
 interface UIState {

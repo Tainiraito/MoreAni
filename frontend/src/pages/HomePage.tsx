@@ -14,6 +14,7 @@ import { OtherContentList } from '@/components/content/OtherContentList'
 import { WeeklyAiringPanel } from '@/components/content/WeeklyAiringPanel'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { LoadingIcon } from '@/components/ui/loading-icon'
 import { HeroSection } from '@/components/content/HeroSection'
 import { LayoutGrid, List } from 'lucide-react'
 import type { AiringCalendarWeek, ContentItem } from '@/types'
@@ -88,7 +89,8 @@ export function HomePage() {
   const { user } = useAuthStore()
   const userId = user?.id
   const { openDetail, openAddAnime } = useUIStore()
-  const { isFavorited, toggleFavorite } = useFavoriteStore()
+  const { isFavorited, isFavoritePending, toggleFavorite } = useFavoriteStore()
+  const favoritePending = isFavoritePending ?? (() => false)
   const refreshKey = useRefreshStore(s => s.refreshKey)
   const [activeTab, setActiveTab] = useState<HomeTab>('anime')
   const [items, setItems] = useState<ContentItem[]>([])
@@ -105,7 +107,9 @@ export function HomePage() {
   const [listError, setListError] = useState<string | null>(null)
   const [listRetryKey, setListRetryKey] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [heroLoading, setHeroLoading] = useState(false)
   const heroIdRef = useRef<number | null>(null)
+  const heroLoadingRef = useRef(false)
   const listRequestGate = useRef(new LatestRequestGate())
   const paginationRequestGate = useRef(new LatestRequestGate())
   const listQueryVersionRef = useRef(0)
@@ -205,6 +209,9 @@ export function HomePage() {
   }, [user?.id])
 
   const fetchHeroRecommendation = useCallback(async () => {
+    if (heroLoadingRef.current) return
+    heroLoadingRef.current = true
+    setHeroLoading(true)
     const requestId = heroRequestGate.current.begin()
     const currentHeroId = heroIdRef.current
     const excludeIds = currentHeroId === null ? [] : [currentHeroId]
@@ -219,6 +226,9 @@ export function HomePage() {
       setHero(item)
     } catch {
       // 随机请求失败时保留当前精选，避免精选区闪烁。
+    } finally {
+      heroLoadingRef.current = false
+      setHeroLoading(false)
     }
   }, [])
 
@@ -467,6 +477,7 @@ export function HomePage() {
   }, [loadMore])
 
   const handleRetryList = useCallback(() => {
+    if (listLoadingRef.current) return
     setListRetryKey(value => value + 1)
   }, [])
 
@@ -525,9 +536,11 @@ export function HomePage() {
             <HeroSection
               content={hero}
               isFavorited={heroFavorited}
+              isFavoritePending={favoritePending(hero.id)}
               onSelect={openDetail}
               onToggleFavorite={() => toggleFavorite(hero.id)}
               onRefresh={handleRefreshHero}
+              isRefreshing={heroLoading}
               progress={progress}
               autoRefreshMs={AUTO_REFRESH_MS}
             />
@@ -691,8 +704,10 @@ export function HomePage() {
               bangumiId: item.subject_id,
               title: item.title,
               titleAlt: item.title_alt,
+              openDetailAfterSave: true,
             })}
             isFavorited={isFavorited}
+            isFavoritePending={favoritePending}
             onToggleFavorite={toggleFavorite}
           />
         ) : loading && items.length === 0 ? (
@@ -705,10 +720,12 @@ export function HomePage() {
             <button
               type="button"
               onClick={handleRetryList}
+              disabled={loading}
+              aria-busy={loading || undefined}
               className="rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: '#FB71A7' }}
             >
-              重试
+              {loading ? <LoadingIcon size={14} /> : null} 重试
             </button>
           </div>
         ) : items.length === 0 ? (
@@ -727,12 +744,12 @@ export function HomePage() {
             {listError && (
               <div className="mb-4 flex items-center justify-between gap-3 rounded-lg px-3 py-2" role="alert" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{listError}</p>
-                <button type="button" onClick={handleRetryList} className="shrink-0 text-xs font-medium hover:opacity-80" style={{ color: '#FB71A7' }}>重试</button>
+                <button type="button" onClick={handleRetryList} disabled={loading} aria-busy={loading || undefined} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium hover:opacity-80 disabled:opacity-50" style={{ color: '#FB71A7' }}>{loading ? <LoadingIcon size={13} /> : null}重试</button>
               </div>
             )}
             {activeTab === 'other' ? (
               <section className="mt-8">
-                <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} onToggleFavorite={toggleFavorite} />
+                <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} isFavoritePending={favoritePending} onToggleFavorite={toggleFavorite} />
                 {loadingMore && <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p></div>}
                 {!hasMore && items.length > 0 && <div className="flex items-center justify-center py-8"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>已显示全部 {totalCount} 条内容</p></div>}
               </section>
@@ -744,6 +761,7 @@ export function HomePage() {
                     items={animeItems}
                     onSelect={openDetail}
                     isFavorited={isFavorited}
+                    isFavoritePending={favoritePending}
                     onToggleFavorite={toggleFavorite}
                   />
                 ) : (
@@ -754,6 +772,7 @@ export function HomePage() {
                         content={item}
                         mode="grid"
                         isFavorited={isFavorited(item.id)}
+                        isFavoritePending={isFavoritePending(item.id)}
                         onSelect={openDetail}
                         onToggleFavorite={toggleFavorite}
                       />
