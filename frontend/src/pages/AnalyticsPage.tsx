@@ -88,13 +88,15 @@ function SummaryCard({ label, value, icon }: SummaryCardProps) {
 
 interface FavoriteCardProps {
   item: AnalyticsFavoriteItem
+  scope: AnalyticsScopeType
   onOpen: (id: number) => void
 }
 
-function FavoriteCard({ item, onOpen }: FavoriteCardProps) {
+function FavoriteCard({ item, scope, onOpen }: FavoriteCardProps) {
   return (
     <button
       type="button"
+      data-testid="analytics-favorite-card"
       onClick={() => onOpen(item.id)}
       className="group flex min-w-0 items-center gap-4 rounded-xl p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
@@ -110,7 +112,9 @@ function FavoriteCard({ item, onOpen }: FavoriteCardProps) {
           {item.score.toFixed(1)}
         </p>
         <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          {item.rating_count} 条评分{item.average_score !== null ? ` · 原始均分 ${item.average_score.toFixed(1)}` : ''}
+          {scope === 'global'
+            ? `${item.rating_count} 条评分 · 实际均分`
+            : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
         </p>
       </div>
     </button>
@@ -178,7 +182,7 @@ export function AnalyticsPage() {
   const openDetail = useUIStore(state => state.openDetail)
   const selection = useMemo(() => parseScope(searchParams), [searchParams])
   const [scoreRange, setScoreRange] = useState<ScoreRange>(DEFAULT_SCORE_RANGE)
-  const [cloudMode, setCloudMode] = useState<TagCloudMode>('frequency')
+  const [cloudMode, setCloudMode] = useState<TagCloudMode>('weighted')
   const debouncedRange = useDebouncedScoreRange(scoreRange)
 
   const usersQuery = useQuery({
@@ -268,8 +272,8 @@ export function AnalyticsPage() {
             <SummaryCard label="区间均分" value={overview.average_score?.toFixed(2) ?? '—'} icon={<Star size={17} />} />
           </div>
 
-          <div className="grid items-start gap-6 xl:grid-cols-2">
-            <section className="rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE}>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <section className="flex h-full min-w-0 flex-col rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE} data-testid="rating-distribution-panel">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>评分分布</h2>
@@ -277,13 +281,17 @@ export function AnalyticsPage() {
                 </div>
                 {overviewQuery.isFetching ? <span className="text-[11px]" style={{ color: 'var(--brand)' }}>更新中</span> : null}
               </div>
-              <ScoreDistributionChart buckets={overview.score_distribution} range={scoreRange} />
+              <ScoreDistributionChart
+                buckets={overview.score_distribution}
+                range={scoreRange}
+                onSelectScore={score => setScoreRange({ min: score, max: score })}
+              />
               <div className="mt-2 rounded-xl p-4" style={{ background: 'var(--bg-card-warm)' }}>
                 <ScoreRangeSlider value={scoreRange} onChange={setScoreRange} />
               </div>
             </section>
 
-            <section className="rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE}>
+            <section className="flex h-full min-w-0 flex-col rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE} data-testid="tag-cloud-panel">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Cloud size={18} />标签词云</h2>
@@ -297,6 +305,7 @@ export function AnalyticsPage() {
                         key={mode}
                         type="button"
                         onClick={() => setCloudMode(mode)}
+                        aria-pressed={active}
                         className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
                         style={{
                           color: active ? 'var(--btn-primary-text)' : 'var(--text-muted)',
@@ -316,11 +325,11 @@ export function AnalyticsPage() {
           <section className="rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE}>
             <div className="mb-4">
               <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Heart size={18} />当前最喜欢</h2>
-              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>代表作会随评分区间变化，全站范围使用贝叶斯均分减少单样本偏差</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>代表作会随评分区间变化；全站按贝叶斯稳定度排序，卡片显示实际均分</p>
             </div>
             {overview.favorites.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
-                {overview.favorites.map(item => <FavoriteCard key={item.id} item={item} onOpen={openDetail} />)}
+                {overview.favorites.map(item => <FavoriteCard key={item.id} item={item} scope={overview.scope.type} onOpen={openDetail} />)}
               </div>
             ) : (
               <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>当前评分区间暂无代表作</p>

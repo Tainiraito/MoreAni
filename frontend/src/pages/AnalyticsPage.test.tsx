@@ -56,7 +56,7 @@ const OVERVIEW: AnalyticsOverview = {
       title_alt: '',
       cover_url: '',
       content_type: 'anime',
-      score: 9.1,
+      score: 9.3,
       average_score: 9.3,
       rating_count: 3,
     },
@@ -126,10 +126,11 @@ describe('AnalyticsPage', () => {
     )
     expect(await view.findByText('全站代表作')).toBeInTheDocument()
     expect(view.getByText('可能喜欢的番剧')).toBeInTheDocument()
-    await waitFor(() => expect(view.getByTestId('mock-word-cloud')).toHaveTextContent('恋爱频次'))
-
-    fireEvent.click(view.getByRole('button', { name: '评分加权' }))
     await waitFor(() => expect(view.getByTestId('mock-word-cloud')).toHaveTextContent('恋爱加权'))
+    expect(view.getByText('3 条评分 · 实际均分')).toBeInTheDocument()
+
+    fireEvent.click(view.getByRole('button', { name: '出现频次' }))
+    await waitFor(() => expect(view.getByTestId('mock-word-cloud')).toHaveTextContent('恋爱频次'))
   })
 
   it('从 URL 恢复单用户分析范围', async () => {
@@ -199,6 +200,20 @@ describe('AnalyticsPage', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
     expect(staleSignal?.aborted).toBe(true)
+  })
+
+  it('点击柱状图整列会同步滑条并请求单个评分', async () => {
+    const view = renderAnalytics()
+    await view.findByText('全站代表作')
+    vi.mocked(api.getAnalyticsOverview).mockClear()
+
+    fireEvent.click(view.getByRole('button', { name: '10.0 分，共 7 条评分，点击仅查看该评分' }))
+
+    expect(view.getByText('10.0 – 10.0')).toBeInTheDocument()
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 10, maxScore: 10 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
   })
 
   it('无统计样本和候选时展示完整空状态', async () => {

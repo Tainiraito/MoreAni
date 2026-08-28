@@ -388,7 +388,7 @@ def _favorite_items(
         scores_by_content: dict[int, list[Rating]] = defaultdict(list)
         for rating in ratings:
             scores_by_content[rating.content_id].append(rating)
-        items: list[AnalyticsFavoriteItem] = []
+        ranked_items: list[tuple[float, AnalyticsFavoriteItem]] = []
         for content_ratings in scores_by_content.values():
             content = content_ratings[0].content
             average = sum(rating.score for rating in content_ratings) / len(content_ratings) / 10
@@ -397,20 +397,23 @@ def _favorite_items(
                 (count / (count + BAYESIAN_PRIOR_STRENGTH)) * average
                 + (BAYESIAN_PRIOR_STRENGTH / (count + BAYESIAN_PRIOR_STRENGTH)) * global_mean
             )
-            items.append(
-                AnalyticsFavoriteItem(
-                    id=content.id,
-                    title=content.title,
-                    title_alt=content.title_alt or '',
-                    cover_url=content.cover_url or '',
-                    content_type=content.content_type,
-                    score=round(bayesian, 2),
-                    average_score=round(average, 2),
-                    rating_count=count,
+            ranked_items.append(
+                (
+                    bayesian,
+                    AnalyticsFavoriteItem(
+                        id=content.id,
+                        title=content.title,
+                        title_alt=content.title_alt or '',
+                        cover_url=content.cover_url or '',
+                        content_type=content.content_type,
+                        score=round(average, 2),
+                        average_score=round(average, 2),
+                        rating_count=count,
+                    ),
                 )
             )
-        items.sort(key=lambda item: (-item.score, -item.rating_count, item.id))
-        return items[:3]
+        ranked_items.sort(key=lambda ranked: (-ranked[0], -ranked[1].rating_count, ranked[1].id))
+        return [item for _, item in ranked_items[:3]]
 
     personal_items: list[AnalyticsFavoriteItem] = []
     for rating in ratings:

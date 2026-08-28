@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 
 import type { AnalyticsScoreBucket } from '@/types'
 import type { ScoreRange } from '@/components/analytics/ScoreRangeSlider'
+import type { KeyboardEvent } from 'react'
 
 interface ScoreDistributionChartProps {
   buckets: AnalyticsScoreBucket[]
   range: ScoreRange
+  onSelectScore: (score: number) => void
 }
 
 const CHART_WIDTH = 640
@@ -13,7 +15,7 @@ const CHART_HEIGHT = 250
 const MARGIN = { top: 18, right: 12, bottom: 34, left: 34 }
 const GRID_RATIOS = [0.25, 0.5, 0.75, 1]
 
-export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChartProps) {
+export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreDistributionChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const maxCount = useMemo(() => Math.max(1, ...buckets.map(bucket => bucket.count)), [buckets])
   const innerWidth = CHART_WIDTH - MARGIN.left - MARGIN.right
@@ -21,6 +23,12 @@ export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChar
   const bandWidth = innerWidth / Math.max(1, buckets.length)
   const barWidth = Math.max(5, bandWidth - 6)
   const hovered = hoveredIndex === null ? null : buckets[hoveredIndex]
+
+  const handleColumnKeyDown = (event: KeyboardEvent<SVGGElement>, score: number): void => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onSelectScore(score)
+  }
 
   return (
     <div className="relative" data-testid="score-distribution-chart">
@@ -73,8 +81,32 @@ export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChar
           const y = MARGIN.top + innerHeight - height
           const inRange = bucket.score >= range.min && bucket.score <= range.max
           const isHovered = hoveredIndex === index
+          const isSelected = range.min === bucket.score && range.max === bucket.score
           return (
-            <g key={bucket.score}>
+            <g
+              key={bucket.score}
+              role="button"
+              tabIndex={0}
+              aria-label={`${bucket.score.toFixed(1)} 分，共 ${bucket.count} 条评分，点击仅查看该评分`}
+              aria-pressed={isSelected}
+              onClick={() => onSelectScore(bucket.score)}
+              onKeyDown={event => handleColumnKeyDown(event, bucket.score)}
+              onPointerEnter={() => setHoveredIndex(index)}
+              onPointerLeave={() => setHoveredIndex(null)}
+              onFocus={() => setHoveredIndex(index)}
+              onBlur={() => setHoveredIndex(null)}
+              style={{ cursor: 'pointer', outline: 'none' }}
+            >
+              <rect
+                x={MARGIN.left + index * bandWidth}
+                y={MARGIN.top}
+                width={bandWidth}
+                height={innerHeight}
+                fill="var(--brand)"
+                opacity={isSelected ? 0.1 : (isHovered ? 0.05 : 0)}
+                rx="3"
+                style={{ transition: 'opacity 150ms ease' }}
+              />
               <rect
                 x={x}
                 y={y}
@@ -83,13 +115,8 @@ export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChar
                 rx="3"
                 fill="url(#analytics-bar-gradient)"
                 opacity={inRange ? (isHovered ? 1 : 0.85) : (isHovered ? 0.45 : 0.2)}
-                filter={isHovered ? 'url(#analytics-bar-glow)' : undefined}
-                tabIndex={0}
-                aria-label={`${bucket.score.toFixed(1)} 分，共 ${bucket.count} 条评分`}
-                onPointerEnter={() => setHoveredIndex(index)}
-                onPointerLeave={() => setHoveredIndex(null)}
-                onFocus={() => setHoveredIndex(index)}
-                onBlur={() => setHoveredIndex(null)}
+                filter={isHovered || isSelected ? 'url(#analytics-bar-glow)' : undefined}
+                pointerEvents="none"
                 style={{ transition: 'opacity 150ms ease' }}
               />
               {index % 2 === 1 ? (
@@ -99,6 +126,7 @@ export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChar
                   textAnchor="middle"
                   fontSize="10"
                   fill="var(--text-muted)"
+                  pointerEvents="none"
                 >
                   {bucket.score.toFixed(0)}
                 </text>
@@ -110,9 +138,9 @@ export function ScoreDistributionChart({ buckets, range }: ScoreDistributionChar
 
       {hovered && hoveredIndex !== null ? (
         <div
-          className="pointer-events-none absolute z-10 rounded-lg px-3 py-2 text-xs"
+          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-lg px-3 py-2 text-xs"
           style={{
-            left: `${((hoveredIndex + 0.5) / Math.max(1, buckets.length)) * 100}%`,
+            left: `clamp(4rem, ${((hoveredIndex + 0.5) / Math.max(1, buckets.length)) * 100}%, calc(100% - 4rem))`,
             top: '8px',
             transform: 'translateX(-50%)',
             background: 'var(--bg-card)',

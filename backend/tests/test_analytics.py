@@ -131,6 +131,13 @@ def test_overview_defaults_to_global_and_filters_cloud_without_hiding_distributi
     assert filtered_distribution[10.0] == 1
     assert {item['name'] for item in filtered['frequency_tags']} == {'奇幻', '漫画改'}
 
+    exact_score = client.get(
+        '/api/v1/analytics/overview?min_score=8&max_score=8',
+        cookies=auth_cookie(viewer),
+    ).json()
+    assert exact_score['favorites'][0]['score'] == 8.0
+    assert exact_score['favorites'][0]['average_score'] == 8.0
+
 
 def test_user_overview_is_visible_to_other_members(client, db, make_user):
     viewer = make_user('member-viewer')

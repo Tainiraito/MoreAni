@@ -79,7 +79,7 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-0 overflow-hidden" data-testid="tag-word-cloud">
+    <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden" data-testid="tag-word-cloud">
       <div role="img" aria-label="番剧标签词云" onPointerLeave={handleLeave}>
         <Wordcloud<CloudDatum>
           width={width}
@@ -145,17 +145,14 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
         </div>
       ) : null}
 
-      <details className="mt-3 rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--bg-card-warm)' }}>
-        <summary className="font-medium" style={{ color: 'var(--text-secondary)' }}>查看标签明细</summary>
-        <ol className="mt-3 grid gap-2 sm:grid-cols-2">
-          {items.slice(0, 20).map(item => (
-            <li key={item.name} className="flex items-center justify-between gap-3">
-              <span style={{ color: 'var(--text-primary)' }}>{item.name}</span>
-              <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>{item.weight.toFixed(2)}</span>
-            </li>
-          ))}
-        </ol>
-      </details>
+      <ol className="sr-only">
+        {items.map(item => (
+          <li key={item.name}>
+            {item.name}：权重 {item.weight.toFixed(2)}，{item.rating_count} 条评分，
+            {item.title_count} 部番剧，平均分 {item.average_score.toFixed(1)}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

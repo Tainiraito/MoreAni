@@ -32,17 +32,18 @@ describe('ScoreRangeSlider', () => {
     expect(view.getByText('4.0 – 8.5')).toBeInTheDocument()
   })
 
-  it('两个端点不会交叉并保留 0.5 分最小间隔', () => {
+  it('两个端点可以重合选择单个评分，但不会交叉', () => {
     const view = render(<ControlledSlider />)
     const minimum = view.getByLabelText('最低评分') as HTMLInputElement
     const maximum = view.getByLabelText('最高评分') as HTMLInputElement
 
     fireEvent.change(minimum, { target: { value: '10' } })
-    expect(minimum).toHaveValue('9.5')
+    expect(minimum).toHaveValue('10')
     expect(maximum).toHaveValue('10')
+    expect(view.getByText('10.0 – 10.0')).toBeInTheDocument()
 
     fireEvent.change(maximum, { target: { value: '0.5' } })
-    expect(minimum).toHaveValue('9.5')
+    expect(minimum).toHaveValue('10')
     expect(maximum).toHaveValue('10')
   })
 })
