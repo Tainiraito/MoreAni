@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -17,6 +17,7 @@ import { useRefreshStore } from '@/stores/refresh-store'
 
 const queryClient = new QueryClient()
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })))
 const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
 const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
 function AdminDialogLoading() {
@@ -34,6 +35,17 @@ function AdminDialogLoading() {
       </div>
     </div>
   )
+}
+
+function RequireUser({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(state => state.user)
+  const openAuth = useUIStore(state => state.openAuth)
+
+  useEffect(() => {
+    if (!user) openAuth()
+  }, [openAuth, user])
+
+  return user ? <>{children}</> : <Navigate to="/" replace />
 }
 
 function AuthValidator({ children }: { children: React.ReactNode }) {
@@ -185,6 +197,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/profile/:id" element={<Suspense fallback={null}><ProfilePage /></Suspense>} />
+              <Route path="/analytics" element={<RequireUser><Suspense fallback={null}><AnalyticsPage /></Suspense></RequireUser>} />
             </Routes>
           </div>
 

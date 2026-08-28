@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
@@ -9,12 +10,13 @@ import { Avatar } from '@/components/ui/Avatar'
 import { NotificationCenter } from '@/components/notification/NotificationFab'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { preloadAdminDialog } from '@/components/admin/admin-dialog-loader'
-import { User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
+import { ChartNoAxesCombined, User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
 
 export function AppHeader() {
   const { user, logout } = useAuthStore()
   const { openAuth, openSettings, openAdmin } = useUIStore()
   const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -41,6 +43,7 @@ export function AppHeader() {
   }, [menuOpen])
 
   const menuItemStyle = "w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2.5"
+  const headerVisible = location.pathname !== '/' || scrolled
 
   const handleLogout = async () => {
     if (loggingOut) return
@@ -61,12 +64,12 @@ export function AppHeader() {
     <header
       className="fixed top-0 right-0 left-0 z-50 flex h-11 items-center sm:h-12 transition-all duration-300"
       style={{
-        background: scrolled ? 'var(--bg-card)' : 'transparent',
-        borderBottom: scrolled ? '1px solid var(--border-line)' : '1px solid transparent',
-        backdropFilter: scrolled ? 'blur(12px)' : 'none',
-        opacity: scrolled ? 1 : 0,
-        transform: scrolled ? 'translateY(0)' : 'translateY(-100%)',
-        pointerEvents: scrolled ? 'auto' : 'none',
+        background: headerVisible ? 'var(--bg-card)' : 'transparent',
+        borderBottom: headerVisible ? '1px solid var(--border-line)' : '1px solid transparent',
+        backdropFilter: headerVisible ? 'blur(12px)' : 'none',
+        opacity: headerVisible ? 1 : 0,
+        transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)',
+        pointerEvents: headerVisible ? 'auto' : 'none',
       }}
     >
       <PageContainer>
@@ -90,6 +93,17 @@ export function AppHeader() {
 
           {/* 右侧：通知与头像菜单 */}
           <div className="flex items-center gap-3">
+            {user ? (
+              <Link
+                to="/analytics"
+                aria-label="打开统计分析"
+                aria-current={location.pathname === '/analytics' ? 'page' : undefined}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+                style={{ color: location.pathname === '/analytics' ? 'var(--brand)' : 'var(--text-secondary)' }}
+              >
+                <ChartNoAxesCombined size={16} />
+              </Link>
+            ) : null}
             <NotificationCenter />
             <div className="relative" ref={menuRef}>
             <button

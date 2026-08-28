@@ -3,6 +3,9 @@ import { normalizeAiringWeek } from '@/lib/airing'
 import type {
   AiringCalendarWeek,
   AnimeResourceResponse,
+  AnalyticsOverview,
+  AnalyticsRecommendations,
+  AnalyticsScopeType,
   Announcement,
   AvatarCrop,
   ContentItem,
@@ -221,6 +224,29 @@ export const api = {
     const query = new URLSearchParams({ type: params.type ?? 'anime', size: String(params.size) })
     params.excludeIds?.forEach(id => query.append('exclude_id', String(id)))
     return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
+  },
+  getAnalyticsOverview: (
+    params: { scope: AnalyticsScopeType; userId?: number; minScore: number; maxScore: number },
+    options?: RequestInit,
+  ) => {
+    const query = new URLSearchParams({
+      scope: params.scope,
+      min_score: String(params.minScore),
+      max_score: String(params.maxScore),
+    })
+    if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    return request<AnalyticsOverview>(`/analytics/overview?${query}`, options)
+  },
+  getAnalyticsRecommendations: (
+    params: { scope: AnalyticsScopeType; userId?: number; limit?: number },
+    options?: RequestInit,
+  ) => {
+    const query = new URLSearchParams({
+      scope: params.scope,
+      limit: String(params.limit ?? 6),
+    })
+    if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    return request<AnalyticsRecommendations>(`/analytics/recommendations?${query}`, options)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getAiringWeek: (options?: RequestInit) => {

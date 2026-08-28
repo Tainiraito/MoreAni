@@ -19,6 +19,7 @@ from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeade
 from models import ContentItem, ResourceSubscription
 from routers.v1.admin import router as admin_router
 from routers.v1.airing import router as airing_router
+from routers.v1.analytics import router as analytics_router
 from routers.v1.auth import router as auth_router
 from routers.v1.bangumi import router as bangumi_router
 from routers.v1.content import router as content_router
@@ -240,6 +241,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # --- V1 API routers ---
 app.include_router(auth_router, prefix='/api/v1')
 app.include_router(content_router, prefix='/api/v1')
+app.include_router(analytics_router, prefix='/api/v1')
 app.include_router(notifications_router, prefix='/api/v1')
 app.include_router(subscription_router, prefix='/api/v1')
 app.include_router(rating_router, prefix='/api/v1')
