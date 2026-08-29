@@ -52,6 +52,9 @@ frontend/*.mjs
 # Local review docs (not for public repo)
 docs/review/
 
+# Deployment docs (NAS login, SOP — not for public repo)
+DEPLOY.md
+
 # Hermes skills (local agent knowledge, not project files)
 skills/
 

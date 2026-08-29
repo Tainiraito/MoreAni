@@ -310,6 +310,42 @@ def mark_all_read(db: Session, *, user_id: int, scope: str | None = None) -> int
     return len(new_rows)
 
 
+def create_private_system_notification(
+    db: Session,
+    *,
+    recipient_user_id: int,
+    kind: str,
+    title: str,
+    body: str,
+    payload: dict[str, Any],
+    dedupe_key: str,
+) -> Notification:
+    """创建可去重的系统私信，但由调用方统一提交事务。"""
+    existing = (
+        db.query(Notification)
+        .filter(
+            Notification.recipient_user_id == recipient_user_id,
+            Notification.dedupe_key == dedupe_key,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing
+    notification = Notification(
+        scope='private',
+        recipient_user_id=recipient_user_id,
+        kind=kind,
+        title=title,
+        body=body,
+        payload_json=json.dumps(payload, ensure_ascii=False),
+        is_published=True,
+        published_at=utcnow_naive(),
+        dedupe_key=dedupe_key,
+    )
+    db.add(notification)
+    return notification
+
+
 def create_announcement(db: Session, *, admin_id: int, data: dict[str, Any]) -> Notification:
     """Create a public announcement."""
     is_published = bool(data.get('is_published', True))

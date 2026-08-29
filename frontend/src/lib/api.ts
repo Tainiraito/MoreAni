@@ -3,6 +3,9 @@ import { normalizeAiringWeek } from '@/lib/airing'
 import type {
   AiringCalendarWeek,
   AnimeResourceResponse,
+  AnalyticsOverview,
+  AnalyticsRecommendations,
+  AnalyticsScopeType,
   Announcement,
   AvatarCrop,
   ContentItem,
@@ -16,6 +19,7 @@ import type {
 
 const API_BASE = '/api/v1'
 const CONTENT_LIST_TIMEOUT_MS = 15_000
+const ANALYTICS_TIMEOUT_MS = 12_000
 const AIRING_WEEK_CACHE_KEY = 'moreani-airing-week-v2'
 
 interface AiringWeekCacheRecord {
@@ -221,6 +225,31 @@ export const api = {
     const query = new URLSearchParams({ type: params.type ?? 'anime', size: String(params.size) })
     params.excludeIds?.forEach(id => query.append('exclude_id', String(id)))
     return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
+  },
+  getAnalyticsOverview: (
+    params: { scope: AnalyticsScopeType; userId?: number; minScore: number; maxScore: number; tags?: string[] },
+    options?: RequestInit,
+  ) => {
+    const query = new URLSearchParams({
+      scope: params.scope,
+      min_score: String(params.minScore),
+      max_score: String(params.maxScore),
+    })
+    if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    params.tags?.forEach(tag => query.append('tag', tag))
+    return request<AnalyticsOverview>(`/analytics/overview?${query}`, options, ANALYTICS_TIMEOUT_MS)
+  },
+  getAnalyticsRecommendations: (
+    params: { scope: AnalyticsScopeType; userId?: number; limit?: number; tags?: string[] },
+    options?: RequestInit,
+  ) => {
+    const query = new URLSearchParams({
+      scope: params.scope,
+      limit: String(params.limit ?? 6),
+    })
+    if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    params.tags?.forEach(tag => query.append('tag', tag))
+    return request<AnalyticsRecommendations>(`/analytics/recommendations?${query}`, options, ANALYTICS_TIMEOUT_MS)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getAiringWeek: (options?: RequestInit) => {

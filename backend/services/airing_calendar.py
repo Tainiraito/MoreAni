@@ -11,8 +11,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
-from models import AiringCalendarItem, AiringCalendarSyncState, ContentItem
-from services import bangumi, covers
+from models import AiringCalendarItem, AiringCalendarSyncState, ContentItem, User
+from services import bangumi, covers, notifications
 
 logger = logging.getLogger('uvicorn')
 
@@ -115,12 +115,46 @@ def _get_sync_state(db: Session) -> AiringCalendarSyncState:
     return state
 
 
-def _set_failed(db: Session, error_message: str) -> None:
+def _set_failed(db: Session, error_message: str, attempted_at: datetime) -> None:
+    """记录按自然日连续失败次数，并在第三天向超级管理员发送一次私信。"""
     db.rollback()
     state = _get_sync_state(db)
+    failure_date = _local_date(attempted_at)
+    previous_failure_date = _local_date(state.last_failure_at)
+    if previous_failure_date == failure_date:
+        failure_days = max(1, state.consecutive_failure_days or 0)
+    elif failure_date is not None and previous_failure_date == failure_date - timedelta(days=1):
+        failure_days = (state.consecutive_failure_days or 0) + 1
+    else:
+        failure_days = 1
+        state.failure_notified_at = None
     state.status = 'failed'
     state.error_message = error_message[:1000]
-    state.updated_at = utcnow_naive()
+    state.consecutive_failure_days = failure_days
+    state.last_failure_at = attempted_at
+    state.updated_at = attempted_at
+    if failure_days >= 3 and state.failure_notified_at is None and failure_date is not None:
+        failure_start = failure_date - timedelta(days=failure_days - 1)
+        dedupe_key = f'airing-calendar-failure:{failure_start.isoformat()}'
+        payload = {
+            'failure_days': failure_days,
+            'failure_start': failure_start.isoformat(),
+            'last_attempt_at': attempted_at.replace(tzinfo=UTC).isoformat(),
+            'error_message': state.error_message,
+        }
+        super_admins = db.query(User).filter(User.role == 'super_admin').all()
+        for admin in super_admins:
+            notifications.create_private_system_notification(
+                db,
+                recipient_user_id=admin.id,
+                kind='airing_sync_failure',
+                title='新番周历连续同步失败',
+                body=f'新番周历已连续 {failure_days} 天同步失败，请检查 Bangumi 接口与服务日志。',
+                payload=payload,
+                dedupe_key=dedupe_key,
+            )
+        if super_admins:
+            state.failure_notified_at = attempted_at
     db.commit()
 
 
@@ -148,10 +182,10 @@ async def sync_calendar(db: Session) -> int:
         payload = await bangumi.fetch_calendar()
         records = parse_calendar(payload)
     except (bangumi.BangumiError, AiringCalendarError) as exc:
-        _set_failed(db, str(exc))
+        _set_failed(db, str(exc), attempted_at)
         raise
     except Exception as exc:  # noqa: BLE001
-        _set_failed(db, 'Bangumi 周历同步失败')
+        _set_failed(db, 'Bangumi 周历同步失败', attempted_at)
         raise AiringCalendarError('Bangumi 周历同步失败') from exc
 
     now = utcnow_naive()
@@ -187,6 +221,9 @@ async def sync_calendar(db: Session) -> int:
     state.status = 'success'
     state.error_message = None
     state.item_count = len(records)
+    state.consecutive_failure_days = 0
+    state.last_failure_at = None
+    state.failure_notified_at = None
     state.updated_at = now
     db.commit()
     if _prefetch_enabled():

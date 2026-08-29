@@ -94,6 +94,84 @@ export interface Tag {
   tag_type: 'bangumi' | 'custom'
 }
 
+export type AnalyticsScopeType = 'global' | 'user'
+
+export interface AnalyticsUserSummary {
+  id: number
+  username: string
+  nickname: string
+  avatar_url?: string | null
+  avatar_crop?: AvatarCrop | null
+}
+
+export interface AnalyticsScope {
+  type: AnalyticsScopeType
+  user: AnalyticsUserSummary | null
+}
+
+export interface AnalyticsScoreBucket {
+  score: number
+  count: number
+}
+
+export interface AnalyticsTagStat {
+  name: string
+  weight: number
+  rating_count: number
+  title_count: number
+  average_score: number
+}
+
+export interface AnalyticsFavoriteItem {
+  id: number
+  title: string
+  title_alt: string
+  cover_url: string
+  content_type: ContentType
+  score: number
+  average_score: number | null
+  rating_count: number
+}
+
+export interface AnalyticsOverview {
+  scope: AnalyticsScope
+  min_score: number
+  max_score: number
+  rating_count: number
+  title_count: number
+  user_count: number
+  average_score: number | null
+  score_distribution: AnalyticsScoreBucket[]
+  frequency_tags: AnalyticsTagStat[]
+  weighted_tags: AnalyticsTagStat[]
+  favorites: AnalyticsFavoriteItem[]
+}
+
+export type AnalyticsConfidence = 'low' | 'medium' | 'high'
+export type AnalyticsRecommendationBasis = 'global' | 'global_fallback' | 'blended' | 'personal'
+
+export interface AnalyticsRecommendationItem {
+  id: number
+  title: string
+  title_alt: string
+  cover_url: string
+  content_type: ContentType
+  match_percent: number
+  confidence: AnalyticsConfidence
+  matched_tags: string[]
+  basis: AnalyticsRecommendationBasis
+  average_score: number | null
+  rating_count: number
+}
+
+export interface AnalyticsRecommendations {
+  scope: AnalyticsScope
+  profile_rating_count: number
+  confidence: AnalyticsConfidence
+  basis: AnalyticsRecommendationBasis
+  items: AnalyticsRecommendationItem[]
+}
+
 export interface PaginatedResponse<T> {
   items: T[]
   total: number

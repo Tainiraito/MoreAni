@@ -324,6 +324,100 @@ class RatingHistoryResponse(BaseModel):
 
 
 # =============================================================================
+# Analytics schemas
+# =============================================================================
+
+
+class AnalyticsUserSummary(BaseModel):
+    """被分析用户的公开摘要。"""
+
+    id: int
+    username: str
+    nickname: str
+    avatar_url: str | None = None
+    avatar_crop: AvatarCrop | None = None
+
+
+class AnalyticsScopeResponse(BaseModel):
+    """统计分析的全站或单用户范围。"""
+
+    type: Literal['global', 'user']
+    user: AnalyticsUserSummary | None = None
+
+
+class AnalyticsScoreBucket(BaseModel):
+    """一个 0.5 分档的评分数量。"""
+
+    score: float
+    count: int
+
+
+class AnalyticsTagStat(BaseModel):
+    """词云中的标签统计。"""
+
+    name: str
+    weight: float
+    rating_count: int
+    title_count: int
+    average_score: float
+
+
+class AnalyticsFavoriteItem(BaseModel):
+    """分析范围内的代表番剧。"""
+
+    id: int
+    title: str
+    title_alt: str = ''
+    cover_url: str = ''
+    content_type: str
+    score: float
+    average_score: float | None = None
+    rating_count: int = 0
+
+
+class AnalyticsOverviewResponse(BaseModel):
+    """评分分布、标签画像和代表作。"""
+
+    scope: AnalyticsScopeResponse
+    min_score: float
+    max_score: float
+    rating_count: int
+    title_count: int
+    user_count: int
+    average_score: float | None = None
+    score_distribution: list[AnalyticsScoreBucket] = Field(default_factory=list)
+    frequency_tags: list[AnalyticsTagStat] = Field(default_factory=list)
+    weighted_tags: list[AnalyticsTagStat] = Field(default_factory=list)
+    favorites: list[AnalyticsFavoriteItem] = Field(default_factory=list)
+
+
+class AnalyticsRecommendationItem(BaseModel):
+    """一条带可解释匹配度的站内推荐。"""
+
+    id: int
+    title: str
+    title_alt: str = ''
+    cover_url: str = ''
+    content_type: str
+    match_percent: int
+    confidence: Literal['low', 'medium', 'high']
+    matched_tags: list[str] = Field(default_factory=list)
+    basis: Literal['global', 'global_fallback', 'blended', 'personal']
+    average_score: float | None = None
+    rating_count: int = 0
+
+
+class AnalyticsRecommendationsResponse(BaseModel):
+    """统计画像生成的未评分番剧推荐。"""
+
+    scope: AnalyticsScopeResponse
+    profile_rating_count: int
+    confidence: Literal['low', 'medium', 'high']
+    basis: Literal['global', 'global_fallback', 'blended', 'personal']
+    items: list[AnalyticsRecommendationItem] = Field(default_factory=list)
+
+
+# =============================================================================
 # User status schemas
 # =============================================================================
 

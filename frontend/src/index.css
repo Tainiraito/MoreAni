@@ -144,6 +144,58 @@ body {
 :root.dark ::-webkit-scrollbar-thumb { background: rgba(251, 113, 167, 0.2); }
 :root.dark ::-webkit-scrollbar-thumb:hover { background: rgba(251, 113, 167, 0.4); }
 
+/* 矮屏桌面端：三张卡片横向排列，把图表和词云从卡片堆叠中释放出来。 */
+@media (min-width: 1280px) and (max-height: 760px) {
+  [data-testid="settings-current-favorites-scroll"],
+  [data-testid="settings-recommendations-scroll"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-y: visible;
+  }
+
+  [data-testid="settings-current-favorites-scroll"] > [data-testid="analytics-favorite-card"] > div,
+  [data-testid="settings-recommendations-scroll"] > [data-testid="analytics-recommendation-card"] > div {
+    grid-template-columns: 1fr;
+  }
+
+  [data-testid="settings-current-favorites-scroll"] [data-testid="analytics-card-cover"],
+  [data-testid="settings-recommendations-scroll"] [data-testid="analytics-card-cover"] {
+    min-height: 3rem;
+    height: 3rem;
+  }
+}
+
+/* 窄屏单列：四个区域在内容容器内分段滚动，卡片三列收纳，避免被区域高度裁切。 */
+@media (max-width: 639px) {
+  [data-testid="settings-analytics-grid"] {
+    grid-template-rows: repeat(4, minmax(180px, auto));
+    align-content: start;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  [data-testid="settings-current-favorites-scroll"],
+  [data-testid="settings-recommendations-scroll"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-y: visible;
+  }
+
+  [data-testid="settings-current-favorites-scroll"] > [data-testid="analytics-favorite-card"] > div,
+  [data-testid="settings-recommendations-scroll"] > [data-testid="analytics-recommendation-card"] > div {
+    grid-template-columns: 1fr;
+  }
+
+  [data-testid="settings-current-favorites-scroll"] [data-testid="analytics-card-cover"],
+  [data-testid="settings-recommendations-scroll"] [data-testid="analytics-card-cover"] {
+    min-height: 2.25rem;
+    height: 2.25rem;
+  }
+
+  [data-testid="settings-current-favorites-scroll"] > [data-testid="analytics-favorite-card"] > div > div:last-child,
+  [data-testid="settings-recommendations-scroll"] > [data-testid="analytics-recommendation-card"] > div > div:last-child {
+    padding: 0.375rem;
+  }
+}
+
 /* Dark select dropdown */
 select option {
   background: var(--bg-card);

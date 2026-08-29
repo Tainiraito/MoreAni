@@ -294,6 +294,9 @@ class AiringCalendarSyncState(Base):
     status = Column(String(20), nullable=False, default='pending')  # success/failed/pending
     error_message = Column(Text, nullable=True)
     item_count = Column(Integer, nullable=False, default=0)
+    consecutive_failure_days = Column(Integer, nullable=False, default=0)
+    last_failure_at = Column(DateTime, nullable=True)
+    failure_notified_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 

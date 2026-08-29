@@ -19,6 +19,7 @@ from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeade
 from models import ContentItem, ResourceSubscription
 from routers.v1.admin import router as admin_router
 from routers.v1.airing import router as airing_router
+from routers.v1.analytics import router as analytics_router
 from routers.v1.auth import router as auth_router
 from routers.v1.bangumi import router as bangumi_router
 from routers.v1.content import router as content_router
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
     _migrate_users_avatar_crop()
     _migrate_resource_subscriptions()
     _migrate_legacy_cover_assets()
+    _migrate_airing_calendar_failure_tracking()
     worker_task = None
     airing_task = None
     stop_event = asyncio.Event()
@@ -53,7 +55,7 @@ async def lifespan(app: FastAPI):
     if worker_enabled:
         interval = max(60, int(os.getenv('MOREANI_NOTIFICATION_INTERVAL_SECONDS', '1800')))
         worker_task = asyncio.create_task(run_worker(stop_event, interval_seconds=interval))
-    airing_enabled = os.getenv('MOREANI_AIRING_CALENDAR_WORKER', 'false').lower() in {'1', 'true', 'yes', 'on'}
+    airing_enabled = os.getenv('MOREANI_AIRING_CALENDAR_WORKER', 'true').lower() in {'1', 'true', 'yes', 'on'}
     if airing_enabled:
         airing_task = asyncio.create_task(run_airing_calendar_worker(stop_event))
     try:
@@ -202,6 +204,29 @@ def _migrate_legacy_cover_assets() -> None:
         print(f'[migrate] cover_assets 迁移跳过: {exc}')
 
 
+def _migrate_airing_calendar_failure_tracking() -> None:
+    """SQLite 轻量迁移：为周历同步状态增加连续失败通知字段（幂等）。"""
+    try:
+        from sqlalchemy import text
+
+        with engine.begin() as conn:
+            columns = {row[1] for row in conn.execute(text('PRAGMA table_info(airing_calendar_sync_state)'))}
+            if not columns:
+                return
+            additions = {
+                'consecutive_failure_days': 'INTEGER NOT NULL DEFAULT 0',
+                'last_failure_at': 'DATETIME',
+                'failure_notified_at': 'DATETIME',
+            }
+            for column, definition in additions.items():
+                if column not in columns:
+                    conn.execute(
+                        text(f'ALTER TABLE airing_calendar_sync_state ADD COLUMN {column} {definition}'),
+                    )
+    except Exception as exc:  # noqa: BLE001
+        print(f'[migrate] airing calendar failure tracking migration skipped: {exc}')
+
+
 app = FastAPI(
     title='MoreAni API',
     version='2.0.0',
@@ -240,6 +265,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # --- V1 API routers ---
 app.include_router(auth_router, prefix='/api/v1')
 app.include_router(content_router, prefix='/api/v1')
+app.include_router(analytics_router, prefix='/api/v1')
 app.include_router(notifications_router, prefix='/api/v1')
 app.include_router(subscription_router, prefix='/api/v1')
 app.include_router(rating_router, prefix='/api/v1')
