@@ -56,7 +56,10 @@ describe('TagWordCloud', () => {
 
     fireEvent.click(loveTag)
     expect(loveTag).toHaveAttribute('aria-pressed', 'true')
-    expect(loveTag).toHaveStyle({ textDecoration: 'underline' })
+    expect(loveTag).toHaveStyle({
+      filter: 'drop-shadow(0 0 8px rgba(251, 113, 167, 0.7))',
+      textDecoration: 'none',
+    })
 
     fireEvent.keyDown(schoolTag, { key: 'Enter' })
     expect(schoolTag).toHaveAttribute('aria-pressed', 'true')

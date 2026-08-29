@@ -263,7 +263,7 @@ describe('AnalyticsPage', () => {
     const loveTag = await view.findByRole('button', { name: '恋爱加权' })
     fireEvent.click(loveTag)
     expect(view.getByRole('button', { name: '恋爱加权' })).toHaveAttribute('aria-pressed', 'true')
-    expect(view.getByRole('button', { name: '取消标签 恋爱加权' })).toBeInTheDocument()
+    expect(view.queryByTestId('active-tag-filters')).not.toBeInTheDocument()
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
       { scope: 'global', userId: undefined, minScore: 0.5, maxScore: 10, tags: ['恋爱加权'] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
@@ -284,7 +284,18 @@ describe('AnalyticsPage', () => {
       { scope: 'global', userId: undefined, limit: 6, tags: ['校园加权'] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
-    expect(view.queryByRole('button', { name: '取消标签 恋爱加权' })).not.toBeInTheDocument()
+    expect(view.getByRole('button', { name: '恋爱加权' })).toHaveAttribute('aria-pressed', 'false')
+    expect(view.getByRole('button', { name: '校园加权' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('分析主面板使用桌面双列，带封面卡片统一使用左侧大图结构', async () => {
+    const view = renderAnalytics()
+    await view.findByText('全站代表作')
+
+    expect(view.getByTestId('analytics-primary-grid')).toHaveClass('lg:grid-cols-2')
+    const covers = view.getAllByTestId('analytics-card-cover')
+    expect(covers).toHaveLength(2)
+    covers.forEach(cover => expect(cover).toHaveClass('aspect-[3/4]'))
   })
 
   it('无统计样本和候选时展示完整空状态', async () => {

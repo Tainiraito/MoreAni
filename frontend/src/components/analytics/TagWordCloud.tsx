@@ -100,10 +100,10 @@ export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloud
                 transform={`translate(${word.x ?? 0}, ${word.y ?? 0})`}
                 textAnchor="middle"
                 fontSize={word.size}
-                fontWeight={selected ? 700 : word.weight}
+                fontWeight={word.weight}
                 fontFamily="var(--font-sans)"
-                fill={cloudTextColor(rank, items.length, hovered || selected)}
-                opacity={hovered || selected ? 1 : Math.max(0.52, 1 - rank / Math.max(items.length * 1.8, 1))}
+                fill={cloudTextColor(rank, items.length, hovered)}
+                opacity={hovered ? 1 : Math.max(0.52, 1 - rank / Math.max(items.length * 1.8, 1))}
                 tabIndex={0}
                 role="button"
                 aria-pressed={selected}
@@ -121,10 +121,9 @@ export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloud
                 }}
                 style={{
                   cursor: 'pointer',
-                  filter: hovered || selected ? 'drop-shadow(0 0 7px rgba(251, 113, 167, 0.55))' : 'none',
+                  filter: hovered || selected ? 'drop-shadow(0 0 8px rgba(251, 113, 167, 0.7))' : 'none',
                   outline: 'none',
-                  textDecoration: selected ? 'underline' : 'none',
-                  textUnderlineOffset: '4px',
+                  textDecoration: 'none',
                   transition: 'fill 150ms ease, opacity 150ms ease, filter 150ms ease',
                 }}
               >

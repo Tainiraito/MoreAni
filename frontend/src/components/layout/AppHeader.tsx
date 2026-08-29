@@ -91,20 +91,22 @@ export function AppHeader() {
             </span>
           </a>
 
-          {/* 右侧：通知与头像菜单 */}
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link
-                to="/analytics"
-                aria-label="打开统计分析"
-                aria-current={location.pathname === '/analytics' ? 'page' : undefined}
-                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
-                style={{ color: location.pathname === '/analytics' ? 'var(--brand)' : 'var(--text-secondary)' }}
-              >
-                <ChartNoAxesCombined size={16} />
-              </Link>
-            ) : null}
-            <NotificationCenter />
+          {/* 右侧：图标组与头像分别控制视觉间距 */}
+          <div className="flex items-center gap-2" data-testid="header-actions">
+            <div className="flex items-center gap-0" data-testid="header-icon-actions">
+              {user ? (
+                <Link
+                  to="/analytics"
+                  aria-label="打开统计分析"
+                  aria-current={location.pathname === '/analytics' ? 'page' : undefined}
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+                  style={{ color: location.pathname === '/analytics' ? 'var(--brand)' : 'var(--text-secondary)' }}
+                >
+                  <ChartNoAxesCombined size={16} />
+                </Link>
+              ) : null}
+              <NotificationCenter />
+            </div>
             <div className="relative" ref={menuRef}>
             <button
               type="button"

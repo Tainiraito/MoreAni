@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, ChartNoAxesCombined, Cloud, Heart, Sparkles, Star, Users, X } from 'lucide-react'
+import { BarChart3, ChartNoAxesCombined, Cloud, Heart, Sparkles, Star, Users } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
@@ -30,6 +30,7 @@ const ANALYTICS_CARD_STYLE = {
   border: '1px solid var(--border-line)',
   boxShadow: '0 0 18px rgba(251, 113, 167, 0.05)',
 } as const
+const COVER_CARD_GRID_CLASS = 'grid grid-cols-[88px_minmax(0,1fr)]'
 
 const BASIS_LABEL: Record<AnalyticsRecommendationBasis, string> = {
   global: '基于全站画像',
@@ -92,37 +93,39 @@ function FavoriteCard({ item, scope, requiredTagNames, onOpen }: FavoriteCardPro
       type="button"
       data-testid="analytics-favorite-card"
       onClick={() => onOpen(item.id)}
-      className="group flex min-w-0 items-center gap-4 rounded-xl p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+      className="group min-w-0 overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
-      <div className="h-24 w-16 shrink-0 overflow-hidden rounded-lg">
-        <CoverImage src={item.cover_url} alt={item.title} />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-        {item.title_alt ? <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p> : null}
-        <p className="mt-3 flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--brand)' }}>
-          <Star size={14} fill="currentColor" />
-          {item.score.toFixed(1)}
-        </p>
-        <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          {scope === 'global'
-            ? `${item.rating_count} 条评分 · 实际均分`
-            : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
-        </p>
-        {requiredTagNames.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-1" data-testid="favorite-required-tags">
-            {requiredTagNames.map(tag => (
-              <span
-                key={tag}
-                className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
+      <div className={COVER_CARD_GRID_CLASS}>
+        <div className="aspect-[3/4] overflow-hidden" data-testid="analytics-card-cover">
+          <CoverImage src={item.cover_url} alt={item.title} />
+        </div>
+        <div className="min-w-0 p-3">
+          <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+          {item.title_alt ? <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p> : null}
+          <p className="mt-3 flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--brand)' }}>
+            <Star size={14} fill="currentColor" />
+            {item.score.toFixed(1)}
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {scope === 'global'
+              ? `${item.rating_count} 条评分 · 实际均分`
+              : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
+          </p>
+          {requiredTagNames.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1" data-testid="favorite-required-tags">
+              {requiredTagNames.map(tag => (
+                <span
+                  key={tag}
+                  className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                  style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
     </button>
   )
@@ -145,8 +148,8 @@ function RecommendationCard({ item, requiredTagNames, onOpen }: RecommendationCa
       className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
-      <div className="grid grid-cols-[88px_minmax(0,1fr)]">
-        <div className="aspect-[3/4] overflow-hidden">
+      <div className={COVER_CARD_GRID_CLASS}>
+        <div className="aspect-[3/4] overflow-hidden" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
         <div className="min-w-0 p-3">
@@ -352,7 +355,7 @@ export function AnalyticsPage() {
             <SummaryCard label="区间均分" value={overview.average_score?.toFixed(2) ?? '—'} icon={<Star size={17} />} />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-2" data-testid="analytics-primary-grid">
             <section className="flex h-full min-w-0 flex-col rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE} data-testid="rating-distribution-panel">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -398,23 +401,6 @@ export function AnalyticsPage() {
                   })}
                 </div>
               </div>
-              {activeTagNames.length > 0 ? (
-                <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="active-tag-filters">
-                  <span className="mr-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>已选标签</span>
-                  {activeTagNames.map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleToggleTag(tag)}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
-                      style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
-                      aria-label={`取消标签 ${tag}`}
-                    >
-                      {tag}<X size={12} />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
               <TagWordCloud
                 items={deferredTags}
                 selectedNames={activeTagNames}

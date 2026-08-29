@@ -38,9 +38,15 @@ describe('AppHeader 统计分析入口', () => {
     const view = renderHeader('/')
     const analytics = view.getByRole('link', { name: '打开统计分析' })
     const notification = view.getByRole('button', { name: '打开通知' })
+    const actions = view.getByTestId('header-actions')
+    const iconActions = view.getByTestId('header-icon-actions')
 
     expect(analytics).toHaveAttribute('href', '/analytics')
     expect(analytics.compareDocumentPosition(notification) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(actions).toHaveClass('gap-2')
+    expect(iconActions).toHaveClass('gap-0')
+    expect(iconActions).toContainElement(analytics)
+    expect(iconActions).toContainElement(notification)
   })
 
   it('未登录时隐藏统计分析入口', () => {

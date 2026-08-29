@@ -48,7 +48,7 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
   }, { auth: { user: currentUser, token: 'analytics-e2e-token', isGuest: false } })
   if (testInfo.project.name === 'chromium') {
-    await page.setViewportSize({ width: 1920, height: 1080 })
+    await page.setViewportSize({ width: 1180, height: 900 })
   }
 
   await page.route('**/api/v1/**', async route => {
@@ -143,6 +143,8 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await expect(page.getByText('站内评分 8.4 · 23 人评分')).toBeVisible()
   await expect(page.getByText('全站优先展示高分且评分人数充足的番剧', { exact: false })).toBeVisible()
   await expect(page).toHaveURL(/\/analytics$/)
+  await expect.poll(() => page.getByTestId('header-actions').evaluate(element => getComputedStyle(element).columnGap)).toBe('8px')
+  await expect.poll(() => page.getByTestId('header-icon-actions').evaluate(element => getComputedStyle(element).columnGap)).toBe('0px')
 
   const wordCloud = page.getByTestId('tag-word-cloud')
   await expect.poll(async () => {
@@ -154,12 +156,14 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await page.getByLabel('恋爱', { exact: true }).hover()
   await expect(page.getByRole('tooltip')).toContainText('当前词云占比')
 
-  if ((page.viewportSize()?.width ?? 0) >= 1280) {
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
     const distributionPanel = await page.getByTestId('rating-distribution-panel').boundingBox()
     const cloudPanel = await page.getByTestId('tag-cloud-panel').boundingBox()
     expect(distributionPanel).not.toBeNull()
     expect(cloudPanel).not.toBeNull()
     expect(Math.abs(distributionPanel!.height - cloudPanel!.height)).toBeLessThanOrEqual(1)
+    expect(Math.abs(distributionPanel!.y - cloudPanel!.y)).toBeLessThanOrEqual(1)
+    expect(cloudPanel!.x).toBeGreaterThan(distributionPanel!.x + distributionPanel!.width)
   }
 
   const minimum = page.getByRole('slider', { name: '最低评分' })
@@ -262,12 +266,14 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await loveTag.click()
   await Promise.all([loveOverviewResponse, loveRecommendationsResponse])
   await expect(loveTag).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: '取消标签 恋爱' })).toBeVisible()
+  await expect(page.getByTestId('active-tag-filters')).toHaveCount(0)
   await expect(page.getByTestId('analytics-favorite-card')).toContainText('包含全部已选标签的代表作')
   await expect(page.getByTestId('analytics-favorite-card')).toContainText('恋爱')
   await expect(page.getByTestId('analytics-recommendation-card')).toContainText('包含全部已选标签的推荐')
   await expect(page.getByTestId('analytics-recommendation-card')).toContainText('恋爱')
   await expect.poll(() => loveTag.evaluate(element => getComputedStyle(element).outlineStyle)).toBe('none')
+  await expect.poll(() => loveTag.evaluate(element => getComputedStyle(element).textDecorationLine)).toBe('none')
+  await expect.poll(() => loveTag.evaluate(element => getComputedStyle(element).filter)).not.toBe('none')
   expect(await loveTag.evaluate(element => document.activeElement === element)).toBe(false)
 
   const intersectionOverviewResponse = waitForTagResponse('/analytics/overview', ['恋爱', '校园'])
@@ -280,6 +286,24 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await expect(page.getByTestId('analytics-favorite-card')).toContainText('校园')
   await expect(page.getByTestId('analytics-recommendation-card')).toContainText('恋爱')
   await expect(page.getByTestId('analytics-recommendation-card')).toContainText('校园')
+  const coverWidths: number[] = []
+  for (const cardTestId of ['analytics-favorite-card', 'analytics-recommendation-card']) {
+    const card = page.getByTestId(cardTestId)
+    const cover = card.getByTestId('analytics-card-cover')
+    const cardBounds = await card.boundingBox()
+    const coverBounds = await cover.boundingBox()
+    expect(cardBounds).not.toBeNull()
+    expect(coverBounds).not.toBeNull()
+    expect(Math.abs(coverBounds!.x - cardBounds!.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(coverBounds!.y - cardBounds!.y)).toBeLessThanOrEqual(1)
+    expect(coverBounds!.height / cardBounds!.height).toBeGreaterThanOrEqual(0.8)
+    expect(coverBounds!.width).toBeGreaterThanOrEqual(80)
+    coverWidths.push(coverBounds!.width)
+  }
+  expect(Math.abs(coverWidths[0] - coverWidths[1])).toBeLessThanOrEqual(1)
+  if (testInfo.project.name === 'chromium') {
+    await page.setViewportSize({ width: 1920, height: 1080 })
+  }
   await page.screenshot({
     path: `/tmp/moreani-analytics-tag-filter-${testInfo.project.name}-dark.png`,
     fullPage: true,
@@ -291,7 +315,6 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await Promise.all([cancelledOverviewResponse, cancelledRecommendationsResponse])
   await expect(loveTag).toHaveAttribute('aria-pressed', 'false')
   await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByRole('button', { name: '取消标签 恋爱' })).toHaveCount(0)
 
   await page.getByRole('button', { name: '全站分析' }).click()
   await page.getByRole('option', { name: '目标成员' }).click()
