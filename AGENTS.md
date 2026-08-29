@@ -11,6 +11,50 @@
 - **生产环境**: NAS (192.168.31.26)
 - **域名**: moreani.lovelysia.top
 
+## CodeGraph 使用规范
+
+CodeGraph 是本地代码结构索引和 LLM 上下文辅助工具，不是 MoreAni 的生产运行时依赖。`.codegraph/` 中的数据库、WAL、日志和其他索引文件只保留在本机，不得提交到 Git。
+
+### 使用时机
+
+- 跨文件、跨前后端或跨层追踪功能流程时，优先使用 CodeGraph。
+- 修改公共模型、服务、API 客户端、路由或共享类型前，先分析影响范围。
+- 排查复杂 Bug、确定测试范围或理解陌生模块时，可以使用 CodeGraph 辅助定位。
+- 简单的单文件样式、文案或机械性修改不强制使用 CodeGraph。
+
+### 标准流程
+
+```bash
+# 确认索引存在且与当前代码同步
+codegraph status .
+
+# 用自然语言理解流程、源码和调用路径
+codegraph explore "描述要了解的流程"
+
+# 定位函数、类、接口或其他符号
+codegraph query "Symbol"
+
+# 修改公共符号前分析影响范围
+codegraph impact "Symbol" --depth 3
+
+# 修改代码后获取候选测试文件
+codegraph affected <changed-files>
+
+# 需要时查看直接调用关系
+codegraph callers "Symbol"
+codegraph callees "Symbol"
+```
+
+如果索引落后，使用 `codegraph sync .`；升级 CodeGraph 后使用 `codegraph index -f .` 完成一次全量重建。使用 `codegraph --version` 查看本机版本，使用 `codegraph upgrade --check` 检查稳定版更新。未经用户要求，不要自动执行 `codegraph upgrade`、`init`、`index` 或安装 MCP。
+
+### 结果使用边界
+
+- CodeGraph 的查询、调用链和影响范围是结构线索，不能替代源码确认、数据库检查、API 测试、pytest、Vitest、Playwright 或运行时验证。
+- 模块别名、动态调用、HTTP 字符串路由、FastAPI 依赖注入、SQL 行为、权限判断、环境变量和后台任务可能无法被完整解析；出现空结果或结果过窄时，必须使用 `rg` 和源码阅读复核。
+- `codegraph affected` 只提供候选测试集合，不能据此跳过项目规定的完整测试。
+- `docs/ARCHITECTURE.md` 和 `.codegraph/errors.log` 可能是历史快照；判断当前架构和索引状态时，以当前源码和 `codegraph status .` 为准。
+- 如果本机没有 CodeGraph、没有索引或命令不可用，回退到 `rg`、源码阅读和项目现有测试，不因工具缺失阻塞任务。
+
 ## 代码风格原则
 
 ### LLM 友好代码
