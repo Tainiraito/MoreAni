@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Wordcloud } from '@visx/wordcloud'
+import { useCallback, useMemo, useState } from 'react'
+import { useWordcloud } from '@visx/wordcloud'
 
+import { calculateCloudFontSize } from '@/components/analytics/tag-word-cloud-scale'
 import type { AnalyticsTagStat } from '@/types'
 
 interface TagWordCloudProps {
@@ -13,9 +14,8 @@ interface CloudDatum {
   rank: number
 }
 
-const MIN_CLOUD_WIDTH = 280
-const MIN_FONT_SIZE = 15
-const MAX_FONT_SIZE = 56
+const CLOUD_LAYOUT_WIDTH = 520
+const CLOUD_LAYOUT_HEIGHT = 340
 const WORD_CLOUD_RANDOM = (): number => 0.5
 const WORD_FONT_SIZE = (word: CloudDatum): number => word.size
 
@@ -26,33 +26,15 @@ function cloudTextColor(rank: number, total: number, hovered: boolean): string {
 }
 
 export function TagWordCloud({ items }: TagWordCloudProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(MIN_CLOUD_WIDTH)
   const [hoveredName, setHoveredName] = useState<string | null>(null)
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    const updateWidth = (): void => {
-      setWidth(Math.max(MIN_CLOUD_WIDTH, container.clientWidth || MIN_CLOUD_WIDTH))
-    }
-    updateWidth()
-    const observer = new ResizeObserver(updateWidth)
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
 
   const words = useMemo<CloudDatum[]>(() => {
     if (items.length === 0) return []
-    const weights = items.map(item => item.weight)
-    const minWeight = Math.min(...weights)
-    const maxWeight = Math.max(...weights)
-    const spread = Math.max(0.001, Math.sqrt(maxWeight) - Math.sqrt(minWeight))
+    const maxWeight = Math.max(...items.map(item => item.weight))
     return items.map((item, rank) => ({
       text: item.name,
       rank,
-      size: MIN_FONT_SIZE
-        + ((Math.sqrt(item.weight) - Math.sqrt(minWeight)) / spread) * (MAX_FONT_SIZE - MIN_FONT_SIZE),
+      size: calculateCloudFontSize(item.weight, maxWeight),
     }))
   }, [items])
   const itemByName = useMemo(
@@ -64,7 +46,22 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
     [words],
   )
   const hoveredItem = hoveredName ? itemByName.get(hoveredName) ?? null : null
-  const height = Math.max(300, Math.min(420, width * 0.62))
+  const totalWeight = useMemo(
+    () => items.reduce((sum, item) => sum + item.weight, 0),
+    [items],
+  )
+  const cloudWords = useWordcloud<CloudDatum>({
+    width: CLOUD_LAYOUT_WIDTH,
+    height: CLOUD_LAYOUT_HEIGHT,
+    words,
+    font: 'Space Grotesk',
+    fontSize: WORD_FONT_SIZE,
+    fontWeight: 600,
+    padding: 2,
+    rotate: 0,
+    spiral: 'archimedean',
+    random: WORD_CLOUD_RANDOM,
+  })
   const handleLeave = useCallback(() => setHoveredName(null), [])
 
   if (items.length === 0) {
@@ -79,21 +76,17 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
   }
 
   return (
-    <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden" data-testid="tag-word-cloud">
-      <div role="img" aria-label="番剧标签词云" onPointerLeave={handleLeave}>
-        <Wordcloud<CloudDatum>
-          width={width}
-          height={height}
-          words={words}
-          font="Space Grotesk"
-          fontSize={WORD_FONT_SIZE}
-          fontWeight={600}
-          padding={3}
-          rotate={0}
-          spiral="rectangular"
-          random={WORD_CLOUD_RANDOM}
-        >
-          {cloudWords => cloudWords.map(word => {
+    <div className="relative w-full min-w-0 flex-1 overflow-hidden" data-testid="tag-word-cloud">
+      <svg
+        role="img"
+        aria-label="番剧标签词云"
+        viewBox={`0 0 ${CLOUD_LAYOUT_WIDTH} ${CLOUD_LAYOUT_HEIGHT}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="block min-h-[300px] w-full"
+        onPointerLeave={handleLeave}
+      >
+        <g transform={`translate(${CLOUD_LAYOUT_WIDTH / 2}, ${CLOUD_LAYOUT_HEIGHT / 2})`}>
+          {cloudWords.map(word => {
             const name = word.text ?? ''
             const rank = rankByName.get(name) ?? items.length
             const hovered = hoveredName === name
@@ -122,8 +115,8 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
               </text>
             )
           })}
-        </Wordcloud>
-      </div>
+        </g>
+      </svg>
 
       {hoveredItem ? (
         <div
@@ -137,6 +130,9 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
         >
           <p className="font-semibold" style={{ color: 'var(--brand)' }}>{hoveredItem.name}</p>
           <p style={{ color: 'var(--text-secondary)' }}>
+            当前词云占比 {totalWeight > 0 ? ((hoveredItem.weight / totalWeight) * 100).toFixed(1) : '0.0'}%
+          </p>
+          <p style={{ color: 'var(--text-muted)' }}>
             权重 {hoveredItem.weight.toFixed(2)} · {hoveredItem.rating_count} 条评分
           </p>
           <p style={{ color: 'var(--text-muted)' }}>
@@ -148,7 +144,8 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
       <ol className="sr-only">
         {items.map(item => (
           <li key={item.name}>
-            {item.name}：权重 {item.weight.toFixed(2)}，{item.rating_count} 条评分，
+            {item.name}：当前词云占比 {totalWeight > 0 ? ((item.weight / totalWeight) * 100).toFixed(1) : '0.0'}%，
+            权重 {item.weight.toFixed(2)}，{item.rating_count} 条评分，
             {item.title_count} 部番剧，平均分 {item.average_score.toFixed(1)}
           </li>
         ))}

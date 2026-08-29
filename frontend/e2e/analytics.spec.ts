@@ -23,7 +23,26 @@ const distribution = Array.from({ length: 20 }, (_, index) => ({
   count: index % 3 === 0 ? index + 1 : 0,
 }))
 
+const weightedTags = [
+  ['恋爱', 125.45], ['奇幻', 124.45], ['日常', 121.25], ['搞笑', 116.05],
+  ['校园', 109.4], ['治愈', 103.25], ['漫画改', 102.2], ['战斗', 95.25],
+  ['青春', 74.45], ['热血', 73.6], ['神作', 64], ['轻小说改', 55.2],
+  ['原创', 47.05], ['催泪', 41.8], ['百合', 37.65], ['科幻', 36.05],
+  ['冒险', 33.2], ['剧情', 32], ['悬疑', 28.6], ['音乐', 22.05],
+].map(([name, weight], index) => ({
+  name: String(name),
+  weight: Number(weight),
+  rating_count: 40 - index,
+  title_count: 20 - Math.floor(index / 2),
+  average_score: 8.2,
+}))
+
 test('统计分析支持默认全站、双端筛选、URL 状态和主题切换', async ({ page }) => {
+  const browserErrors: string[] = []
+  page.on('pageerror', error => browserErrors.push(error.message))
+  page.on('console', message => {
+    if (message.type() === 'error') browserErrors.push(message.text())
+  })
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-theme', 'dark')
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
@@ -62,9 +81,7 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
             { name: '恋爱', weight: 10, rating_count: 10, title_count: 8, average_score: 8.4 },
             { name: '奇幻', weight: 7, rating_count: 7, title_count: 6, average_score: 8.1 },
           ],
-          weighted_tags: [
-            { name: '恋爱', weight: 8.4, rating_count: 10, title_count: 8, average_score: 8.4 },
-          ],
+          weighted_tags: weightedTags,
           favorites: [],
         }),
       })
@@ -80,7 +97,19 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
           profile_rating_count: 18,
           confidence: 'medium',
           basis: userScope ? 'blended' : 'global',
-          items: [],
+          items: [{
+            id: 202,
+            title: '可能喜欢的番剧',
+            title_alt: '',
+            cover_url: '',
+            content_type: 'anime',
+            match_percent: 82,
+            confidence: 'high',
+            matched_tags: ['恋爱', '校园'],
+            basis: userScope ? 'blended' : 'global',
+            average_score: 8.4,
+            rating_count: 23,
+          }],
         }),
       })
       return
@@ -89,12 +118,27 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   })
 
   await page.goto('/analytics')
+  await expect(page).toHaveTitle(/又看一集/)
   await expect(page.getByRole('heading', { name: '统计分析', exact: true })).toBeVisible()
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '全站分析' })).toBeVisible()
   await expect(page.getByRole('link', { name: '打开统计分析' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: '评分加权' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('查看标签明细')).toHaveCount(0)
+  await expect(page.getByText('高置信度')).toHaveCount(0)
+  await expect(page.getByText('站内评分 8.4 · 23 人评分')).toBeVisible()
+  await expect(page.getByText('全站优先展示高分且评分人数充足的番剧', { exact: false })).toBeVisible()
   await expect(page).toHaveURL(/\/analytics$/)
+
+  const wordCloud = page.getByTestId('tag-word-cloud')
+  await expect.poll(async () => {
+    const cloudBounds = await wordCloud.boundingBox()
+    const cloudSvgBounds = await wordCloud.locator('svg').boundingBox()
+    if (!cloudBounds || !cloudSvgBounds) return Number.POSITIVE_INFINITY
+    return Math.abs(cloudBounds.width - cloudSvgBounds.width)
+  }).toBeLessThanOrEqual(1)
+  await page.getByLabel('恋爱', { exact: true }).hover()
+  await expect(page.getByRole('tooltip')).toContainText('当前词云占比')
 
   if ((page.viewportSize()?.width ?? 0) >= 1280) {
     const distributionPanel = await page.getByTestId('rating-distribution-panel').boundingBox()
@@ -140,6 +184,8 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   const rangeTrack = page.getByTestId('score-range-track')
   const trackBounds = await rangeTrack.boundingBox()
   expect(trackBounds).not.toBeNull()
+  await rangeTrack.hover()
+  await expect.poll(() => rangeTrack.evaluate(element => getComputedStyle(element).cursor)).toBe('ew-resize')
   const expandedRangeResponse = page.waitForResponse(response => (
     response.url().includes('/analytics/overview')
     && response.url().includes('min_score=8')
@@ -150,6 +196,7 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   const trackY = trackBounds!.y + trackBounds!.height / 2
   await page.mouse.move(maximumX, trackY)
   await page.mouse.down()
+  await expect.poll(() => rangeTrack.evaluate(element => getComputedStyle(element).cursor)).toBe('grabbing')
   await page.mouse.move(eightPointX, trackY, { steps: 4 })
   await page.mouse.up()
   await expect(page.getByText('8.0 – 10.0', { exact: true })).toBeVisible()
@@ -170,4 +217,5 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
     scrollWidth: document.documentElement.scrollWidth,
   }))
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth)
+  expect(browserErrors).toEqual([])
 })

@@ -126,8 +126,11 @@ describe('AnalyticsPage', () => {
     )
     expect(await view.findByText('全站代表作')).toBeInTheDocument()
     expect(view.getByText('可能喜欢的番剧')).toBeInTheDocument()
+    expect(view.getByText('站内评分 8.4 · 2 人评分')).toBeInTheDocument()
+    expect(view.queryByText('中等置信度')).not.toBeInTheDocument()
     await waitFor(() => expect(view.getByTestId('mock-word-cloud')).toHaveTextContent('恋爱加权'))
     expect(view.getByText('3 条评分 · 实际均分')).toBeInTheDocument()
+    expect(view.getByText('全站优先展示高分且评分人数充足的番剧', { exact: false })).toBeInTheDocument()
 
     fireEvent.click(view.getByRole('button', { name: '出现频次' }))
     await waitFor(() => expect(view.getByTestId('mock-word-cloud')).toHaveTextContent('恋爱频次'))

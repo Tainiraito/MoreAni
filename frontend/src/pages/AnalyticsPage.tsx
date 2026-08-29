@@ -14,7 +14,6 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import type { ScoreRange } from '@/components/analytics/ScoreRangeSlider'
 import type {
-  AnalyticsConfidence,
   AnalyticsFavoriteItem,
   AnalyticsRecommendationBasis,
   AnalyticsRecommendationItem,
@@ -31,12 +30,6 @@ const ANALYTICS_CARD_STYLE = {
   border: '1px solid var(--border-line)',
   boxShadow: '0 0 18px rgba(251, 113, 167, 0.05)',
 } as const
-
-const CONFIDENCE_LABEL: Record<AnalyticsConfidence, string> = {
-  low: '低置信度',
-  medium: '中等置信度',
-  high: '高置信度',
-}
 
 const BASIS_LABEL: Record<AnalyticsRecommendationBasis, string> = {
   global: '基于全站画像',
@@ -148,7 +141,16 @@ function RecommendationCard({ item, onOpen }: RecommendationCardProps) {
               {item.match_percent}%
             </span>
           </div>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>{CONFIDENCE_LABEL[item.confidence]}</p>
+          <p
+            className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
+            style={{ color: 'var(--text-muted)' }}
+            data-testid="analytics-recommendation-rating"
+          >
+            <Star size={12} fill={item.average_score !== null ? 'currentColor' : 'none'} />
+            {item.average_score !== null
+              ? `站内评分 ${item.average_score.toFixed(1)} · ${item.rating_count} 人评分`
+              : '暂无站内评分'}
+          </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {item.matched_tags.length > 0 ? item.matched_tags.map(tag => (
               <span
@@ -295,7 +297,7 @@ export function AnalyticsPage() {
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Cloud size={18} />标签词云</h2>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>字号和颜色共同表示标签权重</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>字号面积按标签权重占比缩放，颜色表示权重层级</p>
                 </div>
                 <div className="inline-flex rounded-lg p-1" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}>
                   {(['frequency', 'weighted'] as const).map(mode => {
@@ -325,7 +327,7 @@ export function AnalyticsPage() {
           <section className="rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE}>
             <div className="mb-4">
               <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Heart size={18} />当前最喜欢</h2>
-              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>代表作会随评分区间变化；全站按贝叶斯稳定度排序，卡片显示实际均分</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>代表作会随评分区间变化；全站优先展示高分且评分人数充足的番剧，卡片显示站内实际均分</p>
             </div>
             {overview.favorites.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
@@ -344,7 +346,7 @@ export function AnalyticsPage() {
               </div>
               {recommendations ? (
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {BASIS_LABEL[recommendations.basis]} · {CONFIDENCE_LABEL[recommendations.confidence]}
+                  {BASIS_LABEL[recommendations.basis]}
                 </span>
               ) : null}
             </div>

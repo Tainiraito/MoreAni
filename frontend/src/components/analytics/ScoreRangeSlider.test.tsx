@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ScoreRangeSlider } from '@/components/analytics/ScoreRangeSlider'
 import type { ScoreRange } from '@/components/analytics/ScoreRangeSlider'
@@ -45,5 +45,24 @@ describe('ScoreRangeSlider', () => {
     fireEvent.change(maximum, { target: { value: '0.5' } })
     expect(minimum).toHaveValue('10')
     expect(maximum).toHaveValue('10')
+  })
+
+  it('悬停和拖动时显示可交互指针反馈', () => {
+    const view = render(<ControlledSlider />)
+    const track = view.getByTestId('score-range-track')
+    Object.assign(track, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => false),
+      releasePointerCapture: vi.fn(),
+    })
+
+    expect(track).toHaveStyle({ cursor: 'ew-resize' })
+    fireEvent.pointerEnter(track)
+    expect(track.querySelector('span')).toHaveStyle({ transform: 'translateX(-50%) scale(1.12)' })
+
+    fireEvent.pointerDown(track, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 0 })
+    expect(track).toHaveStyle({ cursor: 'grabbing' })
+    fireEvent.pointerUp(track, { pointerType: 'mouse', pointerId: 1 })
+    expect(track).toHaveStyle({ cursor: 'ew-resize' })
   })
 })

@@ -22,6 +22,8 @@ function scorePercent(score: number): number {
 export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
   const [activeHandle, setActiveHandle] = useState<'min' | 'max'>('max')
   const [focusedHandle, setFocusedHandle] = useState<'min' | 'max' | null>(null)
+  const [isTrackHovered, setIsTrackHovered] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const trackRef = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<'min' | 'max' | 'both' | null>(null)
   const minPercent = scorePercent(value.min)
@@ -66,6 +68,7 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    setIsDragging(true)
     const nextScore = scoreFromPointer(event.clientX)
     if (value.min === value.max && nextScore === value.min) {
       dragHandleRef.current = 'both'
@@ -82,6 +85,7 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>): void => {
     dragHandleRef.current = null
+    setIsDragging(false)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -100,6 +104,10 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
         ref={trackRef}
         className="relative flex h-8 touch-none items-center"
         data-testid="score-range-track"
+        title="点击或拖动调整评分区间"
+        style={{ cursor: isDragging ? 'grabbing' : 'ew-resize' }}
+        onPointerEnter={() => setIsTrackHovered(true)}
+        onPointerLeave={() => setIsTrackHovered(false)}
         onPointerDown={handlePointerDown}
         onPointerMove={event => {
           if (dragHandleRef.current) updateFromPointer(event.clientX)
@@ -109,7 +117,12 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
       >
         <div
           className="absolute left-0 right-0 h-1.5 rounded-full"
-          style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
+          style={{
+            background: 'var(--bg-card-warm)',
+            border: '1px solid var(--border-line)',
+            boxShadow: isTrackHovered ? '0 0 0 3px rgba(251, 113, 167, 0.08)' : 'none',
+            transition: 'box-shadow 150ms ease',
+          }}
           aria-hidden="true"
         />
         <span
@@ -117,12 +130,13 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
           style={{
             left: `${minPercent}%`,
             zIndex: activeHandle === 'min' ? 6 : 5,
-            transform: 'translateX(-50%)',
+            transform: `translateX(-50%) scale(${isTrackHovered || focusedHandle === 'min' ? 1.12 : 1})`,
             background: 'var(--brand)',
             borderColor: 'var(--bg-card)',
             boxShadow: focusedHandle === 'min'
               ? '0 0 0 3px rgba(251, 113, 167, 0.2), 0 0 16px rgba(251, 113, 167, 0.45)'
               : '0 0 0 1px var(--brand), 0 0 12px rgba(251, 113, 167, 0.35)',
+            transition: 'transform 150ms ease, box-shadow 150ms ease',
           }}
           aria-hidden="true"
         />
@@ -131,12 +145,13 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
           style={{
             left: `${maxPercent}%`,
             zIndex: activeHandle === 'max' ? 6 : 5,
-            transform: 'translateX(-50%)',
+            transform: `translateX(-50%) scale(${isTrackHovered || focusedHandle === 'max' ? 1.12 : 1})`,
             background: 'var(--brand)',
             borderColor: 'var(--bg-card)',
             boxShadow: focusedHandle === 'max'
               ? '0 0 0 3px rgba(251, 113, 167, 0.2), 0 0 16px rgba(251, 113, 167, 0.45)'
               : '0 0 0 1px var(--brand), 0 0 12px rgba(251, 113, 167, 0.35)',
+            transition: 'transform 150ms ease, box-shadow 150ms ease',
           }}
           aria-hidden="true"
         />
