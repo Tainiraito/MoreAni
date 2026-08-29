@@ -7,12 +7,14 @@ import type {
   AnalyticsScopeType,
 } from '@/types'
 
-const COVER_CARD_GRID_CLASS = 'grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]'
+const STANDARD_COVER_CARD_GRID_CLASS = 'grid grid-cols-[80px_minmax(0,1fr)] sm:grid-cols-[88px_minmax(0,1fr)]'
+const COMPACT_COVER_CARD_GRID_CLASS = 'grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]'
 
 interface FavoriteCardProps {
   item: AnalyticsFavoriteItem
   scope: AnalyticsScopeType
   requiredTagNames?: readonly string[]
+  compact?: boolean
   onOpen: (id: number) => void
 }
 
@@ -20,6 +22,7 @@ export function AnalyticsFavoriteCard({
   item,
   scope,
   requiredTagNames = [],
+  compact = false,
   onOpen,
 }: FavoriteCardProps) {
   return (
@@ -30,7 +33,7 @@ export function AnalyticsFavoriteCard({
       className="group min-w-0 overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
-      <div className={COVER_CARD_GRID_CLASS}>
+      <div className={compact ? COMPACT_COVER_CARD_GRID_CLASS : STANDARD_COVER_CARD_GRID_CLASS}>
         <div className="min-h-20 self-stretch overflow-hidden sm:min-h-24" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
@@ -67,12 +70,14 @@ export function AnalyticsFavoriteCard({
 interface RecommendationCardProps {
   item: AnalyticsRecommendationItem
   requiredTagNames?: readonly string[]
+  compact?: boolean
   onOpen: (id: number) => void
 }
 
 export function AnalyticsRecommendationCard({
   item,
   requiredTagNames = [],
+  compact = false,
   onOpen,
 }: RecommendationCardProps) {
   const otherMatchedTags = item.matched_tags.filter(tag => !requiredTagNames.includes(tag))
@@ -85,7 +90,7 @@ export function AnalyticsRecommendationCard({
       className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
-      <div className={COVER_CARD_GRID_CLASS}>
+      <div className={compact ? COMPACT_COVER_CARD_GRID_CLASS : STANDARD_COVER_CARD_GRID_CLASS}>
         <div className="min-h-20 self-stretch overflow-hidden sm:min-h-24" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>

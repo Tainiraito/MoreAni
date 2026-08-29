@@ -91,6 +91,10 @@ describe('UserAnalyticsPanels', () => {
     expect(view.getByTestId('analytics-favorite-card')).not.toHaveTextContent('日本語タイトル')
     expect(view.getByTestId('analytics-favorite-card')).toHaveClass('rounded-xl', 'hover:-translate-y-0.5', 'hover:shadow-lg')
     expect(view.getByTestId('analytics-recommendation-card')).toHaveClass('rounded-xl', 'hover:-translate-y-0.5', 'hover:shadow-lg')
+    expect(view.getByTestId('analytics-favorite-card').firstElementChild).toHaveClass(
+      'grid-cols-[40px_minmax(0,1fr)]',
+      'sm:grid-cols-[72px_minmax(0,1fr)]',
+    )
     expect(view.getByTestId('settings-current-favorites-scroll')).toHaveClass('overflow-y-auto')
     expect(view.getByTestId('settings-recommendations-scroll')).toHaveClass('overflow-y-auto')
     expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
