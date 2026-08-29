@@ -1,4 +1,5 @@
 from conftest import auth_cookie
+from sqlalchemy import event
 
 from models import ContentItem, Rating, Tag
 
@@ -200,8 +201,7 @@ def test_recommendations_exclude_scope_user_ratings_and_penalize_low_score_tags(
     assert set(good['matched_tags']) == {'恋爱', '校园'}
 
     tag_filtered = client.get(
-        f'/api/v1/analytics/recommendations?scope=user&user_id={viewer.id}'
-        '&tag=恋爱&tag=校园&limit=6',
+        f'/api/v1/analytics/recommendations?scope=user&user_id={viewer.id}&tag=恋爱&tag=校园&limit=6',
         cookies=auth_cookie(viewer),
     ).json()
     assert [item['id'] for item in tag_filtered['items']] == [good_candidate.id]
@@ -222,3 +222,46 @@ def test_recommendations_exclude_scope_user_ratings_and_penalize_low_score_tags(
     assert cold_response['basis'] == 'global_fallback'
     assert cold_response['confidence'] == 'low'
     assert cold_response['profile_rating_count'] == 0
+
+
+def test_analytics_endpoints_share_three_query_snapshot_and_invalidate_after_write(
+    client,
+    db,
+    db_engine,
+    make_user,
+):
+    viewer = make_user('analytics-cache-viewer')
+    content = _anime(db, creator_id=viewer.id, title='缓存样本', tags=['日常', '治愈'])
+    candidate = _anime(db, creator_id=viewer.id, title='缓存候选', tags=['日常', '治愈'])
+    _rating(db, user_id=viewer.id, content_id=content.id, score=90)
+    statements: list[str] = []
+
+    def count_selects(_conn, _cursor, statement, _parameters, _context, _executemany):
+        normalized = statement.upper()
+        if statement.lstrip().upper().startswith('SELECT') and any(
+            table in normalized for table in ('CONTENT_ITEMS', 'RATINGS', 'CONTENT_TAGS')
+        ):
+            statements.append(statement)
+
+    event.listen(db_engine, 'before_cursor_execute', count_selects)
+    try:
+        overview = client.get('/api/v1/analytics/overview', cookies=auth_cookie(viewer))
+        cold_selects = len(statements)
+        statements.clear()
+        recommendations = client.get(
+            '/api/v1/analytics/recommendations?limit=6',
+            cookies=auth_cookie(viewer),
+        )
+        shared_selects = len(statements)
+    finally:
+        event.remove(db_engine, 'before_cursor_execute', count_selects)
+
+    assert overview.status_code == 200
+    assert recommendations.status_code == 200
+    assert cold_selects == 3
+    assert shared_selects == 0
+    assert candidate.id in [item['id'] for item in recommendations.json()['items']]
+
+    _rating(db, user_id=viewer.id, content_id=candidate.id, score=80)
+    refreshed = client.get('/api/v1/analytics/overview', cookies=auth_cookie(viewer)).json()
+    assert refreshed['rating_count'] == 2

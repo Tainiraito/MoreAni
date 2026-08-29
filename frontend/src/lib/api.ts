@@ -19,6 +19,7 @@ import type {
 
 const API_BASE = '/api/v1'
 const CONTENT_LIST_TIMEOUT_MS = 15_000
+const ANALYTICS_TIMEOUT_MS = 12_000
 const AIRING_WEEK_CACHE_KEY = 'moreani-airing-week-v2'
 
 interface AiringWeekCacheRecord {
@@ -236,7 +237,7 @@ export const api = {
     })
     if (params.userId !== undefined) query.set('user_id', String(params.userId))
     params.tags?.forEach(tag => query.append('tag', tag))
-    return request<AnalyticsOverview>(`/analytics/overview?${query}`, options)
+    return request<AnalyticsOverview>(`/analytics/overview?${query}`, options, ANALYTICS_TIMEOUT_MS)
   },
   getAnalyticsRecommendations: (
     params: { scope: AnalyticsScopeType; userId?: number; limit?: number; tags?: string[] },
@@ -248,7 +249,7 @@ export const api = {
     })
     if (params.userId !== undefined) query.set('user_id', String(params.userId))
     params.tags?.forEach(tag => query.append('tag', tag))
-    return request<AnalyticsRecommendations>(`/analytics/recommendations?${query}`, options)
+    return request<AnalyticsRecommendations>(`/analytics/recommendations?${query}`, options, ANALYTICS_TIMEOUT_MS)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),
   getAiringWeek: (options?: RequestInit) => {

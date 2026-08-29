@@ -3,23 +3,25 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart3, ChartNoAxesCombined, Cloud, Heart, RotateCcw, Sparkles, Star, Users } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
+import {
+  AnalyticsFavoriteCard,
+  AnalyticsRecommendationCard,
+} from '@/components/analytics/AnalyticsContentCards'
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
 import { ScoreRangeSlider } from '@/components/analytics/ScoreRangeSlider'
 import { TagWordCloud } from '@/components/analytics/TagWordCloud'
 import { PageMain } from '@/components/layout/PageContainer'
-import { CoverImage } from '@/components/ui/CoverImage'
 import { Select } from '@/components/ui/select'
 import { api } from '@/lib/api'
+import {
+  ANALYTICS_QUERY_BEHAVIOR,
+  analyticsOverviewQueryKey,
+  analyticsRecommendationsQueryKey,
+} from '@/lib/analytics-query'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'
 import type { ScoreRange } from '@/components/analytics/ScoreRangeSlider'
-import type {
-  AnalyticsFavoriteItem,
-  AnalyticsRecommendationBasis,
-  AnalyticsRecommendationItem,
-  AnalyticsScopeType,
-  AnalyticsTagStat,
-} from '@/types'
+import type { AnalyticsRecommendationBasis, AnalyticsScopeType, AnalyticsTagStat } from '@/types'
 
 type TagCloudMode = 'frequency' | 'weighted'
 
@@ -30,7 +32,6 @@ const ANALYTICS_CARD_STYLE = {
   border: '1px solid var(--border-line)',
   boxShadow: '0 0 18px rgba(251, 113, 167, 0.05)',
 } as const
-const COVER_CARD_GRID_CLASS = 'grid grid-cols-[88px_minmax(0,1fr)]'
 
 const BASIS_LABEL: Record<AnalyticsRecommendationBasis, string> = {
   global: '基于全站画像',
@@ -104,127 +105,6 @@ function AnalyticsResetButton({ label, onClick }: AnalyticsResetButtonProps) {
   )
 }
 
-interface FavoriteCardProps {
-  item: AnalyticsFavoriteItem
-  scope: AnalyticsScopeType
-  requiredTagNames: readonly string[]
-  onOpen: (id: number) => void
-}
-
-function FavoriteCard({ item, scope, requiredTagNames, onOpen }: FavoriteCardProps) {
-  return (
-    <button
-      type="button"
-      data-testid="analytics-favorite-card"
-      onClick={() => onOpen(item.id)}
-      className="group min-w-0 overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-      style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
-    >
-      <div className={COVER_CARD_GRID_CLASS}>
-        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
-          <CoverImage src={item.cover_url} alt={item.title} />
-        </div>
-        <div className="min-w-0 p-3">
-          <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-          {item.title_alt ? <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p> : null}
-          <p className="mt-3 flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--brand)' }}>
-            <Star size={14} fill="currentColor" />
-            {item.score.toFixed(1)}
-          </p>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-            {scope === 'global'
-              ? `${item.rating_count} 条评分 · 实际均分`
-              : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
-          </p>
-          {requiredTagNames.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1" data-testid="favorite-required-tags">
-              {requiredTagNames.map(tag => (
-                <span
-                  key={tag}
-                  className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                  style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </button>
-  )
-}
-
-interface RecommendationCardProps {
-  item: AnalyticsRecommendationItem
-  requiredTagNames: readonly string[]
-  onOpen: (id: number) => void
-}
-
-function RecommendationCard({ item, requiredTagNames, onOpen }: RecommendationCardProps) {
-  const otherMatchedTags = item.matched_tags.filter(tag => !requiredTagNames.includes(tag))
-  const hasVisibleTags = requiredTagNames.length > 0 || otherMatchedTags.length > 0
-  return (
-    <button
-      type="button"
-      data-testid="analytics-recommendation-card"
-      onClick={() => onOpen(item.id)}
-      className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-      style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
-    >
-      <div className={COVER_CARD_GRID_CLASS}>
-        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
-          <CoverImage src={item.cover_url} alt={item.title} />
-        </div>
-        <div className="min-w-0 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="line-clamp-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-            <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
-              style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.12)' }}
-            >
-              {item.match_percent}%
-            </span>
-          </div>
-          <p
-            className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
-            style={{ color: 'var(--text-muted)' }}
-            data-testid="analytics-recommendation-rating"
-          >
-            <Star size={12} fill={item.average_score !== null ? 'currentColor' : 'none'} />
-            {item.average_score !== null
-              ? `站内评分 ${item.average_score.toFixed(1)} · ${item.rating_count} 人评分`
-              : '暂无站内评分'}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {requiredTagNames.map(tag => (
-              <span
-                key={tag}
-                className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
-              >
-                {tag}
-              </span>
-            ))}
-            {otherMatchedTags.map(tag => (
-              <span
-                key={tag}
-                className="rounded-md px-1.5 py-0.5 text-[10px]"
-                style={{ color: 'var(--text-secondary)', background: 'var(--bg-card)' }}
-              >
-                {tag}
-              </span>
-            ))}
-            {!hasVisibleTags ? (
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>暂无强匹配标签</span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </button>
-  )
-}
-
 function AnalyticsLoading() {
   return (
     <div className="flex min-h-[360px] items-center justify-center" role="status" aria-label="统计分析加载中">
@@ -252,14 +132,13 @@ export function AnalyticsPage() {
     staleTime: 60_000,
   })
   const overviewQuery = useQuery({
-    queryKey: [
-      'analytics-overview',
-      selection.scope,
-      selection.userId ?? null,
-      debouncedRange.min,
-      debouncedRange.max,
-      activeTagNames,
-    ],
+    queryKey: analyticsOverviewQueryKey({
+      scope: selection.scope,
+      userId: selection.userId,
+      minScore: debouncedRange.min,
+      maxScore: debouncedRange.max,
+      tags: activeTagNames,
+    }),
     queryFn: ({ signal }) => api.getAnalyticsOverview({
       scope: selection.scope,
       userId: selection.userId,
@@ -268,15 +147,22 @@ export function AnalyticsPage() {
       tags: activeTagNames,
     }, { signal }),
     placeholderData: previous => previous,
+    ...ANALYTICS_QUERY_BEHAVIOR,
   })
   const recommendationsQuery = useQuery({
-    queryKey: ['analytics-recommendations', selection.scope, selection.userId ?? null, activeTagNames],
+    queryKey: analyticsRecommendationsQueryKey({
+      scope: selection.scope,
+      userId: selection.userId,
+      limit: 6,
+      tags: activeTagNames,
+    }),
     queryFn: ({ signal }) => api.getAnalyticsRecommendations({
       scope: selection.scope,
       userId: selection.userId,
       limit: 6,
       tags: activeTagNames,
     }, { signal }),
+    ...ANALYTICS_QUERY_BEHAVIOR,
   })
 
   const scopeOptions = useMemo(() => {
@@ -398,6 +284,14 @@ export function AnalyticsPage() {
       {overviewQuery.isPending ? <AnalyticsLoading /> : overviewQuery.isError || !overview ? (
         <div className="rounded-xl p-8 text-center text-sm" style={ANALYTICS_CARD_STYLE}>
           <p style={{ color: 'var(--text-muted)' }}>统计数据加载失败，请稍后重试</p>
+          <button
+            type="button"
+            onClick={() => void overviewQuery.refetch()}
+            className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ color: 'var(--brand)', border: '1px solid var(--border-line)' }}
+          >
+            <RotateCcw size={14} />重新分析
+          </button>
         </div>
       ) : (
         <div className="space-y-6">
@@ -472,7 +366,7 @@ export function AnalyticsPage() {
             ) : overview.favorites.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
                 {overview.favorites.map(item => (
-                  <FavoriteCard
+                  <AnalyticsFavoriteCard
                     key={item.id}
                     item={item}
                     scope={overview.scope.type}
@@ -501,11 +395,21 @@ export function AnalyticsPage() {
               ) : null}
             </div>
             {recommendationsQuery.isPending ? <AnalyticsLoading /> : recommendationsQuery.isError ? (
-              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>推荐加载失败，请稍后重试</p>
+              <div className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
+                <p>推荐加载失败，请稍后重试</p>
+                <button
+                  type="button"
+                  onClick={() => void recommendationsQuery.refetch()}
+                  className="mx-auto mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80"
+                  style={{ color: 'var(--brand)', border: '1px solid var(--border-line)' }}
+                >
+                  <RotateCcw size={14} />重新分析
+                </button>
+              </div>
             ) : recommendations && recommendations.items.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {recommendations.items.map(item => (
-                  <RecommendationCard
+                  <AnalyticsRecommendationCard
                     key={item.id}
                     item={item}
                     requiredTagNames={activeTagNames}

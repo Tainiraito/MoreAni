@@ -186,14 +186,8 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
   await initialSingleScoreResponse
 
-  const initialRestoredRangeResponse = page.waitForResponse(response => (
-    response.url().includes('/analytics/overview')
-    && response.url().includes('min_score=0.5')
-    && response.url().includes('max_score=10')
-  ))
   await tenPointColumn.click({ position: { x: columnBounds!.width / 2, y: columnBounds!.height - 2 } })
   await expect(page.getByText('0.5 – 10.0', { exact: true })).toBeVisible()
-  await initialRestoredRangeResponse
 
   const minimum = page.getByRole('slider', { name: '最低评分' })
   const maximum = page.getByRole('slider', { name: '最高评分' })
@@ -217,32 +211,14 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
 
   const minimumColumnHeight = (page.viewportSize()?.width ?? 0) >= 1280 ? 150 : 80
   expect(columnBounds?.height).toBeGreaterThan(minimumColumnHeight)
-  const singleScoreResponse = page.waitForResponse(response => (
-    response.url().includes('/analytics/overview')
-    && response.url().includes('min_score=10')
-    && response.url().includes('max_score=10')
-  ))
   await tenPointColumn.click()
   await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
-  await singleScoreResponse
 
-  const restoredRangeResponse = page.waitForResponse(response => (
-    response.url().includes('/analytics/overview')
-    && response.url().includes('min_score=6')
-    && response.url().includes('max_score=8.5')
-  ))
   await tenPointColumn.click()
   await expect(page.getByText('6.0 – 8.5', { exact: true })).toBeVisible()
-  await restoredRangeResponse
 
-  const repeatedSingleScoreResponse = page.waitForResponse(response => (
-    response.url().includes('/analytics/overview')
-    && response.url().includes('min_score=10')
-    && response.url().includes('max_score=10')
-  ))
   await tenPointColumn.click()
   await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
-  await repeatedSingleScoreResponse
 
   const rangeTrack = page.getByTestId('score-range-track')
   const trackBounds = await rangeTrack.boundingBox()
@@ -357,18 +333,15 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
       && responseUrl.searchParams.get('max_score') === '10'
       && responseUrl.searchParams.getAll('tag').join(',') === '恋爱,校园'
   })
-  const restoredLoveRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['恋爱', '校园'])
   await page.getByRole('button', { name: '重置评分区间' }).click()
   await expect(page.getByText('0.5 – 10.0', { exact: true })).toBeVisible()
-  await Promise.all([restoredLoveOverviewResponse, restoredLoveRecommendationsResponse])
+  await restoredLoveOverviewResponse
   await expect(page.getByRole('button', { name: '恋爱', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
-  const cancelledOverviewResponse = waitForTagResponse('/analytics/overview', ['校园'])
-  const cancelledRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['校园'])
   await page.getByRole('button', { name: '恋爱', exact: true }).click()
-  await Promise.all([cancelledOverviewResponse, cancelledRecommendationsResponse])
   await expect(page.getByRole('button', { name: '恋爱', exact: true })).toHaveAttribute('aria-pressed', 'false')
   await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('analytics-favorite-card')).not.toContainText('恋爱')
 
   await page.getByRole('button', { name: '出现频次' }).click()
   await expect(page.getByRole('button', { name: '出现频次' })).toHaveAttribute('aria-pressed', 'true')

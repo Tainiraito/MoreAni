@@ -256,10 +256,7 @@ describe('AnalyticsPage', () => {
     vi.mocked(api.getAnalyticsOverview).mockClear()
     fireEvent.click(tenPointColumn)
     expect(view.getByText('5.0 – 10.0')).toBeInTheDocument()
-    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10, tags: [] },
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    ))
+    expect(api.getAnalyticsOverview).not.toHaveBeenCalled()
   })
 
   it('标签支持多选和取消，并同时刷新代表作与推荐', async () => {

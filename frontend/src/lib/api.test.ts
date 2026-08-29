@@ -42,6 +42,33 @@ describe('API 请求超时', () => {
     await rejection
   })
 
+  it('统计分析请求超过 12 秒后终止，不会无限保持加载态', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true },
+          )
+        }),
+      ),
+    )
+
+    const request = api.getAnalyticsOverview({
+      scope: 'user',
+      userId: 7,
+      minScore: 0.5,
+      maxScore: 10,
+    })
+    const rejection = expect(request).rejects.toBeInstanceOf(ApiTimeoutError)
+    await vi.advanceTimersByTimeAsync(12_000)
+
+    await rejection
+  })
+
   it('周历请求保存 ETag，并在 304 时复用 sessionStorage 快照', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(week), { status: 200, headers: { 'Content-Type': 'application/json', ETag: '"week-v1"' } }))
