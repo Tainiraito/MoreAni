@@ -70,7 +70,7 @@ export function TagWordCloud({ items, selectedNames = [], onToggleTag }: TagWord
   if (items.length === 0) {
     return (
       <div
-        className="flex min-h-[300px] items-center justify-center rounded-xl text-sm"
+        className="flex min-h-0 items-center justify-center rounded-xl text-sm xl:min-h-[18rem]"
         style={{ background: 'var(--bg-card-warm)', color: 'var(--text-muted)' }}
       >
         当前评分区间暂无可分析标签
@@ -79,13 +79,13 @@ export function TagWordCloud({ items, selectedNames = [], onToggleTag }: TagWord
   }
 
   return (
-    <div className="relative w-full min-w-0 flex-1 overflow-hidden" data-testid="tag-word-cloud">
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden xl:min-h-[18rem]" data-testid="tag-word-cloud">
       <svg
         role="group"
         aria-label="番剧标签词云"
         viewBox={`0 0 ${CLOUD_LAYOUT_WIDTH} ${CLOUD_LAYOUT_HEIGHT}`}
         preserveAspectRatio="xMidYMid meet"
-        className="block min-h-[300px] w-full"
+        className="block h-full min-h-0 w-full"
         onPointerLeave={handleLeave}
       >
         <g transform={`translate(${CLOUD_LAYOUT_WIDTH / 2}, ${CLOUD_LAYOUT_HEIGHT / 2})`}>

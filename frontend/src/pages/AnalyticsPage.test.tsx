@@ -355,7 +355,7 @@ describe('AnalyticsPage', () => {
     expect(view.getByTestId('analytics-primary-grid')).toHaveClass('lg:grid-cols-2')
     const covers = view.getAllByTestId('analytics-card-cover')
     expect(covers).toHaveLength(2)
-    covers.forEach(cover => expect(cover).toHaveClass('min-h-[7.25rem]', 'self-stretch'))
+    covers.forEach(cover => expect(cover).toHaveClass('min-h-20', 'self-stretch'))
   })
 
   it('无统计样本和候选时展示完整空状态', async () => {

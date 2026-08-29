@@ -33,7 +33,7 @@ const overview: AnalyticsOverview = {
   favorites: [{
     id: 11,
     title: '最喜欢的番剧',
-    title_alt: '',
+    title_alt: '日本語タイトル',
     cover_url: '',
     content_type: 'anime',
     score: 9,
@@ -88,6 +88,11 @@ describe('UserAnalyticsPanels', () => {
     expect(view.getByText('可能喜欢', { selector: 'h3' })).toBeInTheDocument()
     expect(view.getByTestId('profile-word-cloud')).toHaveTextContent('治愈')
     expect(view.getByText('可能喜欢的番剧')).toBeInTheDocument()
+    expect(view.getByTestId('analytics-favorite-card')).not.toHaveTextContent('日本語タイトル')
+    expect(view.getByTestId('analytics-favorite-card')).toHaveClass('rounded-xl', 'hover:-translate-y-0.5', 'hover:shadow-lg')
+    expect(view.getByTestId('analytics-recommendation-card')).toHaveClass('rounded-xl', 'hover:-translate-y-0.5', 'hover:shadow-lg')
+    expect(view.getByTestId('settings-current-favorites-scroll')).toHaveClass('overflow-y-auto')
+    expect(view.getByTestId('settings-recommendations-scroll')).toHaveClass('overflow-y-auto')
     expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
       { scope: 'user', userId: 7, minScore: 0.5, maxScore: 10 },
       { signal: expect.any(AbortSignal) },

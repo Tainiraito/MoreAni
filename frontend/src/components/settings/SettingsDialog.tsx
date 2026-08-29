@@ -200,11 +200,11 @@ export function SettingsDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden bg-black/50 p-3 backdrop-blur-[2px] sm:p-4"
       {...maskProps}
     >
       <div
-        className="flex max-h-[92vh] w-[min(1480px,96vw)] flex-col rounded-2xl p-5 sm:p-6"
+        className="flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] min-h-0 w-[min(1480px,96vw)] flex-col overflow-hidden rounded-2xl p-4 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:p-5 xl:h-[min(860px,calc(100dvh-2rem))] xl:max-h-[calc(100dvh-2rem)] xl:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-dialog-title"
@@ -238,12 +238,12 @@ export function SettingsDialog() {
         </div>
 
         <div
-          className="grid min-h-0 gap-5 overflow-y-auto pr-1 xl:grid-cols-[minmax(300px,0.85fr)_minmax(360px,1.075fr)_minmax(360px,1.075fr)]"
+          className="grid min-h-0 flex-1 grid-rows-[minmax(0,0.32fr)_minmax(0,0.68fr)] gap-4 pr-1 sm:grid-rows-[minmax(0,0.38fr)_minmax(0,0.62fr)] xl:grid-cols-[minmax(300px,0.85fr)_minmax(0,2.15fr)] xl:grid-rows-1 xl:gap-5"
           data-testid="settings-profile-grid"
         >
-          <section className="min-w-0" data-testid="settings-profile-left">
+          <section className="flex h-full min-h-0 min-w-0 flex-col" data-testid="settings-profile-left">
             {/* 用户信息 */}
-            <div className="mb-8 flex items-start gap-4">
+            <div className="mb-6 flex shrink-0 items-start gap-4">
           <div className="flex flex-col items-center gap-2">
             {/* 头像：点击触发更换；有头像时 hover 可更换/删除 */}
             <div
@@ -364,13 +364,13 @@ export function SettingsDialog() {
           </div>
             </div>
 
-        {/* 我的动态（评分/收藏/评论，时间降序） */}
-            <div className="mb-8">
-          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>我的动态</h3>
+            {/* 我的动态（评分/收藏/评论，时间降序） */}
+            <div className="flex h-0 min-h-0 flex-1 flex-col">
+          <h3 className="mb-3 shrink-0 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>我的动态</h3>
           {activity.length === 0 ? (
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>还没有动态</p>
           ) : (
-            <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1" data-testid="settings-activity-scroll">
               {activity.map((item, idx) => {
                 const badge =
                   item.type === 'rating'
@@ -435,12 +435,6 @@ export function SettingsDialog() {
           )}
             </div>
 
-        {/* 关于 */}
-            <div className="pt-4" style={{ borderTop: '1px solid var(--border-line)' }}>
-              <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-                MoreAni v2.0 — 又看一集
-              </p>
-            </div>
           </section>
 
           {user ? <UserAnalyticsPanels userId={user.id} onOpenContent={openDetail} /> : null}

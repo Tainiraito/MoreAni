@@ -29,16 +29,17 @@ interface AnalyticsPanelProps {
   title: string
   icon: React.ReactNode
   children: React.ReactNode
+  testId: string
 }
 
-function AnalyticsPanel({ title, icon, children }: AnalyticsPanelProps) {
+function AnalyticsPanel({ title, icon, children, testId }: AnalyticsPanelProps) {
   return (
-    <section className="min-w-0 rounded-xl p-4" style={PANEL_STYLE}>
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+    <section className="flex h-full min-h-0 min-w-0 flex-col rounded-xl p-4" style={PANEL_STYLE} data-testid={testId}>
+      <h3 className="mb-3 flex shrink-0 items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
         <span style={{ color: 'var(--brand)' }}>{icon}</span>
         {title}
       </h3>
-      {children}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </section>
   )
 }
@@ -97,31 +98,28 @@ export function UserAnalyticsPanels({ userId, onOpenContent }: UserAnalyticsPane
   const recommendations = recommendationsQuery.data
 
   return (
-    <div className="grid min-w-0 gap-5 xl:contents" data-testid="settings-analytics-columns">
-      <div className="grid min-w-0 content-start gap-5" data-testid="settings-analytics-middle">
-        <AnalyticsPanel title="评分分布" icon={<BarChart3 size={16} />}>
+    <div className="grid h-full min-h-0 min-w-0 grid-cols-1 grid-rows-4 gap-3 sm:grid-cols-2 sm:grid-rows-2 sm:gap-4 xl:grid-rows-[minmax(0,1fr)_auto] xl:gap-5" data-testid="settings-analytics-grid">
+        <AnalyticsPanel title="评分分布" icon={<BarChart3 size={16} />} testId="settings-panel-score-distribution">
           {overviewQuery.isPending ? <PanelLoading label="评分分布加载中" /> : overviewQuery.isError || !overview ? (
             <PanelError onRetry={() => void overviewQuery.refetch()} />
           ) : (
             <ScoreDistributionChart buckets={overview.score_distribution} range={FULL_SCORE_RANGE} />
           )}
         </AnalyticsPanel>
-        <AnalyticsPanel title="标签词云" icon={<Cloud size={16} />}>
+        <AnalyticsPanel title="标签词云" icon={<Cloud size={16} />} testId="settings-panel-tag-cloud">
           {overviewQuery.isPending ? <PanelLoading label="标签词云加载中" /> : overviewQuery.isError || !overview ? (
             <PanelError onRetry={() => void overviewQuery.refetch()} />
           ) : (
             <TagWordCloud items={overview.weighted_tags} />
           )}
         </AnalyticsPanel>
-      </div>
 
-      <div className="grid min-w-0 content-start gap-5" data-testid="settings-analytics-right">
-        <AnalyticsPanel title="当前最喜欢" icon={<Heart size={16} />}>
+        <AnalyticsPanel title="当前最喜欢" icon={<Heart size={16} />} testId="settings-panel-current-favorites">
           {overviewQuery.isPending ? <PanelLoading label="当前最喜欢加载中" /> : overviewQuery.isError || !overview ? (
             <PanelError onRetry={() => void overviewQuery.refetch()} />
           ) : overview.favorites.length > 0 ? (
-            <div className="grid gap-2.5">
-              {overview.favorites.map(item => (
+            <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto p-2" data-testid="settings-current-favorites-scroll">
+              {overview.favorites.slice(0, 3).map(item => (
                 <AnalyticsFavoriteCard
                   key={item.id}
                   item={item}
@@ -134,11 +132,11 @@ export function UserAnalyticsPanels({ userId, onOpenContent }: UserAnalyticsPane
             <p className="py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>还没有评分代表作</p>
           )}
         </AnalyticsPanel>
-        <AnalyticsPanel title="可能喜欢" icon={<Sparkles size={16} />}>
+        <AnalyticsPanel title="可能喜欢" icon={<Sparkles size={16} />} testId="settings-panel-recommendations">
           {recommendationsQuery.isPending ? <PanelLoading label="可能喜欢加载中" /> : recommendationsQuery.isError || !recommendations ? (
             <PanelError onRetry={() => void recommendationsQuery.refetch()} />
           ) : recommendations.items.length > 0 ? (
-            <div className="grid gap-2.5">
+            <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto p-2" data-testid="settings-recommendations-scroll">
               {recommendations.items.slice(0, 3).map(item => (
                 <AnalyticsRecommendationCard
                   key={item.id}
@@ -151,7 +149,6 @@ export function UserAnalyticsPanels({ userId, onOpenContent }: UserAnalyticsPane
             <p className="py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>暂无未评分候选番剧</p>
           )}
         </AnalyticsPanel>
-      </div>
     </div>
   )
 }

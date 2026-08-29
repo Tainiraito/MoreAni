@@ -65,6 +65,10 @@ describe('SettingsDialog', () => {
     expect(view.getByTestId('settings-profile-grid')).toBeInTheDocument()
     expect(view.getByTestId('settings-profile-left')).toHaveTextContent('设置用户')
     expect(view.getByTestId('mock-user-analytics')).toHaveTextContent('用户 7 的统计区域')
+    expect(view.getByTestId('settings-profile-grid')).not.toHaveClass('overflow-y-auto')
+    expect(view.getByRole('dialog')).toHaveClass('overflow-hidden')
+    expect(view.getByRole('dialog').parentElement).toHaveClass('z-[60]')
+    expect(view.queryByText('MoreAni v2.0 — 又看一集')).not.toBeInTheDocument()
     await waitFor(() => expect(api.getUserActivity).toHaveBeenCalledWith(7, { page: '1', size: '10' }))
 
     fireEvent.click(view.getByRole('button', { name: '全站分析' }))

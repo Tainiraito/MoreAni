@@ -24,7 +24,18 @@ const tags = ['治愈', '日常', '恋爱', '校园', '奇幻', '青春', '搞�
   average_score: 8.8 - index * 0.1,
 }))
 
-test('用户信息弹窗展示本人三列统计并可跳转全站分析', async ({ page }, testInfo) => {
+const activityItems = Array.from({ length: 12 }, (_, index) => ({
+  type: index % 3 === 0 ? 'rating' : 'review',
+  content_id: 300 + index,
+  content_title: `动态番剧 ${index + 1}`,
+  content_cover: '',
+  content_type: 'anime',
+  score: index % 3 === 0 ? 85 : null,
+  review: index % 3 === 0 ? '' : `这是一条动态 ${index + 1}`,
+  updated_at: '2026-08-27T00:00:00Z',
+}))
+
+test('用户信息弹窗展示本人四个统计区域并可跳转全站分析', async ({ page }, testInfo) => {
   const browserErrors: string[] = []
   const analyticsRequests: URL[] = []
   page.on('pageerror', error => browserErrors.push(error.message))
@@ -51,7 +62,13 @@ test('用户信息弹窗展示本人三列统计并可跳转全站分析', async
       return
     }
     if (path.endsWith('/user/7/activity')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0 }) })
+      const page = Number(url.searchParams.get('page') || '1')
+      const start = (page - 1) * 10
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: activityItems.slice(start, start + 10), total: activityItems.length }),
+      })
       return
     }
     if (path.endsWith('/user/7')) {
@@ -86,7 +103,7 @@ test('用户信息弹窗展示本人三列统计并可跳转全站分析', async
           favorites: Array.from({ length: 3 }, (_, index) => ({
             id: 100 + index,
             title: `个人代表作 ${index + 1}`,
-            title_alt: '',
+            title_alt: `日本語标题 ${index + 1}`,
             cover_url: '',
             content_type: 'anime',
             score: 9.5 - index * 0.5,
@@ -141,17 +158,83 @@ test('用户信息弹窗展示本人三列统计并可跳转全站分析', async
   await expect(dialog.getByRole('heading', { name: '可能喜欢' })).toBeVisible()
   await expect(dialog.getByText('个人代表作 1')).toBeVisible()
   await expect(dialog.getByText('可能喜欢 1')).toBeVisible()
+  await expect(dialog.getByText('日本語标题 1')).toHaveCount(0)
+  await expect(dialog.getByText('MoreAni v2.0 — 又看一集')).toHaveCount(0)
   expect(analyticsRequests.some(url => url.searchParams.get('scope') === 'user' && url.searchParams.get('user_id') === '7')).toBe(true)
+
+  const dialogBeforeLoadMore = await dialog.boundingBox()
+  const chartBeforeLoadMore = await dialog.getByTestId('settings-panel-score-distribution').boundingBox()
+  const cloudBeforeLoadMore = await dialog.getByTestId('settings-panel-tag-cloud').boundingBox()
+  await expect(dialog.getByRole('button', { name: '加载更多（10/12）' })).toBeVisible()
+  await dialog.getByRole('button', { name: '加载更多（10/12）' }).click()
+  await expect(dialog.getByRole('button', { name: '加载更多（12/12）' })).toHaveCount(0)
+  const dialogAfterLoadMore = await dialog.boundingBox()
+  const chartAfterLoadMore = await dialog.getByTestId('settings-panel-score-distribution').boundingBox()
+  const cloudAfterLoadMore = await dialog.getByTestId('settings-panel-tag-cloud').boundingBox()
+  expect(dialogAfterLoadMore).not.toBeNull()
+  expect(chartAfterLoadMore).not.toBeNull()
+  expect(cloudAfterLoadMore).not.toBeNull()
+  expect(Math.abs(dialogBeforeLoadMore!.height - dialogAfterLoadMore!.height)).toBeLessThan(1)
+  expect(Math.abs(chartBeforeLoadMore!.height - chartAfterLoadMore!.height)).toBeLessThan(1)
+  expect(Math.abs(cloudBeforeLoadMore!.height - cloudAfterLoadMore!.height)).toBeLessThan(1)
 
   if ((page.viewportSize()?.width ?? 0) >= 1280) {
     const left = await dialog.getByTestId('settings-profile-left').boundingBox()
-    const middle = await dialog.getByTestId('settings-analytics-middle').boundingBox()
-    const right = await dialog.getByTestId('settings-analytics-right').boundingBox()
+    const analytics = await dialog.getByTestId('settings-analytics-grid').boundingBox()
     expect(left).not.toBeNull()
-    expect(middle).not.toBeNull()
-    expect(right).not.toBeNull()
-    expect(left!.x).toBeLessThan(middle!.x)
-    expect(middle!.x).toBeLessThan(right!.x)
+    expect(analytics).not.toBeNull()
+    expect(left!.x).toBeLessThan(analytics!.x)
+    expect(Math.abs(left!.height - analytics!.height)).toBeLessThan(1)
+
+    const score = await dialog.getByTestId('settings-panel-score-distribution').boundingBox()
+    const tags = await dialog.getByTestId('settings-panel-tag-cloud').boundingBox()
+    const favorites = await dialog.getByTestId('settings-panel-current-favorites').boundingBox()
+    const recommendations = await dialog.getByTestId('settings-panel-recommendations').boundingBox()
+    expect(score).not.toBeNull()
+    expect(tags).not.toBeNull()
+    expect(favorites).not.toBeNull()
+    expect(recommendations).not.toBeNull()
+    expect(score!.x).toBeLessThan(tags!.x)
+    expect(score!.y).toBeLessThan(favorites!.y)
+    expect(tags!.y).toBeLessThan(recommendations!.y)
+  } else if ((page.viewportSize()?.width ?? 0) < 640) {
+    const score = await dialog.getByTestId('settings-panel-score-distribution').boundingBox()
+    const tags = await dialog.getByTestId('settings-panel-tag-cloud').boundingBox()
+    const favorites = await dialog.getByTestId('settings-panel-current-favorites').boundingBox()
+    const recommendations = await dialog.getByTestId('settings-panel-recommendations').boundingBox()
+    expect(score).not.toBeNull()
+    expect(tags).not.toBeNull()
+    expect(favorites).not.toBeNull()
+    expect(recommendations).not.toBeNull()
+    expect(score!.x).toBeCloseTo(tags!.x, 0)
+    expect(tags!.y).toBeLessThan(favorites!.y)
+    expect(favorites!.y).toBeLessThan(recommendations!.y)
+  }
+
+  const grid = dialog.getByTestId('settings-profile-grid')
+  await expect(grid).not.toHaveClass(/overflow-y-auto/)
+  await expect(dialog).toHaveClass(/overflow-hidden/)
+  await expect(dialog.getByTestId('settings-panel-score-distribution')).not.toHaveClass(/overflow-y-auto/)
+  await expect(dialog.getByTestId('settings-panel-tag-cloud')).not.toHaveClass(/overflow-y-auto/)
+  await expect(dialog.getByTestId('settings-current-favorites-scroll')).toHaveClass(/flex-1/)
+  await expect(dialog.getByTestId('settings-current-favorites-scroll')).toHaveClass(/overflow-y-auto/)
+  await expect(dialog.getByTestId('settings-recommendations-scroll')).toHaveClass(/flex-1/)
+  await expect(dialog.getByTestId('settings-recommendations-scroll')).toHaveClass(/overflow-y-auto/)
+  await expect(dialog.getByTestId('analytics-favorite-card')).toHaveCount(3)
+  await expect(dialog.getByTestId('analytics-recommendation-card')).toHaveCount(3)
+  if ((page.viewportSize()?.width ?? 0) < 640) {
+    for (const listTestId of ['settings-current-favorites-scroll', 'settings-recommendations-scroll']) {
+      const cardBounds = await dialog.getByTestId(listTestId).evaluate(list => {
+        const listBounds = list.getBoundingClientRect()
+        const cards = Array.from(list.querySelectorAll<HTMLElement>('[data-testid$="-card"]'))
+        return {
+          listBottom: listBounds.bottom,
+          cardBottoms: cards.map(card => card.getBoundingClientRect().bottom),
+        }
+      })
+      expect(cardBounds.cardBottoms).toHaveLength(3)
+      expect(cardBounds.cardBottoms.every(bottom => bottom <= cardBounds.listBottom + 1)).toBe(true)
+    }
   }
 
   await expect(page.locator('vite-error-overlay')).toHaveCount(0)

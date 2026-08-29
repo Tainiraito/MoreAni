@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { AnalyticsScoreBucket } from '@/types'
 import type { ScoreRange } from '@/components/analytics/ScoreRangeSlider'
@@ -15,11 +15,47 @@ const CHART_HEIGHT = 250
 const MARGIN = { top: 18, right: 12, bottom: 34, left: 34 }
 const GRID_RATIOS = [0.25, 0.5, 0.75, 1]
 
+interface ChartViewport {
+  width: number
+  height: number
+}
+
 export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreDistributionChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [viewport, setViewport] = useState<ChartViewport>({ width: CHART_WIDTH, height: CHART_HEIGHT })
+  useLayoutEffect(() => {
+    const element = chartRef.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+
+    const updateViewport = (): void => {
+      const { width, height } = element.getBoundingClientRect()
+      if (width <= 0 || height <= 0) return
+      const nextViewport = { width: Math.round(width), height: Math.round(height) }
+      setViewport(current => (
+        current.width === nextViewport.width && current.height === nextViewport.height
+          ? current
+          : nextViewport
+      ))
+    }
+
+    updateViewport()
+    const observer = new ResizeObserver(updateViewport)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  const chartWidth = viewport.width
+  const chartHeight = viewport.height
+  const margin = {
+    top: Math.min(MARGIN.top, Math.max(8, chartHeight * 0.12)),
+    right: Math.min(MARGIN.right, Math.max(8, chartWidth * 0.04)),
+    bottom: Math.min(MARGIN.bottom, Math.max(22, chartHeight * 0.22)),
+    left: Math.min(MARGIN.left, Math.max(26, chartWidth * 0.1)),
+  }
   const maxCount = useMemo(() => Math.max(1, ...buckets.map(bucket => bucket.count)), [buckets])
-  const innerWidth = CHART_WIDTH - MARGIN.left - MARGIN.right
-  const innerHeight = CHART_HEIGHT - MARGIN.top - MARGIN.bottom
+  const innerWidth = Math.max(1, chartWidth - margin.left - margin.right)
+  const innerHeight = Math.max(1, chartHeight - margin.top - margin.bottom)
   const bandWidth = innerWidth / Math.max(1, buckets.length)
   const barWidth = Math.max(5, bandWidth - 6)
   const hovered = hoveredIndex === null ? null : buckets[hoveredIndex]
@@ -31,10 +67,11 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
   }
 
   return (
-    <div className="relative" data-testid="score-distribution-chart">
+    <div ref={chartRef} className="relative h-full min-h-0 xl:min-h-[13rem]" data-testid="score-distribution-chart">
       <svg
-        className="h-auto w-full select-none overflow-visible"
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        className="block h-full min-h-0 w-full select-none overflow-visible"
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+        preserveAspectRatio="none"
         role="img"
         aria-labelledby="score-distribution-title score-distribution-description"
         style={{ userSelect: 'none' }}
@@ -52,19 +89,19 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
         </defs>
 
         {GRID_RATIOS.map(ratio => {
-          const y = MARGIN.top + innerHeight * (1 - ratio)
+          const y = margin.top + innerHeight * (1 - ratio)
           return (
             <g key={ratio}>
               <line
-                x1={MARGIN.left}
-                x2={CHART_WIDTH - MARGIN.right}
+                x1={margin.left}
+                x2={chartWidth - margin.right}
                 y1={y}
                 y2={y}
                 stroke="var(--border-line)"
                 strokeWidth="1"
               />
               <text
-                x={MARGIN.left - 7}
+                x={margin.left - 7}
                 y={y + 4}
                 textAnchor="end"
                 fontSize="10"
@@ -78,8 +115,8 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
 
         {buckets.map((bucket, index) => {
           const height = (bucket.count / maxCount) * innerHeight
-          const x = MARGIN.left + index * bandWidth + (bandWidth - barWidth) / 2
-          const y = MARGIN.top + innerHeight - height
+          const x = margin.left + index * bandWidth + (bandWidth - barWidth) / 2
+          const y = margin.top + innerHeight - height
           const inRange = bucket.score >= range.min && bucket.score <= range.max
           const isHovered = hoveredIndex === index
           const isSelected = range.min === bucket.score && range.max === bucket.score
@@ -101,16 +138,16 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
               style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none', userSelect: 'none' }}
             >
               <rect
-                x={MARGIN.left + index * bandWidth}
+                x={margin.left + index * bandWidth}
                 y={0}
                 width={bandWidth}
-                height={CHART_HEIGHT}
+                height={chartHeight}
                 fill="transparent"
                 data-testid={`score-column-hit-area-${bucket.score}`}
               />
               <rect
-                x={MARGIN.left + index * bandWidth}
-                y={MARGIN.top}
+                x={margin.left + index * bandWidth}
+                y={margin.top}
                 width={bandWidth}
                 height={innerHeight}
                 fill="var(--brand)"
@@ -134,7 +171,7 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
               {index % 2 === 1 ? (
                 <text
                   x={x + barWidth / 2}
-                  y={CHART_HEIGHT - 12}
+                  y={chartHeight - 12}
                   textAnchor="middle"
                   fontSize="10"
                   fill="var(--text-muted)"

@@ -7,7 +7,7 @@ import type {
   AnalyticsScopeType,
 } from '@/types'
 
-const COVER_CARD_GRID_CLASS = 'grid grid-cols-[88px_minmax(0,1fr)]'
+const COVER_CARD_GRID_CLASS = 'grid grid-cols-[40px_minmax(0,1fr)] sm:grid-cols-[72px_minmax(0,1fr)]'
 
 interface FavoriteCardProps {
   item: AnalyticsFavoriteItem
@@ -31,17 +31,16 @@ export function AnalyticsFavoriteCard({
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
       <div className={COVER_CARD_GRID_CLASS}>
-        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
+        <div className="min-h-20 self-stretch overflow-hidden sm:min-h-24" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
-        <div className="min-w-0 p-3">
-          <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
-          {item.title_alt ? <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p> : null}
-          <p className="mt-3 flex items-center gap-1 text-sm font-semibold" style={{ color: 'var(--brand)' }}>
+        <div className="min-w-0 space-y-1 p-2 sm:space-y-1.5 sm:p-2.5">
+          <p className="truncate text-xs font-semibold sm:text-sm" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+          <p className="flex items-center gap-1 text-xs font-semibold sm:text-sm" style={{ color: 'var(--brand)' }}>
             <Star size={14} fill="currentColor" />
             {item.score.toFixed(1)}
           </p>
-          <p className="mt-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-[10px] leading-4 sm:text-[11px]" style={{ color: 'var(--text-muted)' }}>
             {scope === 'global'
               ? `${item.rating_count} 条评分 · 实际均分`
               : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
@@ -83,25 +82,25 @@ export function AnalyticsRecommendationCard({
       type="button"
       data-testid="analytics-recommendation-card"
       onClick={() => onOpen(item.id)}
-      className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+      className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
       <div className={COVER_CARD_GRID_CLASS}>
-        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
+        <div className="min-h-20 self-stretch overflow-hidden sm:min-h-24" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
-        <div className="min-w-0 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="line-clamp-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
+        <div className="min-w-0 space-y-1 p-2 sm:space-y-1.5 sm:p-2.5">
+          <div className="analytics-recommendation-heading flex items-start justify-between gap-1">
+            <p className="min-w-0 flex-1 truncate text-xs font-semibold sm:text-sm" style={{ color: 'var(--text-primary)' }}>{item.title}</p>
             <span
-              className="shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+              className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums sm:px-2 sm:text-xs"
               style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.12)' }}
             >
               {item.match_percent}%
             </span>
           </div>
           <p
-            className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
+            className="flex items-center gap-1 text-[10px] leading-4 tabular-nums sm:text-[11px]"
             style={{ color: 'var(--text-muted)' }}
             data-testid="analytics-recommendation-rating"
           >
@@ -110,11 +109,11 @@ export function AnalyticsRecommendationCard({
               ? `站内评分 ${item.average_score.toFixed(1)} · ${item.rating_count} 人评分`
               : '暂无站内评分'}
           </p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {requiredTagNames.map(tag => (
               <span
                 key={tag}
-                className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                className="rounded-md px-1 py-0.5 text-[10px] font-medium sm:px-1.5"
                 style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
               >
                 {tag}
@@ -123,7 +122,7 @@ export function AnalyticsRecommendationCard({
             {otherMatchedTags.map(tag => (
               <span
                 key={tag}
-                className="rounded-md px-1.5 py-0.5 text-[10px]"
+                className="rounded-md px-1 py-0.5 text-[10px] sm:px-1.5"
                 style={{ color: 'var(--text-secondary)', background: 'var(--bg-card)' }}
               >
                 {tag}
