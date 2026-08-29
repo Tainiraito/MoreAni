@@ -124,6 +124,7 @@ export function UserAnalyticsPanels({ userId, onOpenContent }: UserAnalyticsPane
                   key={item.id}
                   item={item}
                   scope="user"
+                  compact
                   onOpen={onOpenContent}
                 />
               ))}
@@ -141,6 +142,7 @@ export function UserAnalyticsPanels({ userId, onOpenContent }: UserAnalyticsPane
                 <AnalyticsRecommendationCard
                   key={item.id}
                   item={item}
+                  compact
                   onOpen={onOpenContent}
                 />
               ))}
