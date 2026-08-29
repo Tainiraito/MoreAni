@@ -7,7 +7,7 @@ import type { KeyboardEvent } from 'react'
 interface ScoreDistributionChartProps {
   buckets: AnalyticsScoreBucket[]
   range: ScoreRange
-  onSelectScore: (score: number) => void
+  onSelectScore?: (score: number) => void
 }
 
 const CHART_WIDTH = 640
@@ -25,7 +25,7 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
   const hovered = hoveredIndex === null ? null : buckets[hoveredIndex]
 
   const handleColumnKeyDown = (event: KeyboardEvent<SVGGElement>, score: number): void => {
-    if (event.key !== 'Enter' && event.key !== ' ') return
+    if (!onSelectScore || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
     onSelectScore(score)
   }
@@ -83,21 +83,22 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
           const inRange = bucket.score >= range.min && bucket.score <= range.max
           const isHovered = hoveredIndex === index
           const isSelected = range.min === bucket.score && range.max === bucket.score
+          const interactive = onSelectScore !== undefined
           return (
             <g
               key={bucket.score}
-              role="button"
-              tabIndex={0}
-              aria-label={`${bucket.score.toFixed(1)} 分，共 ${bucket.count} 条评分，点击仅查看该评分`}
-              aria-pressed={isSelected}
-              onPointerDown={event => event.preventDefault()}
-              onClick={() => onSelectScore(bucket.score)}
+              role={interactive ? 'button' : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              aria-label={`${bucket.score.toFixed(1)} 分，共 ${bucket.count} 条评分${interactive ? '，点击仅查看该评分' : ''}`}
+              aria-pressed={interactive ? isSelected : undefined}
+              onPointerDown={interactive ? event => event.preventDefault() : undefined}
+              onClick={interactive ? () => onSelectScore?.(bucket.score) : undefined}
               onKeyDown={event => handleColumnKeyDown(event, bucket.score)}
               onPointerEnter={() => setHoveredIndex(index)}
               onPointerLeave={() => setHoveredIndex(null)}
               onFocus={() => setHoveredIndex(index)}
               onBlur={() => setHoveredIndex(null)}
-              style={{ cursor: 'pointer', outline: 'none', userSelect: 'none' }}
+              style={{ cursor: interactive ? 'pointer' : 'default', outline: 'none', userSelect: 'none' }}
             >
               <rect
                 x={MARGIN.left + index * bandWidth}

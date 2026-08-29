@@ -6,8 +6,8 @@ import type { AnalyticsTagStat } from '@/types'
 
 interface TagWordCloudProps {
   items: AnalyticsTagStat[]
-  selectedNames: readonly string[]
-  onToggleTag: (name: string) => void
+  selectedNames?: readonly string[]
+  onToggleTag?: (name: string) => void
 }
 
 interface CloudDatum {
@@ -27,7 +27,7 @@ function cloudTextColor(rank: number, total: number, emphasized: boolean): strin
   return 'var(--text-muted)'
 }
 
-export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloudProps) {
+export function TagWordCloud({ items, selectedNames = [], onToggleTag }: TagWordCloudProps) {
   const [hoveredName, setHoveredName] = useState<string | null>(null)
   const selectedNameSet = useMemo(() => new Set(selectedNames), [selectedNames])
 
@@ -94,6 +94,7 @@ export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloud
             const rank = rankByName.get(name) ?? items.length
             const hovered = hoveredName === name
             const selected = selectedNameSet.has(name)
+            const interactive = onToggleTag !== undefined
             return (
               <text
                 key={name}
@@ -104,23 +105,23 @@ export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloud
                 fontFamily="var(--font-sans)"
                 fill={cloudTextColor(rank, items.length, hovered)}
                 opacity={hovered ? 1 : Math.max(0.52, 1 - rank / Math.max(items.length * 1.8, 1))}
-                tabIndex={0}
-                role="button"
-                aria-pressed={selected}
+                tabIndex={interactive ? 0 : undefined}
+                role={interactive ? 'button' : undefined}
+                aria-pressed={interactive ? selected : undefined}
                 aria-label={name}
-                onPointerDown={event => event.preventDefault()}
+                onPointerDown={interactive ? event => event.preventDefault() : undefined}
                 onPointerEnter={() => setHoveredName(name)}
                 onFocus={() => setHoveredName(name)}
                 onBlur={() => setHoveredName(null)}
-                onClick={() => onToggleTag(name)}
+                onClick={interactive ? () => onToggleTag?.(name) : undefined}
                 onKeyDown={event => {
-                  if (event.key === 'Enter' || event.key === ' ') {
+                  if (interactive && (event.key === 'Enter' || event.key === ' ')) {
                     event.preventDefault()
-                    onToggleTag(name)
+                    onToggleTag?.(name)
                   }
                 }}
                 style={{
-                  cursor: 'pointer',
+                  cursor: interactive ? 'pointer' : 'default',
                   filter: hovered || selected ? 'drop-shadow(0 0 8px rgba(251, 113, 167, 0.7))' : 'none',
                   outline: 'none',
                   textDecoration: 'none',
