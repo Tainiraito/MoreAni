@@ -1,6 +1,6 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, ChartNoAxesCombined, Cloud, Heart, Sparkles, Star, Users } from 'lucide-react'
+import { BarChart3, ChartNoAxesCombined, Cloud, Heart, Sparkles, Star, Users, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
@@ -82,10 +82,11 @@ function SummaryCard({ label, value, icon }: SummaryCardProps) {
 interface FavoriteCardProps {
   item: AnalyticsFavoriteItem
   scope: AnalyticsScopeType
+  requiredTagNames: readonly string[]
   onOpen: (id: number) => void
 }
 
-function FavoriteCard({ item, scope, onOpen }: FavoriteCardProps) {
+function FavoriteCard({ item, scope, requiredTagNames, onOpen }: FavoriteCardProps) {
   return (
     <button
       type="button"
@@ -109,6 +110,19 @@ function FavoriteCard({ item, scope, onOpen }: FavoriteCardProps) {
             ? `${item.rating_count} 条评分 · 实际均分`
             : `全站 ${item.rating_count} 条评分${item.average_score !== null ? ` · 均分 ${item.average_score.toFixed(1)}` : ''}`}
         </p>
+        {requiredTagNames.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1" data-testid="favorite-required-tags">
+            {requiredTagNames.map(tag => (
+              <span
+                key={tag}
+                className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </button>
   )
@@ -116,13 +130,17 @@ function FavoriteCard({ item, scope, onOpen }: FavoriteCardProps) {
 
 interface RecommendationCardProps {
   item: AnalyticsRecommendationItem
+  requiredTagNames: readonly string[]
   onOpen: (id: number) => void
 }
 
-function RecommendationCard({ item, onOpen }: RecommendationCardProps) {
+function RecommendationCard({ item, requiredTagNames, onOpen }: RecommendationCardProps) {
+  const otherMatchedTags = item.matched_tags.filter(tag => !requiredTagNames.includes(tag))
+  const hasVisibleTags = requiredTagNames.length > 0 || otherMatchedTags.length > 0
   return (
     <button
       type="button"
+      data-testid="analytics-recommendation-card"
       onClick={() => onOpen(item.id)}
       className="group overflow-hidden rounded-xl text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
@@ -152,7 +170,16 @@ function RecommendationCard({ item, onOpen }: RecommendationCardProps) {
               : '暂无站内评分'}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {item.matched_tags.length > 0 ? item.matched_tags.map(tag => (
+            {requiredTagNames.map(tag => (
+              <span
+                key={tag}
+                className="rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
+              >
+                {tag}
+              </span>
+            ))}
+            {otherMatchedTags.map(tag => (
               <span
                 key={tag}
                 className="rounded-md px-1.5 py-0.5 text-[10px]"
@@ -160,9 +187,10 @@ function RecommendationCard({ item, onOpen }: RecommendationCardProps) {
               >
                 {tag}
               </span>
-            )) : (
+            ))}
+            {!hasVisibleTags ? (
               <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>暂无强匹配标签</span>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -185,6 +213,9 @@ export function AnalyticsPage() {
   const selection = useMemo(() => parseScope(searchParams), [searchParams])
   const [scoreRange, setScoreRange] = useState<ScoreRange>(DEFAULT_SCORE_RANGE)
   const [cloudMode, setCloudMode] = useState<TagCloudMode>('weighted')
+  const [activeTagNames, setActiveTagNames] = useState<string[]>([])
+  const scoreRangeBeforeColumnSelectionRef = useRef<ScoreRange | null>(null)
+  const selectedScoreColumnRef = useRef<number | null>(null)
   const debouncedRange = useDebouncedScoreRange(scoreRange)
 
   const usersQuery = useQuery({
@@ -193,21 +224,30 @@ export function AnalyticsPage() {
     staleTime: 60_000,
   })
   const overviewQuery = useQuery({
-    queryKey: ['analytics-overview', selection.scope, selection.userId ?? null, debouncedRange.min, debouncedRange.max],
+    queryKey: [
+      'analytics-overview',
+      selection.scope,
+      selection.userId ?? null,
+      debouncedRange.min,
+      debouncedRange.max,
+      activeTagNames,
+    ],
     queryFn: ({ signal }) => api.getAnalyticsOverview({
       scope: selection.scope,
       userId: selection.userId,
       minScore: debouncedRange.min,
       maxScore: debouncedRange.max,
+      tags: activeTagNames,
     }, { signal }),
     placeholderData: previous => previous,
   })
   const recommendationsQuery = useQuery({
-    queryKey: ['analytics-recommendations', selection.scope, selection.userId ?? null],
+    queryKey: ['analytics-recommendations', selection.scope, selection.userId ?? null, activeTagNames],
     queryFn: ({ signal }) => api.getAnalyticsRecommendations({
       scope: selection.scope,
       userId: selection.userId,
       limit: 6,
+      tags: activeTagNames,
     }, { signal }),
   })
 
@@ -224,10 +264,48 @@ export function AnalyticsPage() {
   const selectedScopeValue = selection.scope === 'global' ? 'global' : `user:${selection.userId}`
   const overview = overviewQuery.data
   const recommendations = recommendationsQuery.data
-  const selectedTags = cloudMode === 'frequency' ? overview?.frequency_tags ?? [] : overview?.weighted_tags ?? []
-  const deferredTags = useDeferredValue<AnalyticsTagStat[]>(selectedTags)
+  const cloudTagItems = cloudMode === 'frequency' ? overview?.frequency_tags ?? [] : overview?.weighted_tags ?? []
+  const deferredTags = useDeferredValue<AnalyticsTagStat[]>(cloudTagItems)
+
+  const handleScoreRangeChange = useCallback((nextRange: ScoreRange): void => {
+    scoreRangeBeforeColumnSelectionRef.current = null
+    selectedScoreColumnRef.current = null
+    setScoreRange(nextRange)
+  }, [])
+
+  const handleScoreColumnSelect = useCallback((score: number): void => {
+    setScoreRange(currentRange => {
+      const previousRange = scoreRangeBeforeColumnSelectionRef.current
+      if (
+        selectedScoreColumnRef.current === score
+        && currentRange.min === score
+        && currentRange.max === score
+        && previousRange
+      ) {
+        scoreRangeBeforeColumnSelectionRef.current = null
+        selectedScoreColumnRef.current = null
+        return previousRange
+      }
+      if (selectedScoreColumnRef.current === null) {
+        scoreRangeBeforeColumnSelectionRef.current = currentRange
+      }
+      selectedScoreColumnRef.current = score
+      return { min: score, max: score }
+    })
+  }, [])
+
+  const handleToggleTag = useCallback((name: string): void => {
+    setActiveTagNames(currentNames => (
+      currentNames.includes(name)
+        ? currentNames.filter(currentName => currentName !== name)
+        : [...currentNames, name]
+    ))
+  }, [])
 
   const handleScopeChange = (value: string): void => {
+    setActiveTagNames([])
+    scoreRangeBeforeColumnSelectionRef.current = null
+    selectedScoreColumnRef.current = null
     if (value === 'global') {
       setSearchParams({})
       return
@@ -286,10 +364,10 @@ export function AnalyticsPage() {
               <ScoreDistributionChart
                 buckets={overview.score_distribution}
                 range={scoreRange}
-                onSelectScore={score => setScoreRange({ min: score, max: score })}
+                onSelectScore={handleScoreColumnSelect}
               />
               <div className="mt-2 rounded-xl p-4" style={{ background: 'var(--bg-card-warm)' }}>
-                <ScoreRangeSlider value={scoreRange} onChange={setScoreRange} />
+                <ScoreRangeSlider value={scoreRange} onChange={handleScoreRangeChange} />
               </div>
             </section>
 
@@ -297,7 +375,7 @@ export function AnalyticsPage() {
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Cloud size={18} />标签词云</h2>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>字号面积按标签权重占比缩放，颜色表示权重层级</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>点击标签可多选；卡片需同时包含全部已选标签</p>
                 </div>
                 <div className="inline-flex rounded-lg p-1" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}>
                   {(['frequency', 'weighted'] as const).map(mode => {
@@ -320,7 +398,28 @@ export function AnalyticsPage() {
                   })}
                 </div>
               </div>
-              <TagWordCloud items={deferredTags} />
+              {activeTagNames.length > 0 ? (
+                <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="active-tag-filters">
+                  <span className="mr-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>已选标签</span>
+                  {activeTagNames.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => handleToggleTag(tag)}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
+                      style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.14)' }}
+                      aria-label={`取消标签 ${tag}`}
+                    >
+                      {tag}<X size={12} />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <TagWordCloud
+                items={deferredTags}
+                selectedNames={activeTagNames}
+                onToggleTag={handleToggleTag}
+              />
             </section>
           </div>
 
@@ -329,12 +428,24 @@ export function AnalyticsPage() {
               <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Heart size={18} />当前最喜欢</h2>
               <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>代表作会随评分区间变化；全站优先展示高分且评分人数充足的番剧，卡片显示站内实际均分</p>
             </div>
-            {overview.favorites.length > 0 ? (
+            {overviewQuery.isPlaceholderData ? (
+              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>筛选代表作中…</p>
+            ) : overview.favorites.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
-                {overview.favorites.map(item => <FavoriteCard key={item.id} item={item} scope={overview.scope.type} onOpen={openDetail} />)}
+                {overview.favorites.map(item => (
+                  <FavoriteCard
+                    key={item.id}
+                    item={item}
+                    scope={overview.scope.type}
+                    requiredTagNames={activeTagNames}
+                    onOpen={openDetail}
+                  />
+                ))}
               </div>
             ) : (
-              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>当前评分区间暂无代表作</p>
+              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
+                {activeTagNames.length > 0 ? '暂无同时包含全部已选标签的代表作' : '当前评分区间暂无代表作'}
+              </p>
             )}
           </section>
 
@@ -354,10 +465,19 @@ export function AnalyticsPage() {
               <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>推荐加载失败，请稍后重试</p>
             ) : recommendations && recommendations.items.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {recommendations.items.map(item => <RecommendationCard key={item.id} item={item} onOpen={openDetail} />)}
+                {recommendations.items.map(item => (
+                  <RecommendationCard
+                    key={item.id}
+                    item={item}
+                    requiredTagNames={activeTagNames}
+                    onOpen={openDetail}
+                  />
+                ))}
               </div>
             ) : (
-              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>暂无未评分候选番剧</p>
+              <p className="rounded-xl p-6 text-center text-sm" style={{ color: 'var(--text-muted)', background: 'var(--bg-card-warm)' }}>
+                {activeTagNames.length > 0 ? '暂无同时包含全部已选标签的推荐番剧' : '暂无未评分候选番剧'}
+              </p>
             )}
           </section>
         </div>

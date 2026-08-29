@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,6 +22,8 @@ describe('ScoreRangeSlider', () => {
     expect(maximum).toHaveValue('10')
     expect(minimum).toHaveAttribute('step', '0.5')
     expect(maximum).toHaveAttribute('step', '0.5')
+    expect(minimum).toHaveClass('sr-only', 'pointer-events-none')
+    expect(maximum).toHaveClass('sr-only', 'pointer-events-none')
 
     fireEvent.change(minimum, { target: { value: '4' } })
     expect(minimum).toHaveValue('4')
@@ -63,6 +65,33 @@ describe('ScoreRangeSlider', () => {
     fireEvent.pointerDown(track, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 0 })
     expect(track).toHaveStyle({ cursor: 'grabbing' })
     fireEvent.pointerUp(track, { pointerType: 'mouse', pointerId: 1 })
+    expect(track).toHaveStyle({ cursor: 'ew-resize' })
+  })
+
+  it('连续两次指针拖动都能更新区间且不会进入原生拖放', () => {
+    const view = render(<ControlledSlider />)
+    const track = view.getByTestId('score-range-track')
+    Object.assign(track, {
+      getBoundingClientRect: () => ({ left: 0, width: 100 }),
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    })
+
+    fireEvent.pointerDown(track, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 50 })
+    fireEvent.pointerMove(track, { pointerType: 'mouse', pointerId: 1, clientX: 75 })
+    fireEvent.pointerUp(track, { pointerType: 'mouse', pointerId: 1, clientX: 75 })
+    expect(view.getByText('0.5 – 7.5')).toBeInTheDocument()
+
+    fireEvent.pointerDown(track, { pointerType: 'mouse', button: 0, pointerId: 2, clientX: 0 })
+    fireEvent.pointerMove(track, { pointerType: 'mouse', pointerId: 2, clientX: 25 })
+    fireEvent.pointerUp(track, { pointerType: 'mouse', pointerId: 2, clientX: 25 })
+    expect(view.getByText('3.0 – 7.5')).toBeInTheDocument()
+
+    const dragEvent = createEvent.dragStart(track)
+    const preventDefault = vi.spyOn(dragEvent, 'preventDefault')
+    fireEvent(track, dragEvent)
+    expect(preventDefault).toHaveBeenCalled()
     expect(track).toHaveStyle({ cursor: 'ew-resize' })
   })
 })

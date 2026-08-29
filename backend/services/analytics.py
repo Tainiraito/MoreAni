@@ -67,12 +67,19 @@ def get_overview(
     target_user: User | None,
     min_score: int,
     max_score: int,
+    required_tags: list[str] | None = None,
 ) -> AnalyticsOverviewResponse:
     """返回完整评分分布、区间标签画像和代表番剧。"""
     contents = _load_public_anime(db)
     scope_ratings = _load_scored_ratings(db, user_id=target_user.id if target_user else None)
     global_ratings = scope_ratings if scope == 'global' else _load_scored_ratings(db)
     filtered_ratings = [rating for rating in scope_ratings if min_score <= rating.score <= max_score]
+    normalized_required_tags = _normalize_tag_names(required_tags or [])
+    favorite_ratings = [
+        rating
+        for rating in filtered_ratings
+        if normalized_required_tags.issubset(_normalized_tags(rating.content))
+    ]
     _, blocked_tags = _tag_document_context(contents)
     frequency_tags, weighted_tags = _build_tag_clouds(filtered_ratings, blocked_tags)
     global_quality, global_mean = _build_global_quality(global_ratings)
@@ -93,7 +100,7 @@ def get_overview(
         frequency_tags=frequency_tags,
         weighted_tags=weighted_tags,
         favorites=_favorite_items(
-            filtered_ratings,
+            favorite_ratings,
             scope=scope,
             global_quality=global_quality,
             global_mean=global_mean,
@@ -108,11 +115,13 @@ def get_recommendations(
     target_user: User | None,
     current_user_id: int,
     limit: int,
+    required_tags: list[str] | None = None,
 ) -> AnalyticsRecommendationsResponse:
     """按标签画像返回未评分站内番剧，并解释匹配度来源。"""
     contents = _load_public_anime(db)
     global_ratings = _load_scored_ratings(db)
     document_frequency, blocked_tags = _tag_document_context(contents)
+    normalized_required_tags = _normalize_tag_names(required_tags or [])
     eligible_tags = {
         tag
         for tag, count in document_frequency.items()
@@ -163,6 +172,8 @@ def get_recommendations(
 
     for content in contents:
         if content.id in excluded_content_ids:
+            continue
+        if not normalized_required_tags.issubset(_normalized_tags(content)):
             continue
         candidate_vector = _candidate_vector(
             content,
@@ -281,6 +292,16 @@ def _normalized_tags(content: ContentItem) -> set[str]:
         if not name:
             continue
         normalized.add(TAG_ALIASES.get(name, name))
+    return normalized
+
+
+def _normalize_tag_names(names: list[str]) -> set[str]:
+    """规范化 API 传入的标签名称，并忽略空值。"""
+    normalized: set[str] = set()
+    for raw_name in names:
+        name = raw_name.strip()
+        if name:
+            normalized.add(TAG_ALIASES.get(name, name))
     return normalized
 
 

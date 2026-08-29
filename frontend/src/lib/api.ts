@@ -226,7 +226,7 @@ export const api = {
     return request<{ items: ContentItem[] }>(`/content/recommendations?${query}`, options)
   },
   getAnalyticsOverview: (
-    params: { scope: AnalyticsScopeType; userId?: number; minScore: number; maxScore: number },
+    params: { scope: AnalyticsScopeType; userId?: number; minScore: number; maxScore: number; tags?: string[] },
     options?: RequestInit,
   ) => {
     const query = new URLSearchParams({
@@ -235,10 +235,11 @@ export const api = {
       max_score: String(params.maxScore),
     })
     if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    params.tags?.forEach(tag => query.append('tag', tag))
     return request<AnalyticsOverview>(`/analytics/overview?${query}`, options)
   },
   getAnalyticsRecommendations: (
-    params: { scope: AnalyticsScopeType; userId?: number; limit?: number },
+    params: { scope: AnalyticsScopeType; userId?: number; limit?: number; tags?: string[] },
     options?: RequestInit,
   ) => {
     const query = new URLSearchParams({
@@ -246,6 +247,7 @@ export const api = {
       limit: String(params.limit ?? 6),
     })
     if (params.userId !== undefined) query.set('user_id', String(params.userId))
+    params.tags?.forEach(tag => query.append('tag', tag))
     return request<AnalyticsRecommendations>(`/analytics/recommendations?${query}`, options)
   },
   getSeasons: () => request<{ items: { value: string; count: number }[] }>('/content/seasons'),

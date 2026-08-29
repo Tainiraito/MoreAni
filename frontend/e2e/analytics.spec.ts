@@ -37,7 +37,7 @@ const weightedTags = [
   average_score: 8.2,
 }))
 
-test('统计分析支持默认全站、双端筛选、URL 状态和主题切换', async ({ page }) => {
+test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态和主题切换', async ({ page }, testInfo) => {
   const browserErrors: string[] = []
   page.on('pageerror', error => browserErrors.push(error.message))
   page.on('console', message => {
@@ -47,6 +47,9 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
     window.localStorage.setItem('moreani-theme', 'dark')
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
   }, { auth: { user: currentUser, token: 'analytics-e2e-token', isGuest: false } })
+  if (testInfo.project.name === 'chromium') {
+    await page.setViewportSize({ width: 1920, height: 1080 })
+  }
 
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url())
@@ -65,6 +68,7 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
     }
     if (path.endsWith('/analytics/overview')) {
       const userScope = url.searchParams.get('scope') === 'user'
+      const requiredTags = url.searchParams.getAll('tag')
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -82,13 +86,23 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
             { name: '奇幻', weight: 7, rating_count: 7, title_count: 6, average_score: 8.1 },
           ],
           weighted_tags: weightedTags,
-          favorites: [],
+          favorites: requiredTags.length > 0 ? [{
+            id: 101,
+            title: '包含全部已选标签的代表作',
+            title_alt: '',
+            cover_url: '',
+            content_type: 'anime',
+            score: 9.1,
+            average_score: 9.1,
+            rating_count: 12,
+          }] : [],
         }),
       })
       return
     }
     if (path.endsWith('/analytics/recommendations')) {
       const userScope = url.searchParams.get('scope') === 'user'
+      const requiredTags = url.searchParams.getAll('tag')
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -99,7 +113,7 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
           basis: userScope ? 'blended' : 'global',
           items: [{
             id: 202,
-            title: '可能喜欢的番剧',
+            title: requiredTags.length > 0 ? '包含全部已选标签的推荐' : '可能喜欢的番剧',
             title_alt: '',
             cover_url: '',
             content_type: 'anime',
@@ -181,6 +195,24 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
   await singleScoreResponse
 
+  const restoredRangeResponse = page.waitForResponse(response => (
+    response.url().includes('/analytics/overview')
+    && response.url().includes('min_score=6')
+    && response.url().includes('max_score=8.5')
+  ))
+  await tenPointColumn.click()
+  await expect(page.getByText('6.0 – 8.5', { exact: true })).toBeVisible()
+  await restoredRangeResponse
+
+  const repeatedSingleScoreResponse = page.waitForResponse(response => (
+    response.url().includes('/analytics/overview')
+    && response.url().includes('min_score=10')
+    && response.url().includes('max_score=10')
+  ))
+  await tenPointColumn.click()
+  await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
+  await repeatedSingleScoreResponse
+
   const rangeTrack = page.getByTestId('score-range-track')
   const trackBounds = await rangeTrack.boundingBox()
   expect(trackBounds).not.toBeNull()
@@ -201,6 +233,65 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   await page.mouse.up()
   await expect(page.getByText('8.0 – 10.0', { exact: true })).toBeVisible()
   await expandedRangeResponse
+  await expect.poll(() => rangeTrack.evaluate(element => getComputedStyle(element).cursor)).toBe('ew-resize')
+
+  const sevenPointRangeResponse = page.waitForResponse(response => (
+    response.url().includes('/analytics/overview')
+    && response.url().includes('min_score=7')
+    && response.url().includes('max_score=10')
+  ))
+  const sevenPointX = trackBounds!.x + ((7 - 0.5) / (10 - 0.5)) * trackBounds!.width
+  await page.mouse.move(eightPointX, trackY)
+  await page.mouse.down()
+  await page.mouse.move(sevenPointX, trackY, { steps: 4 })
+  await page.mouse.up()
+  await expect(page.getByText('7.0 – 10.0', { exact: true })).toBeVisible()
+  await sevenPointRangeResponse
+  await expect.poll(() => rangeTrack.evaluate(element => getComputedStyle(element).cursor)).toBe('ew-resize')
+
+  const loveTag = page.getByRole('button', { name: '恋爱', exact: true })
+  const schoolTag = page.getByRole('button', { name: '校园', exact: true })
+  const waitForTagResponse = (suffix: string, tags: string[]) => page.waitForResponse(response => {
+    const responseUrl = new URL(response.url())
+    return responseUrl.pathname.endsWith(suffix)
+      && responseUrl.searchParams.getAll('tag').join(',') === tags.join(',')
+  })
+
+  const loveOverviewResponse = waitForTagResponse('/analytics/overview', ['恋爱'])
+  const loveRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['恋爱'])
+  await loveTag.click()
+  await Promise.all([loveOverviewResponse, loveRecommendationsResponse])
+  await expect(loveTag).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '取消标签 恋爱' })).toBeVisible()
+  await expect(page.getByTestId('analytics-favorite-card')).toContainText('包含全部已选标签的代表作')
+  await expect(page.getByTestId('analytics-favorite-card')).toContainText('恋爱')
+  await expect(page.getByTestId('analytics-recommendation-card')).toContainText('包含全部已选标签的推荐')
+  await expect(page.getByTestId('analytics-recommendation-card')).toContainText('恋爱')
+  await expect.poll(() => loveTag.evaluate(element => getComputedStyle(element).outlineStyle)).toBe('none')
+  expect(await loveTag.evaluate(element => document.activeElement === element)).toBe(false)
+
+  const intersectionOverviewResponse = waitForTagResponse('/analytics/overview', ['恋爱', '校园'])
+  const intersectionRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['恋爱', '校园'])
+  await schoolTag.click()
+  await Promise.all([intersectionOverviewResponse, intersectionRecommendationsResponse])
+  await expect(loveTag).toHaveAttribute('aria-pressed', 'true')
+  await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('analytics-favorite-card')).toContainText('恋爱')
+  await expect(page.getByTestId('analytics-favorite-card')).toContainText('校园')
+  await expect(page.getByTestId('analytics-recommendation-card')).toContainText('恋爱')
+  await expect(page.getByTestId('analytics-recommendation-card')).toContainText('校园')
+  await page.screenshot({
+    path: `/tmp/moreani-analytics-tag-filter-${testInfo.project.name}-dark.png`,
+    fullPage: true,
+  })
+
+  const cancelledOverviewResponse = waitForTagResponse('/analytics/overview', ['校园'])
+  const cancelledRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['校园'])
+  await loveTag.click()
+  await Promise.all([cancelledOverviewResponse, cancelledRecommendationsResponse])
+  await expect(loveTag).toHaveAttribute('aria-pressed', 'false')
+  await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '取消标签 恋爱' })).toHaveCount(0)
 
   await page.getByRole('button', { name: '全站分析' }).click()
   await page.getByRole('option', { name: '目标成员' }).click()
@@ -211,6 +302,10 @@ test('统计分析支持默认全站、双端筛选、URL 状态和主题切换'
   await page.getByRole('button', { name: '打开用户菜单' }).click()
   await page.getByRole('button', { name: '浅色模式' }).click()
   await expect(page.locator('html')).not.toHaveClass(/dark/)
+  await page.screenshot({
+    path: `/tmp/moreani-analytics-${testInfo.project.name}-light.png`,
+    fullPage: true,
+  })
 
   const layout = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,

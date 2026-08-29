@@ -1,6 +1,6 @@
 """登录成员可见的全站与单用户统计分析 API。"""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ def get_analytics_overview(
     user_id: int | None = Query(None, ge=1),
     min_score: float = Query(0.5, ge=0.5, le=10, multiple_of=0.5),
     max_score: float = Query(10, ge=0.5, le=10, multiple_of=0.5),
+    tag: Annotated[list[str] | None, Query()] = None,
     _: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AnalyticsOverviewResponse:
@@ -32,6 +33,7 @@ def get_analytics_overview(
         target_user=target_user,
         min_score=round(min_score * 10),
         max_score=round(max_score * 10),
+        required_tags=tag,
     )
 
 
@@ -40,6 +42,7 @@ def get_analytics_recommendations(
     scope: Literal['global', 'user'] = Query('global'),
     user_id: int | None = Query(None, ge=1),
     limit: int = Query(6, ge=1, le=12),
+    tag: Annotated[list[str] | None, Query()] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AnalyticsRecommendationsResponse:
@@ -51,6 +54,7 @@ def get_analytics_recommendations(
         target_user=target_user,
         current_user_id=current_user.id,
         limit=limit,
+        required_tags=tag,
     )
 
 

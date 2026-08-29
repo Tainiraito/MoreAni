@@ -6,6 +6,8 @@ import type { AnalyticsTagStat } from '@/types'
 
 interface TagWordCloudProps {
   items: AnalyticsTagStat[]
+  selectedNames: readonly string[]
+  onToggleTag: (name: string) => void
 }
 
 interface CloudDatum {
@@ -19,14 +21,15 @@ const CLOUD_LAYOUT_HEIGHT = 340
 const WORD_CLOUD_RANDOM = (): number => 0.5
 const WORD_FONT_SIZE = (word: CloudDatum): number => word.size
 
-function cloudTextColor(rank: number, total: number, hovered: boolean): string {
-  if (hovered || rank < Math.max(1, Math.ceil(total / 3))) return 'var(--brand)'
+function cloudTextColor(rank: number, total: number, emphasized: boolean): string {
+  if (emphasized || rank < Math.max(1, Math.ceil(total / 3))) return 'var(--brand)'
   if (rank < Math.max(2, Math.ceil((total * 2) / 3))) return 'var(--text-secondary)'
   return 'var(--text-muted)'
 }
 
-export function TagWordCloud({ items }: TagWordCloudProps) {
+export function TagWordCloud({ items, selectedNames, onToggleTag }: TagWordCloudProps) {
   const [hoveredName, setHoveredName] = useState<string | null>(null)
+  const selectedNameSet = useMemo(() => new Set(selectedNames), [selectedNames])
 
   const words = useMemo<CloudDatum[]>(() => {
     if (items.length === 0) return []
@@ -78,7 +81,7 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
   return (
     <div className="relative w-full min-w-0 flex-1 overflow-hidden" data-testid="tag-word-cloud">
       <svg
-        role="img"
+        role="group"
         aria-label="番剧标签词云"
         viewBox={`0 0 ${CLOUD_LAYOUT_WIDTH} ${CLOUD_LAYOUT_HEIGHT}`}
         preserveAspectRatio="xMidYMid meet"
@@ -90,24 +93,38 @@ export function TagWordCloud({ items }: TagWordCloudProps) {
             const name = word.text ?? ''
             const rank = rankByName.get(name) ?? items.length
             const hovered = hoveredName === name
+            const selected = selectedNameSet.has(name)
             return (
               <text
                 key={name}
                 transform={`translate(${word.x ?? 0}, ${word.y ?? 0})`}
                 textAnchor="middle"
                 fontSize={word.size}
-                fontWeight={word.weight}
+                fontWeight={selected ? 700 : word.weight}
                 fontFamily="var(--font-sans)"
-                fill={cloudTextColor(rank, items.length, hovered)}
-                opacity={hovered ? 1 : Math.max(0.52, 1 - rank / Math.max(items.length * 1.8, 1))}
+                fill={cloudTextColor(rank, items.length, hovered || selected)}
+                opacity={hovered || selected ? 1 : Math.max(0.52, 1 - rank / Math.max(items.length * 1.8, 1))}
                 tabIndex={0}
+                role="button"
+                aria-pressed={selected}
                 aria-label={name}
+                onPointerDown={event => event.preventDefault()}
                 onPointerEnter={() => setHoveredName(name)}
                 onFocus={() => setHoveredName(name)}
                 onBlur={() => setHoveredName(null)}
+                onClick={() => onToggleTag(name)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onToggleTag(name)
+                  }
+                }}
                 style={{
-                  cursor: 'default',
-                  filter: hovered ? 'drop-shadow(0 0 6px rgba(251, 113, 167, 0.45))' : 'none',
+                  cursor: 'pointer',
+                  filter: hovered || selected ? 'drop-shadow(0 0 7px rgba(251, 113, 167, 0.55))' : 'none',
+                  outline: 'none',
+                  textDecoration: selected ? 'underline' : 'none',
+                  textUnderlineOffset: '4px',
                   transition: 'fill 150ms ease, opacity 150ms ease, filter 150ms ease',
                 }}
               >

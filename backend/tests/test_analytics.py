@@ -138,6 +138,14 @@ def test_overview_defaults_to_global_and_filters_cloud_without_hiding_distributi
     assert exact_score['favorites'][0]['score'] == 8.0
     assert exact_score['favorites'][0]['average_score'] == 8.0
 
+    tag_filtered = client.get(
+        '/api/v1/analytics/overview?tag=漫改&tag=恋爱',
+        cookies=auth_cookie(viewer),
+    ).json()
+    assert tag_filtered['rating_count'] == 2
+    assert {item['name'] for item in tag_filtered['frequency_tags']} == set(frequency)
+    assert [item['id'] for item in tag_filtered['favorites']] == [first.id]
+
 
 def test_user_overview_is_visible_to_other_members(client, db, make_user):
     viewer = make_user('member-viewer')
@@ -190,6 +198,13 @@ def test_recommendations_exclude_scope_user_ratings_and_penalize_low_score_tags(
     bad = next(item for item in personal['items'] if item['id'] == bad_candidate.id)
     assert good['match_percent'] > bad['match_percent']
     assert set(good['matched_tags']) == {'恋爱', '校园'}
+
+    tag_filtered = client.get(
+        f'/api/v1/analytics/recommendations?scope=user&user_id={viewer.id}'
+        '&tag=恋爱&tag=校园&limit=6',
+        cookies=auth_cookie(viewer),
+    ).json()
+    assert [item['id'] for item in tag_filtered['items']] == [good_candidate.id]
 
     global_response = client.get(
         '/api/v1/analytics/recommendations?limit=6',

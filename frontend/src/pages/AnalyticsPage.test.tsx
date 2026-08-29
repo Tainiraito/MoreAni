@@ -17,8 +17,27 @@ vi.mock('@/lib/api', () => ({
 }))
 
 vi.mock('@/components/analytics/TagWordCloud', () => ({
-  TagWordCloud: ({ items }: { items: Array<{ name: string }> }) => items.length > 0 ? (
-    <div data-testid="mock-word-cloud">{items.map(item => item.name).join(',')}</div>
+  TagWordCloud: ({
+    items,
+    selectedNames,
+    onToggleTag,
+  }: {
+    items: Array<{ name: string }>
+    selectedNames: readonly string[]
+    onToggleTag: (name: string) => void
+  }) => items.length > 0 ? (
+    <div data-testid="mock-word-cloud">
+      {items.map(item => (
+        <button
+          key={item.name}
+          type="button"
+          aria-pressed={selectedNames.includes(item.name)}
+          onClick={() => onToggleTag(item.name)}
+        >
+          {item.name}
+        </button>
+      ))}
+    </div>
   ) : <div>当前评分区间暂无可分析标签</div>,
 }))
 
@@ -48,6 +67,7 @@ const OVERVIEW: AnalyticsOverview = {
   ],
   weighted_tags: [
     { name: '恋爱加权', weight: 5.2, rating_count: 6, title_count: 4, average_score: 8.7 },
+    { name: '校园加权', weight: 4.6, rating_count: 5, title_count: 3, average_score: 8.4 },
   ],
   favorites: [
     {
@@ -117,11 +137,11 @@ describe('AnalyticsPage', () => {
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalled())
     expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, minScore: 0.5, maxScore: 10 },
+      { scope: 'global', userId: undefined, minScore: 0.5, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, limit: 6 },
+      { scope: 'global', userId: undefined, limit: 6, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(await view.findByText('全站代表作')).toBeInTheDocument()
@@ -144,11 +164,11 @@ describe('AnalyticsPage', () => {
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalled())
     expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'user', userId: 8, minScore: 0.5, maxScore: 10 },
+      { scope: 'user', userId: 8, minScore: 0.5, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
-      { scope: 'user', userId: 8, limit: 6 },
+      { scope: 'user', userId: 8, limit: 6, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
@@ -161,7 +181,7 @@ describe('AnalyticsPage', () => {
     fireEvent.click(await view.findByRole('option', { name: '我 · 分析用户' }))
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'user', userId: CURRENT_USER.id, minScore: 0.5, maxScore: 10 },
+      { scope: 'user', userId: CURRENT_USER.id, minScore: 0.5, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
   })
@@ -190,7 +210,7 @@ describe('AnalyticsPage', () => {
     expect(api.getAnalyticsOverview).not.toHaveBeenCalled()
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, minScore: 4, maxScore: 10 },
+      { scope: 'global', userId: undefined, minScore: 4, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
 
@@ -199,24 +219,72 @@ describe('AnalyticsPage', () => {
     expect(api.getAnalyticsOverview).toHaveBeenCalledTimes(1)
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10 },
+      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
     expect(staleSignal?.aborted).toBe(true)
   })
 
-  it('点击柱状图整列会同步滑条并请求单个评分', async () => {
+  it('再次点击同一评分列会恢复选择单列前的评分区间', async () => {
     const view = renderAnalytics()
     await view.findByText('全站代表作')
+    const minimum = view.getByLabelText('最低评分')
+    fireEvent.change(minimum, { target: { value: '5' } })
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10, tags: [] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
     vi.mocked(api.getAnalyticsOverview).mockClear()
 
-    fireEvent.click(view.getByRole('button', { name: '10.0 分，共 7 条评分，点击仅查看该评分' }))
+    const tenPointColumn = view.getByRole('button', { name: '10.0 分，共 7 条评分，点击仅查看该评分' })
+    fireEvent.click(tenPointColumn)
 
     expect(view.getByText('10.0 – 10.0')).toBeInTheDocument()
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
-      { scope: 'global', userId: undefined, minScore: 10, maxScore: 10 },
+      { scope: 'global', userId: undefined, minScore: 10, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
+
+    vi.mocked(api.getAnalyticsOverview).mockClear()
+    fireEvent.click(tenPointColumn)
+    expect(view.getByText('5.0 – 10.0')).toBeInTheDocument()
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10, tags: [] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+  })
+
+  it('标签支持多选和取消，并同时刷新代表作与推荐', async () => {
+    const view = renderAnalytics()
+    await view.findByText('全站代表作')
+    vi.mocked(api.getAnalyticsOverview).mockClear()
+    vi.mocked(api.getAnalyticsRecommendations).mockClear()
+
+    const loveTag = await view.findByRole('button', { name: '恋爱加权' })
+    fireEvent.click(loveTag)
+    expect(view.getByRole('button', { name: '恋爱加权' })).toHaveAttribute('aria-pressed', 'true')
+    expect(view.getByRole('button', { name: '取消标签 恋爱加权' })).toBeInTheDocument()
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 0.5, maxScore: 10, tags: ['恋爱加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+    await waitFor(() => expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, limit: 6, tags: ['恋爱加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+
+    fireEvent.click(view.getByRole('button', { name: '校园加权' }))
+    await waitFor(() => expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, limit: 6, tags: ['恋爱加权', '校园加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+
+    fireEvent.click(view.getByRole('button', { name: '恋爱加权' }))
+    await waitFor(() => expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, limit: 6, tags: ['校园加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+    expect(view.queryByRole('button', { name: '取消标签 恋爱加权' })).not.toBeInTheDocument()
   })
 
   it('无统计样本和候选时展示完整空状态', async () => {

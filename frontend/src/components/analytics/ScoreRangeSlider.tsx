@@ -68,6 +68,7 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>): void => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
     setIsDragging(true)
     const nextScore = scoreFromPointer(event.clientX)
     if (value.min === value.max && nextScore === value.min) {
@@ -91,6 +92,11 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
     }
   }
 
+  const handleLostPointerCapture = (): void => {
+    dragHandleRef.current = null
+    setIsDragging(false)
+  }
+
   return (
     <div className="space-y-3" data-testid="score-range-slider">
       <div className="flex items-center justify-between gap-4 text-sm">
@@ -105,15 +111,20 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
         className="relative flex h-8 touch-none items-center"
         data-testid="score-range-track"
         title="点击或拖动调整评分区间"
-        style={{ cursor: isDragging ? 'grabbing' : 'ew-resize' }}
+        style={{ cursor: isDragging ? 'grabbing' : 'ew-resize', userSelect: 'none' }}
         onPointerEnter={() => setIsTrackHovered(true)}
         onPointerLeave={() => setIsTrackHovered(false)}
         onPointerDown={handlePointerDown}
         onPointerMove={event => {
-          if (dragHandleRef.current) updateFromPointer(event.clientX)
+          if (dragHandleRef.current) {
+            event.preventDefault()
+            updateFromPointer(event.clientX)
+          }
         }}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onLostPointerCapture={handleLostPointerCapture}
+        onDragStart={event => event.preventDefault()}
       >
         <div
           className="absolute left-0 right-0 h-1.5 rounded-full"
@@ -166,38 +177,34 @@ export function ScoreRangeSlider({ value, onChange }: ScoreRangeSliderProps) {
           aria-hidden="true"
         />
         <input
-          className="analytics-range-input"
+          className="pointer-events-none sr-only"
           type="range"
           min={MIN_SCORE}
           max={MAX_SCORE}
           step={SCORE_STEP}
           value={value.min}
           aria-label="最低评分"
-          onPointerDown={() => setActiveHandle('min')}
           onFocus={() => {
             setActiveHandle('min')
             setFocusedHandle('min')
           }}
           onBlur={() => setFocusedHandle(null)}
           onChange={event => updateMin(Number(event.target.value))}
-          style={{ zIndex: activeHandle === 'min' ? 4 : 3 }}
         />
         <input
-          className="analytics-range-input"
+          className="pointer-events-none sr-only"
           type="range"
           min={MIN_SCORE}
           max={MAX_SCORE}
           step={SCORE_STEP}
           value={value.max}
           aria-label="最高评分"
-          onPointerDown={() => setActiveHandle('max')}
           onFocus={() => {
             setActiveHandle('max')
             setFocusedHandle('max')
           }}
           onBlur={() => setFocusedHandle(null)}
           onChange={event => updateMax(Number(event.target.value))}
-          style={{ zIndex: activeHandle === 'max' ? 4 : 3 }}
         />
       </div>
 
