@@ -33,10 +33,11 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
   return (
     <div className="relative" data-testid="score-distribution-chart">
       <svg
-        className="h-auto w-full overflow-visible"
+        className="h-auto w-full select-none overflow-visible"
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         role="img"
         aria-labelledby="score-distribution-title score-distribution-description"
+        style={{ userSelect: 'none' }}
       >
         <title id="score-distribution-title">评分分布柱状图</title>
         <desc id="score-distribution-description">显示从 0.5 到 10 分各评分档的番剧评分数量</desc>
@@ -89,14 +90,23 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
               tabIndex={0}
               aria-label={`${bucket.score.toFixed(1)} 分，共 ${bucket.count} 条评分，点击仅查看该评分`}
               aria-pressed={isSelected}
+              onPointerDown={event => event.preventDefault()}
               onClick={() => onSelectScore(bucket.score)}
               onKeyDown={event => handleColumnKeyDown(event, bucket.score)}
               onPointerEnter={() => setHoveredIndex(index)}
               onPointerLeave={() => setHoveredIndex(null)}
               onFocus={() => setHoveredIndex(index)}
               onBlur={() => setHoveredIndex(null)}
-              style={{ cursor: 'pointer', outline: 'none' }}
+              style={{ cursor: 'pointer', outline: 'none', userSelect: 'none' }}
             >
+              <rect
+                x={MARGIN.left + index * bandWidth}
+                y={0}
+                width={bandWidth}
+                height={CHART_HEIGHT}
+                fill="transparent"
+                data-testid={`score-column-hit-area-${bucket.score}`}
+              />
               <rect
                 x={MARGIN.left + index * bandWidth}
                 y={MARGIN.top}
@@ -105,6 +115,7 @@ export function ScoreDistributionChart({ buckets, range, onSelectScore }: ScoreD
                 fill="var(--brand)"
                 opacity={isSelected ? 0.1 : (isHovered ? 0.05 : 0)}
                 rx="3"
+                pointerEvents="none"
                 style={{ transition: 'opacity 150ms ease' }}
               />
               <rect

@@ -69,12 +69,13 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
     if (path.endsWith('/analytics/overview')) {
       const userScope = url.searchParams.get('scope') === 'user'
       const requiredTags = url.searchParams.getAll('tag')
+      const minimumScore = Number(url.searchParams.get('min_score') ?? 0.5)
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           scope: userScope ? { type: 'user', user: targetUser } : { type: 'global', user: null },
-          min_score: Number(url.searchParams.get('min_score') ?? 0.5),
+          min_score: minimumScore,
           max_score: Number(url.searchParams.get('max_score') ?? 10),
           rating_count: 18,
           title_count: 12,
@@ -85,7 +86,9 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
             { name: '恋爱', weight: 10, rating_count: 10, title_count: 8, average_score: 8.4 },
             { name: '奇幻', weight: 7, rating_count: 7, title_count: 6, average_score: 8.1 },
           ],
-          weighted_tags: weightedTags,
+          weighted_tags: minimumScore === 9.5
+            ? weightedTags.filter(item => item.name !== '恋爱')
+            : weightedTags,
           favorites: requiredTags.length > 0 ? [{
             id: 101,
             title: '包含全部已选标签的代表作',
@@ -138,8 +141,13 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await expect(page.getByRole('button', { name: '全站分析' })).toBeVisible()
   await expect(page.getByRole('link', { name: '打开统计分析' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: '评分加权' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '重置评分区间' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '重置标签词云' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '评分分布' }).locator('svg')).toHaveCount(1)
   await expect(page.getByText('查看标签明细')).toHaveCount(0)
   await expect(page.getByText('高置信度')).toHaveCount(0)
+  await expect(page.getByText('柱状图保留完整分布，粉色区域为当前筛选范围')).toHaveCount(0)
+  await expect(page.getByText('点击标签可多选；卡片需同时包含全部已选标签')).toHaveCount(0)
   await expect(page.getByText('站内评分 8.4 · 23 人评分')).toBeVisible()
   await expect(page.getByText('全站优先展示高分且评分人数充足的番剧', { exact: false })).toBeVisible()
   await expect(page).toHaveURL(/\/analytics$/)
@@ -166,6 +174,27 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
     expect(cloudPanel!.x).toBeGreaterThan(distributionPanel!.x + distributionPanel!.width)
   }
 
+  const tenPointColumn = page.getByRole('button', { name: '10.0 分，共 0 条评分，点击仅查看该评分' })
+  const columnBounds = await tenPointColumn.boundingBox()
+  expect(columnBounds).not.toBeNull()
+  const initialSingleScoreResponse = page.waitForResponse(response => (
+    response.url().includes('/analytics/overview')
+    && response.url().includes('min_score=10')
+    && response.url().includes('max_score=10')
+  ))
+  await tenPointColumn.click({ position: { x: columnBounds!.width / 2, y: columnBounds!.height - 2 } })
+  await expect(page.getByText('10.0 – 10.0', { exact: true })).toBeVisible()
+  await initialSingleScoreResponse
+
+  const initialRestoredRangeResponse = page.waitForResponse(response => (
+    response.url().includes('/analytics/overview')
+    && response.url().includes('min_score=0.5')
+    && response.url().includes('max_score=10')
+  ))
+  await tenPointColumn.click({ position: { x: columnBounds!.width / 2, y: columnBounds!.height - 2 } })
+  await expect(page.getByText('0.5 – 10.0', { exact: true })).toBeVisible()
+  await initialRestoredRangeResponse
+
   const minimum = page.getByRole('slider', { name: '最低评分' })
   const maximum = page.getByRole('slider', { name: '最高评分' })
   const minimumResponse = page.waitForResponse(response => (
@@ -186,8 +215,6 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await expect(page.getByText('6.0 – 8.5', { exact: true })).toBeVisible()
   await maximumResponse
 
-  const tenPointColumn = page.getByRole('button', { name: '10.0 分，共 0 条评分，点击仅查看该评分' })
-  const columnBounds = await tenPointColumn.boundingBox()
   const minimumColumnHeight = (page.viewportSize()?.width ?? 0) >= 1280 ? 150 : 80
   expect(columnBounds?.height).toBeGreaterThan(minimumColumnHeight)
   const singleScoreResponse = page.waitForResponse(response => (
@@ -296,7 +323,7 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
     expect(coverBounds).not.toBeNull()
     expect(Math.abs(coverBounds!.x - cardBounds!.x)).toBeLessThanOrEqual(1)
     expect(Math.abs(coverBounds!.y - cardBounds!.y)).toBeLessThanOrEqual(1)
-    expect(coverBounds!.height / cardBounds!.height).toBeGreaterThanOrEqual(0.8)
+    expect(Math.abs(coverBounds!.height - (cardBounds!.height - 2))).toBeLessThanOrEqual(1)
     expect(coverBounds!.width).toBeGreaterThanOrEqual(80)
     coverWidths.push(coverBounds!.width)
   }
@@ -309,12 +336,45 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
     fullPage: true,
   })
 
+  const hiddenLoveOverviewResponse = page.waitForResponse(response => {
+    const responseUrl = new URL(response.url())
+    return responseUrl.pathname.endsWith('/analytics/overview')
+      && responseUrl.searchParams.get('min_score') === '9.5'
+      && responseUrl.searchParams.getAll('tag').join(',') === '校园'
+  })
+  const hiddenLoveRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['校园'])
+  await minimum.focus()
+  for (let step = 0; step < 5; step += 1) await page.keyboard.press('ArrowRight')
+  await expect(page.getByText('9.5 – 10.0', { exact: true })).toBeVisible()
+  await Promise.all([hiddenLoveOverviewResponse, hiddenLoveRecommendationsResponse])
+  await expect(page.getByRole('button', { name: '恋爱', exact: true })).toHaveCount(0)
+  await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
+
+  const restoredLoveOverviewResponse = page.waitForResponse(response => {
+    const responseUrl = new URL(response.url())
+    return responseUrl.pathname.endsWith('/analytics/overview')
+      && responseUrl.searchParams.get('min_score') === '0.5'
+      && responseUrl.searchParams.get('max_score') === '10'
+      && responseUrl.searchParams.getAll('tag').join(',') === '恋爱,校园'
+  })
+  const restoredLoveRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['恋爱', '校园'])
+  await page.getByRole('button', { name: '重置评分区间' }).click()
+  await expect(page.getByText('0.5 – 10.0', { exact: true })).toBeVisible()
+  await Promise.all([restoredLoveOverviewResponse, restoredLoveRecommendationsResponse])
+  await expect(page.getByRole('button', { name: '恋爱', exact: true })).toHaveAttribute('aria-pressed', 'true')
+
   const cancelledOverviewResponse = waitForTagResponse('/analytics/overview', ['校园'])
   const cancelledRecommendationsResponse = waitForTagResponse('/analytics/recommendations', ['校园'])
-  await loveTag.click()
+  await page.getByRole('button', { name: '恋爱', exact: true }).click()
   await Promise.all([cancelledOverviewResponse, cancelledRecommendationsResponse])
-  await expect(loveTag).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByRole('button', { name: '恋爱', exact: true })).toHaveAttribute('aria-pressed', 'false')
   await expect(schoolTag).toHaveAttribute('aria-pressed', 'true')
+
+  await page.getByRole('button', { name: '出现频次' }).click()
+  await expect(page.getByRole('button', { name: '出现频次' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: '重置标签词云' }).click()
+  await expect(page.getByRole('button', { name: '评分加权' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: '校园', exact: true })).toHaveAttribute('aria-pressed', 'false')
 
   await page.getByRole('button', { name: '全站分析' }).click()
   await page.getByRole('option', { name: '目标成员' }).click()

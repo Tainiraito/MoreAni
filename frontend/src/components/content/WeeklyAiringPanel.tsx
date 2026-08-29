@@ -86,8 +86,8 @@ function WeeklyAiringSkeleton() {
 
 function CalendarItemMedia({ item }: { item: AiringCalendarEntry }) {
   return (
-    <div className="h-full w-full overflow-hidden" style={{ background: 'var(--bg-card-warm)' }}>
-      {item.cover_url ? <CoverImage src={item.cover_url} alt={item.title} /> : <CalendarDays className="m-auto mt-4" size={18} style={{ color: 'var(--text-muted)' }} />}
+    <div className="flex h-full w-full overflow-hidden" style={{ background: 'var(--bg-card-warm)' }}>
+      {item.cover_url ? <CoverImage src={item.cover_url} alt={item.title} /> : <CalendarDays className="m-auto" size={18} style={{ color: 'var(--text-muted)' }} />}
     </div>
   )
 }
@@ -168,7 +168,7 @@ function UnmatchedActionButtons({
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
       >
         <ExternalLink size={14} style={{ color: '#FB71A7' }} />
-        前往 Bangumi
+        <span className={compact ? 'hidden sm:inline' : undefined}>前往 Bangumi</span>
       </a>
       <button
         type="button"
@@ -184,7 +184,7 @@ function UnmatchedActionButtons({
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: 'var(--text-primary)' }}
       >
         <Plus size={14} style={{ color: '#FB71A7' }} />
-        添加番剧
+        <span className={compact ? 'hidden sm:inline' : undefined}>添加番剧</span>
       </button>
     </div>
   )
@@ -291,24 +291,29 @@ function AiringCard({
 function AiringListRow({ item, onOpenContent, onAddAnime }: { item: AiringCalendarEntry; onOpenContent: (id: number) => void; onAddAnime: (item: AiringCalendarEntry) => void }) {
   const rowContent = (
     <>
-      <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md"><CalendarItemMedia item={item} /></div>
-      <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
-        {item.title_alt && <p className="mt-1 truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p>}
+      <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="airing-list-cover">
+        <CalendarItemMedia item={item} />
       </div>
-      {item.matched && <span className="inline-flex shrink-0 items-center gap-1 text-xs" style={{ color: '#FB71A7' }}>查看详情</span>}
+      <div className="flex min-w-0 flex-col justify-center gap-3 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
+          {item.title_alt && <p className="mt-1 truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>{item.title_alt}</p>}
+        </div>
+        {item.matched
+          ? <span className="inline-flex shrink-0 items-center gap-1 text-xs" style={{ color: '#FB71A7' }}>查看详情</span>
+          : <UnmatchedActionButtons item={item} onAddAnime={onAddAnime} compact />}
+      </div>
     </>
   )
-  const className = 'flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-black/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50 dark:hover:bg-white/[0.035] sm:px-4'
+  const className = 'grid w-full cursor-pointer grid-cols-[88px_minmax(0,1fr)] overflow-hidden text-left transition-colors hover:bg-black/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50 dark:hover:bg-white/[0.035]'
 
   return (
     <li className="border-b last:border-b-0" style={{ borderColor: 'var(--border-line)' }}>
       {item.matched && item.content_id != null ? (
-        <button type="button" onClick={() => onOpenContent(item.content_id as number)} className={className}>{rowContent}</button>
+        <button type="button" data-testid="airing-list-row" onClick={() => onOpenContent(item.content_id as number)} className={className}>{rowContent}</button>
       ) : (
-        <div className={className}>
+        <div className={className} data-testid="airing-list-row">
           {rowContent}
-          <UnmatchedActionButtons item={item} onAddAnime={onAddAnime} compact />
         </div>
       )}
     </li>

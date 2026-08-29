@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -108,13 +109,15 @@ const RECOMMENDATIONS: AnalyticsRecommendations = {
 function renderAnalytics(initialEntry = '/analytics') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/analytics" element={<AnalyticsPage />} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path="/analytics" element={<AnalyticsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </StrictMode>,
   )
 }
 
@@ -228,6 +231,12 @@ describe('AnalyticsPage', () => {
   it('再次点击同一评分列会恢复选择单列前的评分区间', async () => {
     const view = renderAnalytics()
     await view.findByText('全站代表作')
+    const tenPointColumn = view.getByRole('button', { name: '10.0 分，共 7 条评分，点击仅查看该评分' })
+    fireEvent.click(tenPointColumn)
+    expect(view.getByText('10.0 – 10.0')).toBeInTheDocument()
+    fireEvent.click(tenPointColumn)
+    expect(view.getByText('0.5 – 10.0')).toBeInTheDocument()
+
     const minimum = view.getByLabelText('最低评分')
     fireEvent.change(minimum, { target: { value: '5' } })
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
@@ -236,7 +245,6 @@ describe('AnalyticsPage', () => {
     ))
     vi.mocked(api.getAnalyticsOverview).mockClear()
 
-    const tenPointColumn = view.getByRole('button', { name: '10.0 分，共 7 条评分，点击仅查看该评分' })
     fireEvent.click(tenPointColumn)
 
     expect(view.getByText('10.0 – 10.0')).toBeInTheDocument()
@@ -288,6 +296,61 @@ describe('AnalyticsPage', () => {
     expect(view.getByRole('button', { name: '校园加权' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('标签离开当前评分词云时暂时排除，重新出现后恢复选中', async () => {
+    vi.mocked(api.getAnalyticsOverview).mockImplementation(params => Promise.resolve({
+      ...OVERVIEW,
+      min_score: params.minScore,
+      max_score: params.maxScore,
+      weighted_tags: params.minScore === 5
+        ? [OVERVIEW.weighted_tags[1]]
+        : OVERVIEW.weighted_tags,
+    }))
+    const view = renderAnalytics()
+    const loveTag = await view.findByRole('button', { name: '恋爱加权' })
+    fireEvent.click(loveTag)
+    await waitFor(() => expect(api.getAnalyticsRecommendations).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, limit: 6, tags: ['恋爱加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+
+    fireEvent.change(view.getByLabelText('最低评分'), { target: { value: '5' } })
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 5, maxScore: 10, tags: [] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+    await waitFor(() => expect(view.queryByRole('button', { name: '恋爱加权' })).not.toBeInTheDocument())
+
+    fireEvent.change(view.getByLabelText('最低评分'), { target: { value: '4' } })
+    const restoredLoveTag = await view.findByRole('button', { name: '恋爱加权' })
+    await waitFor(() => expect(restoredLoveTag).toHaveAttribute('aria-pressed', 'true'))
+    await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
+      { scope: 'global', userId: undefined, minScore: 4, maxScore: 10, tags: ['恋爱加权'] },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    ))
+  })
+
+  it('评分与词云标题提供独立重置按钮并移除说明文案', async () => {
+    const view = renderAnalytics()
+    await view.findByText('全站代表作')
+
+    expect(view.queryByText('柱状图保留完整分布，粉色区域为当前筛选范围')).not.toBeInTheDocument()
+    expect(view.queryByText('点击标签可多选；卡片需同时包含全部已选标签')).not.toBeInTheDocument()
+    expect(view.getByRole('heading', { name: '评分分布' }).querySelector('svg')).not.toBeNull()
+
+    fireEvent.change(view.getByLabelText('最低评分'), { target: { value: '5' } })
+    expect(view.getByText('5.0 – 10.0')).toBeInTheDocument()
+    fireEvent.click(view.getByRole('button', { name: '重置评分区间' }))
+    expect(view.getByText('0.5 – 10.0')).toBeInTheDocument()
+
+    const loveTag = await view.findByRole('button', { name: '恋爱加权' })
+    fireEvent.click(loveTag)
+    expect(loveTag).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(view.getByRole('button', { name: '出现频次' }))
+    fireEvent.click(view.getByRole('button', { name: '重置标签词云' }))
+    expect(view.getByRole('button', { name: '评分加权' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await view.findByRole('button', { name: '恋爱加权' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('分析主面板使用桌面双列，带封面卡片统一使用左侧大图结构', async () => {
     const view = renderAnalytics()
     await view.findByText('全站代表作')
@@ -295,7 +358,7 @@ describe('AnalyticsPage', () => {
     expect(view.getByTestId('analytics-primary-grid')).toHaveClass('lg:grid-cols-2')
     const covers = view.getAllByTestId('analytics-card-cover')
     expect(covers).toHaveLength(2)
-    covers.forEach(cover => expect(cover).toHaveClass('aspect-[3/4]'))
+    covers.forEach(cover => expect(cover).toHaveClass('min-h-[7.25rem]', 'self-stretch'))
   })
 
   it('无统计样本和候选时展示完整空状态', async () => {

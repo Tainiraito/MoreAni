@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, ChartNoAxesCombined, Cloud, Heart, Sparkles, Star, Users } from 'lucide-react'
+import { BarChart3, ChartNoAxesCombined, Cloud, Heart, RotateCcw, Sparkles, Star, Users } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
@@ -62,6 +62,10 @@ function parseScope(searchParams: URLSearchParams): AnalyticsScopeSelection {
   return { scope: 'user', userId }
 }
 
+function haveSameTagNames(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((name, index) => name === right[index])
+}
+
 interface SummaryCardProps {
   label: string
   value: string
@@ -77,6 +81,26 @@ function SummaryCard({ label, value, icon }: SummaryCardProps) {
       </div>
       <p className="mt-2 text-2xl font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{value}</p>
     </div>
+  )
+}
+
+interface AnalyticsResetButtonProps {
+  label: string
+  onClick: () => void
+}
+
+function AnalyticsResetButton({ label, onClick }: AnalyticsResetButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+      style={{ color: 'var(--text-muted)' }}
+    >
+      <RotateCcw size={14} />
+    </button>
   )
 }
 
@@ -97,7 +121,7 @@ function FavoriteCard({ item, scope, requiredTagNames, onOpen }: FavoriteCardPro
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
       <div className={COVER_CARD_GRID_CLASS}>
-        <div className="aspect-[3/4] overflow-hidden" data-testid="analytics-card-cover">
+        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
         <div className="min-w-0 p-3">
@@ -149,7 +173,7 @@ function RecommendationCard({ item, requiredTagNames, onOpen }: RecommendationCa
       style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
     >
       <div className={COVER_CARD_GRID_CLASS}>
-        <div className="aspect-[3/4] overflow-hidden" data-testid="analytics-card-cover">
+        <div className="min-h-[7.25rem] self-stretch overflow-hidden" data-testid="analytics-card-cover">
           <CoverImage src={item.cover_url} alt={item.title} />
         </div>
         <div className="min-w-0 p-3">
@@ -216,6 +240,7 @@ export function AnalyticsPage() {
   const selection = useMemo(() => parseScope(searchParams), [searchParams])
   const [scoreRange, setScoreRange] = useState<ScoreRange>(DEFAULT_SCORE_RANGE)
   const [cloudMode, setCloudMode] = useState<TagCloudMode>('weighted')
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([])
   const [activeTagNames, setActiveTagNames] = useState<string[]>([])
   const scoreRangeBeforeColumnSelectionRef = useRef<ScoreRange | null>(null)
   const selectedScoreColumnRef = useRef<number | null>(null)
@@ -267,8 +292,22 @@ export function AnalyticsPage() {
   const selectedScopeValue = selection.scope === 'global' ? 'global' : `user:${selection.userId}`
   const overview = overviewQuery.data
   const recommendations = recommendationsQuery.data
-  const cloudTagItems = cloudMode === 'frequency' ? overview?.frequency_tags ?? [] : overview?.weighted_tags ?? []
+  const cloudTagItems = useMemo<AnalyticsTagStat[]>(
+    () => (cloudMode === 'frequency' ? overview?.frequency_tags ?? [] : overview?.weighted_tags ?? []),
+    [cloudMode, overview?.frequency_tags, overview?.weighted_tags],
+  )
   const deferredTags = useDeferredValue<AnalyticsTagStat[]>(cloudTagItems)
+  const availableTagNameSet = useMemo(
+    () => new Set(cloudTagItems.map(item => item.name)),
+    [cloudTagItems],
+  )
+
+  useEffect(() => {
+    const nextActiveTagNames = selectedTagNames.filter(name => availableTagNameSet.has(name))
+    setActiveTagNames(currentNames => (
+      haveSameTagNames(currentNames, nextActiveTagNames) ? currentNames : nextActiveTagNames
+    ))
+  }, [availableTagNameSet, selectedTagNames])
 
   const handleScoreRangeChange = useCallback((nextRange: ScoreRange): void => {
     scoreRangeBeforeColumnSelectionRef.current = null
@@ -277,35 +316,49 @@ export function AnalyticsPage() {
   }, [])
 
   const handleScoreColumnSelect = useCallback((score: number): void => {
-    setScoreRange(currentRange => {
-      const previousRange = scoreRangeBeforeColumnSelectionRef.current
-      if (
-        selectedScoreColumnRef.current === score
-        && currentRange.min === score
-        && currentRange.max === score
-        && previousRange
-      ) {
-        scoreRangeBeforeColumnSelectionRef.current = null
-        selectedScoreColumnRef.current = null
-        return previousRange
-      }
-      if (selectedScoreColumnRef.current === null) {
-        scoreRangeBeforeColumnSelectionRef.current = currentRange
-      }
-      selectedScoreColumnRef.current = score
-      return { min: score, max: score }
-    })
-  }, [])
+    const previousRange = scoreRangeBeforeColumnSelectionRef.current
+    if (
+      selectedScoreColumnRef.current === score
+      && scoreRange.min === score
+      && scoreRange.max === score
+      && previousRange
+    ) {
+      scoreRangeBeforeColumnSelectionRef.current = null
+      selectedScoreColumnRef.current = null
+      setScoreRange(previousRange)
+      return
+    }
+    if (selectedScoreColumnRef.current === null) {
+      scoreRangeBeforeColumnSelectionRef.current = { ...scoreRange }
+    }
+    selectedScoreColumnRef.current = score
+    setScoreRange({ min: score, max: score })
+  }, [scoreRange])
 
   const handleToggleTag = useCallback((name: string): void => {
-    setActiveTagNames(currentNames => (
-      currentNames.includes(name)
-        ? currentNames.filter(currentName => currentName !== name)
-        : [...currentNames, name]
-    ))
+    const alreadySelected = selectedTagNames.includes(name)
+    setSelectedTagNames(alreadySelected
+      ? selectedTagNames.filter(currentName => currentName !== name)
+      : [...selectedTagNames, name])
+    setActiveTagNames(alreadySelected
+      ? activeTagNames.filter(currentName => currentName !== name)
+      : [...activeTagNames, name])
+  }, [activeTagNames, selectedTagNames])
+
+  const handleResetScoreRange = useCallback((): void => {
+    scoreRangeBeforeColumnSelectionRef.current = null
+    selectedScoreColumnRef.current = null
+    setScoreRange(DEFAULT_SCORE_RANGE)
+  }, [])
+
+  const handleResetTagCloud = useCallback((): void => {
+    setCloudMode('weighted')
+    setSelectedTagNames([])
+    setActiveTagNames([])
   }, [])
 
   const handleScopeChange = (value: string): void => {
+    setSelectedTagNames([])
     setActiveTagNames([])
     scoreRangeBeforeColumnSelectionRef.current = null
     selectedScoreColumnRef.current = null
@@ -358,9 +411,9 @@ export function AnalyticsPage() {
           <div className="grid gap-6 lg:grid-cols-2" data-testid="analytics-primary-grid">
             <section className="flex h-full min-w-0 flex-col rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE} data-testid="rating-distribution-panel">
               <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>评分分布</h2>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>柱状图保留完整分布，粉色区域为当前筛选范围</p>
+                <div className="flex items-center gap-1">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><BarChart3 size={18} />评分分布</h2>
+                  <AnalyticsResetButton label="重置评分区间" onClick={handleResetScoreRange} />
                 </div>
                 {overviewQuery.isFetching ? <span className="text-[11px]" style={{ color: 'var(--brand)' }}>更新中</span> : null}
               </div>
@@ -376,9 +429,9 @@ export function AnalyticsPage() {
 
             <section className="flex h-full min-w-0 flex-col rounded-xl p-5 sm:p-6" style={ANALYTICS_CARD_STYLE} data-testid="tag-cloud-panel">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div className="flex items-center gap-1">
                   <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}><Cloud size={18} />标签词云</h2>
-                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>点击标签可多选；卡片需同时包含全部已选标签</p>
+                  <AnalyticsResetButton label="重置标签词云" onClick={handleResetTagCloud} />
                 </div>
                 <div className="inline-flex rounded-lg p-1" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}>
                   {(['frequency', 'weighted'] as const).map(mode => {

@@ -69,6 +69,8 @@ describe('WeeklyAiringPanel', () => {
 
     fireEvent.click(getByRole('button', { name: '列表视图' }))
     expect(getByTestId('airing-calendar-list')).toBeInTheDocument()
+    expect(getByTestId('airing-list-row')).toHaveClass('grid-cols-[88px_minmax(0,1fr)]', 'overflow-hidden')
+    expect(getByTestId('airing-list-cover')).toHaveClass('min-h-[7.25rem]', 'self-stretch')
     fireEvent.click(getByRole('button', { name: '卡片视图' }))
     expect(getByTestId('airing-calendar-grid')).toBeInTheDocument()
 

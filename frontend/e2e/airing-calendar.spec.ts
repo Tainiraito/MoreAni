@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }) => {
+test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }, testInfo) => {
   const user = {
     id: 7,
     username: 'calendar-e2e',
@@ -152,6 +152,21 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
   await page.goto('/')
   await page.getByRole('button', { name: '新番周历' }).click()
   await expect(page.getByTestId('airing-calendar')).toBeVisible()
+  await page.getByRole('button', { name: '列表视图' }).click()
+  const airingListRow = page.getByTestId('airing-list-row').first()
+  const airingListCover = airingListRow.getByTestId('airing-list-cover')
+  const airingRowBounds = await airingListRow.boundingBox()
+  const airingCoverBounds = await airingListCover.boundingBox()
+  expect(airingRowBounds).not.toBeNull()
+  expect(airingCoverBounds).not.toBeNull()
+  expect(Math.abs(airingCoverBounds!.x - airingRowBounds!.x)).toBeLessThanOrEqual(1)
+  expect(Math.abs(airingCoverBounds!.y - airingRowBounds!.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(airingCoverBounds!.height - airingRowBounds!.height)).toBeLessThanOrEqual(1)
+  expect(airingCoverBounds!.width).toBeGreaterThanOrEqual(80)
+  if (process.env.QA_SCREENSHOTS === '1') {
+    await page.screenshot({ path: `/tmp/moreani-airing-calendar-list-${testInfo.project.name}.png`, fullPage: false })
+  }
+  await page.getByRole('button', { name: '卡片视图' }).click()
   if (process.env.QA_SCREENSHOTS === '1') {
     await page.screenshot({ path: '/tmp/moreani-airing-calendar.png', fullPage: false })
   }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ScoreDistributionChart } from '@/components/analytics/ScoreDistributionChart'
@@ -24,8 +24,13 @@ describe('ScoreDistributionChart', () => {
     fireEvent.click(emptyColumn)
     expect(onSelectScore).toHaveBeenLastCalledWith(9.5)
 
-    fireEvent.keyDown(fullColumn, { key: 'Enter' })
+    fireEvent.click(view.getByTestId('score-column-hit-area-10'))
     expect(onSelectScore).toHaveBeenLastCalledWith(10)
+
+    const pointerDown = createEvent.pointerDown(fullColumn)
+    fireEvent(fullColumn, pointerDown)
+    expect(pointerDown.defaultPrevented).toBe(true)
+    expect(fullColumn).toHaveStyle({ userSelect: 'none' })
 
     fireEvent.keyDown(emptyColumn, { key: ' ' })
     expect(onSelectScore).toHaveBeenLastCalledWith(9.5)
