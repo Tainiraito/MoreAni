@@ -384,8 +384,6 @@ export function WeeklyAiringPanel({ week, loading, error, onOpenContent, onAddAn
         </div>
       </div>
 
-      {week.sync_status === 'failed' && <p className="text-right text-[11px]" style={{ color: '#d97706' }}>同步失败，显示上次数据</p>}
-
       {error && week.sync_status !== 'failed' && <p className="text-xs" style={{ color: '#d97706' }}>{error}</p>}
 
       {selectedDay?.items.length === 0 ? (

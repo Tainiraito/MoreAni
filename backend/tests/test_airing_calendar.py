@@ -1,10 +1,11 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
 import pytest
 from PIL import Image
 
-from models import AiringCalendarItem, AiringCalendarSyncState, ContentItem
+from models import AiringCalendarItem, AiringCalendarSyncState, ContentItem, Notification
 from services import airing_calendar, covers
 
 
@@ -66,6 +67,55 @@ def test_sync_failure_keeps_previous_active_snapshot(db, monkeypatch):
     state = db.query(AiringCalendarSyncState).filter(AiringCalendarSyncState.id == 1).one()
     assert state.status == 'failed'
     assert state.item_count == 7
+
+
+def test_calendar_attempts_at_most_once_per_local_day(db):
+    now = datetime(2026, 8, 29, 4, 30, tzinfo=airing_calendar.LOCAL_TZ)
+    db.add(
+        AiringCalendarSyncState(
+            id=1,
+            status='failed',
+            item_count=0,
+            last_attempt_at=now.astimezone(UTC).replace(tzinfo=None),
+        ),
+    )
+    db.commit()
+
+    assert airing_calendar.should_sync_today(db, now=now) is False
+    assert airing_calendar.should_sync_today(db, now=now + timedelta(hours=12)) is False
+    assert airing_calendar.should_sync_today(db, now=now + timedelta(days=1)) is True
+
+
+def test_three_consecutive_failure_days_notify_super_admin_once(db, make_user, monkeypatch):
+    super_admin = make_user('airing-super-admin', role='super_admin')
+
+    async def failed_fetch():
+        raise airing_calendar.bangumi.BangumiError('upstream unavailable')
+
+    monkeypatch.setattr(airing_calendar.bangumi, 'fetch_calendar', failed_fetch)
+    attempted_at = datetime(2026, 8, 1, 20, 15)
+
+    for day in range(3):
+        current_attempt = attempted_at + timedelta(days=day)
+        monkeypatch.setattr(airing_calendar, 'utcnow_naive', lambda value=current_attempt: value)
+        with pytest.raises(airing_calendar.bangumi.BangumiError):
+            asyncio.run(airing_calendar.sync_calendar(db))
+
+    state = db.query(AiringCalendarSyncState).filter(AiringCalendarSyncState.id == 1).one()
+    assert state.consecutive_failure_days == 3
+    assert state.failure_notified_at == attempted_at + timedelta(days=2)
+    notices = db.query(Notification).filter(Notification.kind == 'airing_sync_failure').all()
+    assert len(notices) == 1
+    assert notices[0].recipient_user_id == super_admin.id
+    assert notices[0].scope == 'private'
+    assert '连续 3 天' in notices[0].body
+
+    fourth_attempt = attempted_at + timedelta(days=3)
+    monkeypatch.setattr(airing_calendar, 'utcnow_naive', lambda: fourth_attempt)
+    with pytest.raises(airing_calendar.bangumi.BangumiError):
+        asyncio.run(airing_calendar.sync_calendar(db))
+
+    assert db.query(Notification).filter(Notification.kind == 'airing_sync_failure').count() == 1
 
 
 def test_week_api_matches_public_bangumi_content(client, db, make_user, monkeypatch):

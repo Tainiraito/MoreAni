@@ -96,6 +96,25 @@ describe('WeeklyAiringPanel', () => {
     expect(getByTestId('airing-calendar-skeleton')).toBeTruthy()
   })
 
+  it('keeps the previous calendar silently when background sync failed', () => {
+    const failedWeek: AiringCalendarWeek = { ...week, sync_status: 'failed' }
+    const view = render(
+      <WeeklyAiringPanel
+        week={failedWeek}
+        loading={false}
+        error="同步失败"
+        onOpenContent={vi.fn()}
+        onAddAnime={vi.fn()}
+        isFavorited={() => false}
+        onToggleFavorite={vi.fn()}
+      />,
+    )
+
+    expect(view.getByText('本地番剧')).toBeInTheDocument()
+    expect(view.queryByText('同步失败，显示上次数据')).not.toBeInTheDocument()
+    expect(view.queryByText('同步失败')).not.toBeInTheDocument()
+  })
+
   it('reveals in-card actions after clicking an unmatched card', () => {
     const onAddAnime = vi.fn()
     const view = render(
