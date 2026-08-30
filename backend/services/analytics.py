@@ -25,6 +25,7 @@ from schemas import (
     AnalyticsTagStat,
     AnalyticsUserSummary,
 )
+from services import covers as covers_svc
 from services.avatar import avatar_crop_from_db
 
 type AnalyticsScope = Literal['global', 'user']
@@ -323,12 +324,13 @@ def _build_dataset(db: Session) -> _AnalyticsDataset:
         .order_by(ContentItem.id.asc())
         .all()
     )
+    cover_urls = covers_svc.get_content_cover_url_map(db, content_rows)
     contents = tuple(
         _ContentRecord(
             id=content.id,
             title=content.title,
             title_alt=content.title_alt or '',
-            cover_url=content.cover_url or '',
+            cover_url=cover_urls.get(content.id) or content.cover_url or '',
             content_type=content.content_type,
             tags=frozenset(_normalize_raw_tags(tag.name for tag in content.tags)),
         )

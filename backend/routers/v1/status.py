@@ -7,6 +7,7 @@ from deps import get_current_user, get_db
 from models import ContentItem, User, UserContentStatus
 from schemas import StatusResponse, StatusSetRequest
 from services import content as content_svc
+from services import covers as covers_svc
 
 router = APIRouter(prefix='/status', tags=['status'])
 
@@ -56,6 +57,7 @@ def set_status(
 
     db.commit()
     db.refresh(existing)
+    cover_url = covers_svc.get_content_cover_url_map(db, [content]).get(content.id)
 
     return StatusResponse(
         id=existing.id,
@@ -63,7 +65,7 @@ def set_status(
         status=existing.status,
         updated_at=existing.updated_at,
         content_title=content.title,
-        content_cover=content.cover_url,
+        content_cover=cover_url,
         content_type=content.content_type,
     )
 
@@ -101,6 +103,7 @@ def list_my_status(
         .order_by(UserContentStatus.updated_at.desc())
         .all()
     )
+    cover_urls = covers_svc.get_content_cover_url_map(db, [content for _, content in records])
 
     items = [
         StatusResponse(
@@ -109,7 +112,7 @@ def list_my_status(
             status=s.status,
             updated_at=s.updated_at,
             content_title=c.title,
-            content_cover=c.cover_url,
+            content_cover=cover_urls.get(c.id),
             content_type=c.content_type,
         )
         for s, c in records

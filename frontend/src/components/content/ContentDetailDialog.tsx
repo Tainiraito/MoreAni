@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useToastStore } from '@/stores/toast-store'
@@ -6,6 +7,7 @@ import { useRefreshStore } from '@/stores/refresh-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
+import { contentDetailQueryKey } from '@/lib/content-detail-query'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil, Search } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
@@ -40,6 +42,14 @@ interface Review {
   created_at: string
 }
 
+interface ContentDetailData {
+  content: ContentItem
+  reviews: Review[]
+}
+
+const CONTENT_DETAIL_STALE_TIME_MS = 60_000
+const CONTENT_DETAIL_GC_TIME_MS = 5 * 60_000
+
 interface ContentDetailDialogProps {
   isFavorited?: boolean
   isFavoritePending?: boolean
@@ -50,16 +60,15 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   const { detailOpen, detailContentId, closeDetail, openEditContent, resourceFocus, clearResourceFocus } = useUIStore()
   const maskProps = useMaskClose(closeDetail)
   useLockBodyScroll(detailOpen)
+  const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const addToast = useToastStore(state => state.addToast)
   const username = user?.username
-  const [content, setContent] = useState<ContentItem | null>(null)
-  const [loading, setLoading] = useState(false)
+  const userId = user?.id ?? null
   const [score, setScore] = useState(0)
   const [hoverScore, setHoverScore] = useState(0)
   const [reviewText, setReviewText] = useState('')
   const [myRatingId, setMyRatingId] = useState<number | null>(null)
-  const [allReviews, setAllReviews] = useState<Review[]>([])
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
   const [savingRating, setSavingRating] = useState(false)
@@ -67,47 +76,53 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   const [editing, setEditing] = useState(false)
   const [resourceOpen, setResourceOpen] = useState(false)
   const previousDetailKey = useRef<string | null>(null)
-  // 监听全局刷新信号：编辑保存/删除/评分变化后详情弹窗内容保持最新
-  const refreshKey = useRefreshStore(s => s.refreshKey)
 
-  useEffect(() => {
-    if (detailOpen && detailContentId) {
-      setLoading(true)
-      setBangumiScore(null)
-      setScore(0)
-      setReviewText('')
-      setMyRatingId(null)
-      setEditing(false)
-
-      Promise.all([
-        api.getContent(detailContentId) as Promise<ContentItem>,
-        api.getContentRatings(detailContentId, { size: '50' }),
+  const detailQuery = useQuery<ContentDetailData>({
+    queryKey: contentDetailQueryKey(detailContentId, userId),
+    enabled: detailOpen && detailContentId !== null,
+    queryFn: async ({ signal }) => {
+      const contentId = detailContentId
+      if (contentId === null) throw new Error('缺少内容 ID')
+      const [nextContent, ratingsRes] = await Promise.all([
+        api.getContent(contentId, { signal }),
+        api.getContentRatings(contentId, { size: '50' }, { signal }),
       ])
-        .then(([c, ratingsRes]) => {
-          setContent(c)
-          const ratings = (ratingsRes.items || []) as Review[]
-          setAllReviews(ratings)
+      return {
+        content: nextContent,
+        reviews: (ratingsRes.items || []) as Review[],
+      }
+    },
+    staleTime: CONTENT_DETAIL_STALE_TIME_MS,
+    gcTime: CONTENT_DETAIL_GC_TIME_MS,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
 
-          // Extract current user's existing rating from the list
-          if (username) {
-            const mine = ratings.find((r: Review) => r.username === username)
-            if (mine) {
-              setScore(mine.score / 10) // API returns 0-100, UI shows 1-10
-              setReviewText(mine.review || '')
-              setMyRatingId(mine.id)
-            }
-          }
-        })
-        .catch(() => addToast('error', '加载失败'))
-        .finally(() => setLoading(false))
-    }
-  }, [addToast, detailContentId, detailOpen, refreshKey, username])
+  const content = detailQuery.data?.content ?? null
+  const allReviews = detailQuery.data?.reviews ?? []
+  const loading = detailQuery.isPending || (detailQuery.isFetching && !detailQuery.data)
 
   useEffect(() => {
-    const nextDetailKey = detailOpen && detailContentId ? String(detailContentId) : null
+    if (!detailQuery.data) return
+    const mine = username
+      ? detailQuery.data.reviews.find(review => review.username === username)
+      : undefined
+    setScore(mine ? mine.score / 10 : 0)
+    setReviewText(mine?.review || '')
+    setMyRatingId(mine?.id ?? null)
+  }, [detailQuery.data, username])
+
+  useEffect(() => {
+    if (detailQuery.isError) addToast('error', '加载失败')
+  }, [addToast, detailQuery.error, detailQuery.isError])
+
+  useEffect(() => {
+    const nextDetailKey = detailOpen && detailContentId !== null ? String(detailContentId) : null
     if (previousDetailKey.current !== nextDetailKey) {
       previousDetailKey.current = nextDetailKey
       setResourceOpen(false)
+      setBangumiScore(null)
+      setEditing(false)
     }
   }, [detailContentId, detailOpen])
 
@@ -152,7 +167,8 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
         review: reviewText,
       })
       setEditing(false)
-      // 触发全局刷新：详情弹窗本组件监听 refreshKey 会自动重新加载（含我的评分提取）
+      await queryClient.invalidateQueries({ queryKey: contentDetailQueryKey(content.id, userId) })
+      // 触发列表刷新；详情数据由上面的查询失效机制更新
       useRefreshStore.getState().triggerRefresh()
       addToast('success', '评分已保存')
     } catch (err: any) {
@@ -170,15 +186,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       setScore(0)
       setReviewText('')
       setMyRatingId(null)
-      // Refresh content and ratings
-      if (content) {
-        const [updated, ratingsRes] = await Promise.all([
-          api.getContent(content.id) as Promise<ContentItem>,
-          api.getContentRatings(content.id, { size: '50' }),
-        ])
-        setContent(updated)
-        setAllReviews((ratingsRes.items || []) as Review[])
-      }
+      if (content) await queryClient.invalidateQueries({ queryKey: contentDetailQueryKey(content.id, userId) })
       // 通知列表刷新（删除评分后 my_score 变化）
       useRefreshStore.getState().triggerRefresh()
       addToast('success', '评分已删除')

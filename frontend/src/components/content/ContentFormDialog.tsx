@@ -217,7 +217,9 @@ export function ContentFormDialog({
   }, [form.cover_url])
 
   const coverPreviewUrl = form.cover_url.trim()
-    ? `${secureUrl(form.cover_url.trim())}${form.cover_url.includes('?') ? '&' : '?'}preview_retry=${coverPreviewRetry}`
+    ? coverPreviewRetry > 0
+      ? `${secureUrl(form.cover_url.trim())}${form.cover_url.includes('?') ? '&' : '?'}preview_retry=${coverPreviewRetry}`
+      : secureUrl(form.cover_url.trim())
     : ''
 
   // ── Debounced Bangumi search ──

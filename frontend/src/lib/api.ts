@@ -271,7 +271,7 @@ export const api = {
       return normalizedWeek
     })
   },
-  getContent: (id: number) => request<unknown>(`/content/${id}`),
+  getContent: (id: number, options?: RequestInit) => request<ContentItem>(`/content/${id}`, options),
   getAnimeResources: (id: number, params?: { source?: 'mikan' | 'animegarden'; page?: number; size?: number }) => {
     const query = new URLSearchParams()
     if (params?.source) query.set('source', params.source)
@@ -303,9 +303,9 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[] }>(`/rating/recent${q}`)
   },
-  getContentRatings: (contentId: number, params?: Record<string, string>) => {
+  getContentRatings: (contentId: number, params?: Record<string, string>, options?: RequestInit) => {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`)
+    return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`, options)
   },
   // Resource subscriptions
   listResourceSubscriptions: (contentId?: number) => {

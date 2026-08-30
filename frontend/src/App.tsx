@@ -14,6 +14,7 @@ import { ApiError, api } from '@/lib/api'
 import type { ContentFormSavedEvent } from '@/components/content/ContentFormDialog'
 
 import { useRefreshStore } from '@/stores/refresh-store'
+import { contentDetailQueryKeyPrefix } from '@/lib/content-detail-query'
 
 const queryClient = new QueryClient()
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
@@ -149,6 +150,7 @@ function GlobalDialogs() {
   }
 
   const handleContentSaved = (event: ContentFormSavedEvent) => {
+    void queryClient.invalidateQueries({ queryKey: contentDetailQueryKeyPrefix(event.contentId) })
     if (event.operation === 'created' && addAnimePreset?.openDetailAfterSave) {
       closeAddAnime()
       openDetail(event.contentId)

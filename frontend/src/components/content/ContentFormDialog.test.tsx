@@ -96,6 +96,7 @@ describe('ContentFormDialog 周历导入', () => {
     const coverInput = view.getByPlaceholderText('https://...')
     fireEvent.change(coverInput, { target: { value: 'https://img.example/cover.jpg' } })
     const image = await view.findByAltText('封面预览')
+    expect(image).toHaveAttribute('src', 'https://img.example/cover.jpg')
     fireEvent.error(image)
     expect(view.getByText('封面加载失败，请重试')).toBeInTheDocument()
 

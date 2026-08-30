@@ -8,6 +8,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from models import ContentItem, Notification, Rating, User, UserContentStatus
+from services import covers
 from services.avatar import avatar_fields
 
 logger = logging.getLogger(__name__)
@@ -275,6 +276,7 @@ def get_recent_activity(
 
     total = query.count()
     rows = query.offset((page - 1) * size).limit(size).all()
+    cover_urls = covers.get_content_cover_url_map(db, [content for _, _, content in rows])
 
     items = []
     for rating, user, content in rows:
@@ -283,7 +285,7 @@ def get_recent_activity(
                 'rating_id': rating.id,
                 'content_id': content.id,
                 'content_title': content.title,
-                'content_cover': content.cover_url,
+                'content_cover': cover_urls.get(content.id),
                 'content_type': content.content_type,
                 'score': rating.score,
                 'recommend': rating.recommend,
@@ -315,6 +317,7 @@ def get_user_ratings(
 
     total = query.count()
     rows = query.offset((page - 1) * size).limit(size).all()
+    cover_urls = covers.get_content_cover_url_map(db, [content for _, content in rows])
 
     items = []
     for rating, content in rows:
@@ -329,7 +332,7 @@ def get_user_ratings(
                 'created_at': rating.created_at,
                 'updated_at': rating.updated_at,
                 'content_title': content.title,
-                'content_cover': content.cover_url,
+                'content_cover': cover_urls.get(content.id),
                 'content_type': content.content_type,
             }
         )

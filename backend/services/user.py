@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import ContentItem, Rating, User, UserContentStatus
+from services import covers
 
 
 def get_user_by_id(db: Session, user_id: int) -> User | None:
@@ -166,6 +167,9 @@ def get_user_activity(
         )
         .all()
     )
+    content_by_id = {content.id: content for _, content in rating_rows}
+    content_by_id.update({content.id: content for _, content in status_rows})
+    cover_urls = covers.get_content_cover_url_map(db, list(content_by_id.values()))
 
     entries: list[dict] = []
     for rating, content in rating_rows:
@@ -175,7 +179,7 @@ def get_user_activity(
                 'type': 'review' if has_review else 'rating',
                 'content_id': content.id,
                 'content_title': content.title,
-                'content_cover': content.cover_url,
+                'content_cover': cover_urls.get(content.id),
                 'content_type': content.content_type,
                 'score': rating.score,
                 'review': rating.review,
@@ -189,7 +193,7 @@ def get_user_activity(
                 'type': 'favorite',
                 'content_id': content.id,
                 'content_title': content.title,
-                'content_cover': content.cover_url,
+                'content_cover': cover_urls.get(content.id),
                 'content_type': content.content_type,
                 'score': None,
                 'review': '',
