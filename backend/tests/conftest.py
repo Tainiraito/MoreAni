@@ -13,7 +13,19 @@ sys.path.insert(0, str(BACKEND_DIR))
 from auth import create_access_token, get_password_hash  # noqa: E402
 from database import Base, get_db  # noqa: E402
 from main import app  # noqa: E402
+from middleware import RateLimitMiddleware  # noqa: E402
 from models import User  # noqa: E402
+
+
+def _clear_rate_limit_state() -> None:
+    """Keep process-global rate-limit buckets isolated between API tests."""
+    current = app.middleware_stack
+    while current is not None:
+        if isinstance(current, RateLimitMiddleware):
+            with current._lock:
+                current._hits.clear()
+            return
+        current = getattr(current, 'app', None)
 
 
 @pytest.fixture
@@ -64,6 +76,7 @@ def client(session_factory) -> Iterator[TestClient]:
     try:
         yield test_client
     finally:
+        _clear_rate_limit_state()
         app.dependency_overrides.clear()
 
 
