@@ -47,6 +47,7 @@ class RecordingAsyncClient:
         self.proxy = kwargs.get('proxy')
         self.trust_env = kwargs.get('trust_env')
         self.get_calls = 0
+        self.post_calls = 0
         self.closed = False
         type(self).instances.append(self)
 
@@ -70,6 +71,18 @@ class RecordingAsyncClient:
         if self.fail_first and self.get_calls == 1:
             request = httpx.Request('GET', url)
             raise httpx.ConnectError('upstream unavailable', request=request)
+        return response_for(url)
+
+    async def post(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        del params, json, headers
+        self.post_calls += 1
         return response_for(url)
 
     async def aclose(self) -> None:
@@ -200,22 +213,38 @@ def test_search_cache_normalizes_keyword_but_separates_limit(monkeypatch: pytest
     """Equivalent search text shares a result, while a different limit does not."""
     configure_fake_client(monkeypatch)
     search_payload = {
-        'results': 1,
-        'list': [{'id': 1002, 'name': 'Exact Anime', 'name_cn': '精确番剧'}],
+        'total': 1,
+        'data': [
+            {
+                'id': 1002,
+                'name': 'Exact Anime',
+                'name_cn': '精确番剧',
+                'images': {'large': 'https://img.example/exact.jpg'},
+                'rating': {'score': 8.8},
+                'tags': [{'name': '奇幻'}],
+                'total_episodes': 12,
+                'date': '2026-04-01',
+                'platform': 'TV',
+                'summary': '来自 Bangumi 的简介',
+            },
+        ],
     }
+    requests: list[tuple[str, dict[str, Any] | None, dict[str, Any] | None]] = []
 
     async def search_response(
         self: RecordingAsyncClient,
         url: str,
         *,
         params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
     ) -> httpx.Response:
-        del params, headers
-        self.get_calls += 1
+        del headers
+        self.post_calls += 1
+        requests.append((url, params, json))
         return response_for(url, search_payload)
 
-    monkeypatch.setattr(RecordingAsyncClient, 'get', search_response)
+    monkeypatch.setattr(RecordingAsyncClient, 'post', search_response)
 
     first = asyncio.run(bangumi.search_subjects('  Test '))
     second = asyncio.run(bangumi.search_subjects('test'))
@@ -223,7 +252,10 @@ def test_search_cache_normalizes_keyword_but_separates_limit(monkeypatch: pytest
 
     assert first == second
     assert third['total'] == 1
-    assert sum(client.get_calls for client in RecordingAsyncClient.instances) == 2
+    assert first['items'][0]['cover_url'] == 'https://img.example/exact.jpg'
+    assert requests[0][0] == 'https://api.bgm.tv/v0/search/subjects'
+    assert requests[0][2] == {'keyword': 'test', 'filter': {'type': [2]}}
+    assert sum(client.post_calls for client in RecordingAsyncClient.instances) == 2
 
 
 def test_score_cache_has_independent_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
