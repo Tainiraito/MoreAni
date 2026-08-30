@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render as rtlRender, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -63,7 +64,9 @@ function renderHomePage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return rtlRender(
     <QueryClientProvider client={queryClient}>
-      <HomePage />
+      <MemoryRouter initialEntries={['/']}>
+        <HomePage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
@@ -236,6 +239,23 @@ describe('HomePage 内容列表请求', () => {
     requests[0].deferred.resolve({ items: [content(5, '旧番剧')], total: 1, page: 1, size: 20 })
     await waitFor(() => expect(view.queryByText('旧番剧')).not.toBeInTheDocument())
     expect(view.getByTestId('other-list')).toHaveTextContent('其他列表')
+  })
+
+  it('更多功能 Tab 始终位于末尾并展开随机比较和偏好分析入口', async () => {
+    const view = renderHomePage()
+    await waitFor(() => expect(requests).toHaveLength(1))
+
+    const tabButtons = view.getAllByRole('button')
+    expect(tabButtons.findIndex(button => button.textContent === '更多功能')).toBeGreaterThan(
+      tabButtons.findIndex(button => button.textContent === '其他'),
+    )
+
+    fireEvent.click(view.getByRole('button', { name: '更多功能' }))
+    expect(view.getByRole('link', { name: /随机比较/ })).toHaveAttribute('href', '/ratings/calibration')
+    expect(view.getByRole('link', { name: /偏好分析/ })).toHaveAttribute('href', '/analytics')
+    expect(view.queryByRole('heading', { name: '更多功能' })).not.toBeInTheDocument()
+    expect(view.queryByText('从这里进入评分整理和偏好分析工具。')).not.toBeInTheDocument()
+    expect(requests).toHaveLength(1)
   })
 
   it('中文组合输入期间不请求，完成后 300ms 只提交完整关键词', async () => {

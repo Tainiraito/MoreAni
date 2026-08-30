@@ -19,6 +19,7 @@ import { contentDetailQueryKeyPrefix } from '@/lib/content-detail-query'
 const queryClient = new QueryClient()
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })))
+const RatingCalibrationPage = lazy(() => import('@/pages/RatingCalibrationPage').then(module => ({ default: module.RatingCalibrationPage })))
 const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
 const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
 function AdminDialogLoading() {
@@ -200,6 +201,7 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/profile/:id" element={<Suspense fallback={null}><ProfilePage /></Suspense>} />
               <Route path="/analytics" element={<RequireUser><Suspense fallback={null}><AnalyticsPage /></Suspense></RequireUser>} />
+              <Route path="/ratings/calibration" element={<RequireUser><Suspense fallback={null}><RatingCalibrationPage /></Suspense></RequireUser>} />
             </Routes>
           </div>
 

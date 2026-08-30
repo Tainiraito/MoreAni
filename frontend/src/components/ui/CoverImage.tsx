@@ -3,6 +3,7 @@ import { secureUrl } from '@/lib/image-url'
 
 const MAX_RETRIES = 1
 const RETRY_DELAY_MS = 800
+const loadedCoverSources = new Set<string>()
 
 interface CoverImageProps {
   src: string
@@ -22,14 +23,12 @@ export function CoverImage({
   loading = 'lazy',
   fetchPriority,
 }: CoverImageProps) {
-  const [loaded, setLoaded] = useState(false)
+  const proxiedSrc = src ? secureUrl(src) : ''
+  const [loaded, setLoaded] = useState(() => proxiedSrc !== '' && loadedCoverSources.has(proxiedSrc))
   const [error, setError] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [currentSrc, setCurrentSrc] = useState('')
+  const [currentSrc, setCurrentSrc] = useState(proxiedSrc)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Compute the proxied URL
-  const proxiedSrc = src ? secureUrl(src) : ''
 
   // Reset state when src changes
   useEffect(() => {
@@ -37,7 +36,7 @@ export function CoverImage({
       clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
     }
-    setLoaded(false)
+    setLoaded(proxiedSrc !== '' && loadedCoverSources.has(proxiedSrc))
     setError(false)
     setRetryCount(0)
     setCurrentSrc(proxiedSrc)
@@ -65,9 +64,10 @@ export function CoverImage({
   }, [retryCount, proxiedSrc])
 
   const handleLoad = useCallback(() => {
+    if (proxiedSrc) loadedCoverSources.add(proxiedSrc)
     setLoaded(true)
     setError(false)
-  }, [])
+  }, [proxiedSrc])
 
   return (
     <div className={`relative w-full h-full ${className}`} style={{ background: 'var(--bg-card-warm)' }}>
@@ -76,6 +76,7 @@ export function CoverImage({
         src="/placeholder.png"
         alt=""
         aria-hidden="true"
+        draggable={false}
         className="absolute inset-0 w-full h-full object-cover"
       />
       {/* Real image — fades in on load */}
@@ -84,6 +85,7 @@ export function CoverImage({
           key={currentSrc} // force remount on retry
           src={currentSrc}
           alt={alt}
+          draggable={false}
           loading={loading}
           decoding="async"
           fetchPriority={fetchPriority}

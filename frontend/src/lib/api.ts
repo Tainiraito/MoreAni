@@ -13,6 +13,8 @@ import type {
   NotificationListResponse,
   NotificationUnreadCount,
   PaginatedResponse,
+  RatingCalibrationCandidate,
+  RatingCalibrationSaveResponse,
   ResourceSubscription,
   User,
 } from '@/types'
@@ -307,6 +309,18 @@ export const api = {
     const q = params ? '?' + new URLSearchParams(params).toString() : ''
     return request<{ items: unknown[]; total: number }>(`/rating/content/${contentId}${q}`, options)
   },
+  getCalibrationCandidates: (params?: { count?: number; excludeContentIds?: number[] }, options?: ApiRequestInit) => {
+    const query = new URLSearchParams()
+    if (params?.count) query.set('count', String(params.count))
+    params?.excludeContentIds?.forEach(id => query.append('exclude_content_id', String(id)))
+    const suffix = query.toString() ? `?${query}` : ''
+    return request<RatingCalibrationCandidate[]>(`/rating/calibration/candidates${suffix}`, options)
+  },
+  saveCalibration: (items: Array<{ content_id: number; expected_score: number; new_score: number }>) =>
+    request<RatingCalibrationSaveResponse>('/rating/calibration', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
   // Resource subscriptions
   listResourceSubscriptions: (contentId?: number) => {
     const suffix = contentId ? `?content_id=${contentId}` : ''

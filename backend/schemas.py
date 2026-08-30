@@ -323,6 +323,66 @@ class RatingHistoryResponse(BaseModel):
     total: int
 
 
+class RatingRevisionResponse(BaseModel):
+    """One primary-score revision in a user's rating timeline."""
+
+    id: int
+    rating_id: int | None = None
+    content_id: int
+    user_id: int
+    previous_score: int
+    new_score: int
+    changed_at: datetime
+    source: str
+    comparison_id: str | None = None
+    content_title: str | None = None
+    content_cover: str | None = None
+    content_type: str | None = None
+
+
+class RatingRevisionListResponse(BaseModel):
+    """Paginated primary-score revision history."""
+
+    items: list[RatingRevisionResponse]
+    total: int
+
+
+class RatingCalibrationCandidateResponse(BaseModel):
+    """One randomly selected rated content for score calibration."""
+
+    rating_id: int
+    content_id: int
+    title: str
+    title_alt: str = ''
+    cover_url: str | None = None
+    content_type: str
+    old_score: int
+    rated_at: datetime
+    last_rated_at: datetime
+
+
+class RatingCalibrationItem(BaseModel):
+    """One pending score update from a calibration session."""
+
+    content_id: int
+    expected_score: int = Field(ge=0, le=100)
+    new_score: int = Field(ge=0, le=100)
+
+
+class RatingCalibrationSaveRequest(BaseModel):
+    """Batch score updates submitted by a calibration session."""
+
+    items: list[RatingCalibrationItem] = Field(default_factory=list)
+
+
+class RatingCalibrationSaveResponse(BaseModel):
+    """Result of a calibration batch save."""
+
+    comparison_id: str
+    updated_content_ids: list[int] = Field(default_factory=list)
+    skipped_content_ids: list[int] = Field(default_factory=list)
+
+
 # =============================================================================
 # Analytics schemas
 # =============================================================================

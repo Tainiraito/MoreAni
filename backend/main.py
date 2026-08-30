@@ -7,6 +7,7 @@ rate limit middleware, and creates tables on startup.
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +17,7 @@ from starlette.types import Scope
 
 from database import Base, SessionLocal, engine
 from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
-from models import ContentItem, ResourceSubscription
+from models import ContentItem, Rating, RatingRevision, ResourceSubscription
 from routers.v1.admin import router as admin_router
 from routers.v1.airing import router as airing_router
 from routers.v1.analytics import router as analytics_router
@@ -42,6 +43,7 @@ from services.notifications import run_worker
 async def lifespan(app: FastAPI):
     """Create database tables on startup + lightweight migrations."""
     Base.metadata.create_all(bind=engine)
+    _migrate_rating_revisions()
     _migrate_legacy_anime_movies()
     _migrate_invite_codes_expires()
     _migrate_users_avatar_crop()
@@ -225,6 +227,36 @@ def _migrate_airing_calendar_failure_tracking() -> None:
                     )
     except Exception as exc:  # noqa: BLE001
         print(f'[migrate] airing calendar failure tracking migration skipped: {exc}')
+
+
+def _migrate_rating_revisions() -> None:
+    """Create a baseline snapshot for existing positive ratings, once."""
+    try:
+        with SessionLocal() as db:
+            ratings = db.query(Rating).filter(Rating.score > 0).all()
+            if not ratings:
+                return
+            rating_ids = {revision.rating_id for revision in db.query(RatingRevision.rating_id).all()}
+            now = datetime.now(UTC)
+            snapshots = [
+                RatingRevision(
+                    rating_id=rating.id,
+                    content_id=rating.content_id,
+                    user_id=rating.user_id,
+                    previous_score=0,
+                    new_score=rating.score,
+                    changed_at=now,
+                    source='migration_snapshot',
+                )
+                for rating in ratings
+                if rating.id not in rating_ids
+            ]
+            if snapshots:
+                db.add_all(snapshots)
+                db.commit()
+                print(f'[migrate] rating revisions baseline snapshots: {len(snapshots)}')
+    except Exception as exc:  # noqa: BLE001
+        print(f'[migrate] rating revisions migration skipped: {exc}')
 
 
 app = FastAPI(

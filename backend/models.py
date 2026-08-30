@@ -38,6 +38,7 @@ class User(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     ratings = relationship('Rating', back_populates='user', cascade='all, delete-orphan')
+    rating_revisions = relationship('RatingRevision', back_populates='user', cascade='all, delete-orphan')
     # 删除账号时内容会先转交给执行操作的超级管理员，不能随父用户级联删除。
     content_items = relationship('ContentItem', back_populates='creator')
     statuses = relationship('UserContentStatus', back_populates='user', cascade='all, delete-orphan')
@@ -84,6 +85,7 @@ class ContentItem(Base):
 
     creator = relationship('User', back_populates='content_items')
     ratings = relationship('Rating', back_populates='content', cascade='all, delete-orphan')
+    rating_revisions = relationship('RatingRevision', back_populates='content', cascade='all, delete-orphan')
     tags = relationship('Tag', secondary='content_tags', back_populates='contents')
     statuses = relationship('UserContentStatus', back_populates='content', cascade='all, delete-orphan')
 
@@ -151,6 +153,40 @@ class Rating(Base):
         UniqueConstraint('content_id', 'user_id', name='uq_content_user'),
         {'comment': 'Per-user rating for a content item'},
     )
+
+
+class RatingRevision(Base):
+    """One persisted primary-score change for a user's content rating."""
+
+    __tablename__ = 'rating_revisions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    rating_id = Column(
+        Integer,
+        ForeignKey('ratings.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    content_id = Column(
+        Integer,
+        ForeignKey('content_items.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey('users.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    previous_score = Column(Integer, nullable=False)
+    new_score = Column(Integer, nullable=False)
+    changed_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+    source = Column(String(30), nullable=False, default='manual')
+    comparison_id = Column(String(64), nullable=True, index=True)
+
+    user = relationship('User', back_populates='rating_revisions')
+    content = relationship('ContentItem', back_populates='rating_revisions')
 
 
 class UserContentStatus(Base):

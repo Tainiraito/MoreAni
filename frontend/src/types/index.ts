@@ -67,6 +67,24 @@ export interface Rating {
   updated_at: string
 }
 
+export interface RatingCalibrationCandidate {
+  rating_id: number
+  content_id: number
+  title: string
+  title_alt: string
+  cover_url: string | null
+  content_type: ContentType | string
+  old_score: number
+  rated_at: string
+  last_rated_at: string
+}
+
+export interface RatingCalibrationSaveResponse {
+  comparison_id: string
+  updated_content_ids: number[]
+  skipped_content_ids: number[]
+}
+
 export interface User {
   id: number
   username: string

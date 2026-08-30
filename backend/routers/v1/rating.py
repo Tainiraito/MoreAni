@@ -5,7 +5,15 @@ from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
 from models import Rating, User
-from schemas import RatingCreate, RatingHistoryResponse, RatingResponse
+from schemas import (
+    RatingCalibrationCandidateResponse,
+    RatingCalibrationSaveRequest,
+    RatingCalibrationSaveResponse,
+    RatingCreate,
+    RatingHistoryResponse,
+    RatingResponse,
+    RatingRevisionListResponse,
+)
 from services import rating as rating_svc
 from services.avatar import avatar_fields
 
@@ -44,6 +52,64 @@ def create_or_update_rating(
         created_at=rating.created_at,
         updated_at=rating.updated_at,
     )
+
+
+@router.get('/calibration/candidates', response_model=list[RatingCalibrationCandidateResponse])
+def get_calibration_candidates(
+    count: int = Query(1, ge=1, le=20),
+    exclude_content_id: list[int] = Query(default=[]),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[RatingCalibrationCandidateResponse]:
+    """Return random positive ratings not already used in the session."""
+    candidates = rating_svc.get_random_calibration_candidates(
+        db,
+        user.id,
+        exclude_content_ids=set(exclude_content_id),
+        count=count,
+    )
+    if not candidates:
+        raise HTTPException(status_code=404, detail='没有更多可对比的评分作品')
+    return [RatingCalibrationCandidateResponse(**candidate) for candidate in candidates]
+
+
+@router.post('/calibration', response_model=RatingCalibrationSaveResponse)
+def save_calibration(
+    body: RatingCalibrationSaveRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RatingCalibrationSaveResponse:
+    """Save a calibration batch atomically and record score revisions."""
+    items = [(item.content_id, item.expected_score, item.new_score) for item in body.items]
+    try:
+        result = rating_svc.save_calibration_scores(db, user_id=user.id, items=items)
+    except rating_svc.RatingCalibrationConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={'message': str(exc), 'conflicts': exc.conflicts},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RatingCalibrationSaveResponse(**result)
+
+
+@router.get('/revisions', response_model=RatingRevisionListResponse)
+def get_rating_revisions(
+    content_id: int | None = Query(default=None, ge=1),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+) -> RatingRevisionListResponse:
+    """Get the current user's primary-score revision history."""
+    items, total = rating_svc.get_user_rating_revisions(
+        db,
+        user.id,
+        content_id=content_id,
+        page=page,
+        size=size,
+    )
+    return RatingRevisionListResponse(items=items, total=total)
 
 
 @router.delete('/{rating_id}', status_code=204)

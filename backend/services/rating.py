@@ -3,13 +3,15 @@
 import json
 import logging
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from models import ContentItem, Notification, Rating, User, UserContentStatus
+from models import ContentItem, Notification, Rating, RatingRevision, User, UserContentStatus
 from services import covers
 from services.avatar import avatar_fields
+from services.content import ANIME_CONTENT_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +21,38 @@ def get_user_rating(db: Session, user_id: int, content_id: int) -> Rating | None
     return db.query(Rating).filter(Rating.user_id == user_id, Rating.content_id == content_id).first()
 
 
-def _bump_content_updated_at(db: Session, content_id: int) -> None:
+def _bump_content_updated_at(db: Session, content_id: int, updated_at: datetime | None = None) -> None:
     """Touch the content's updated_at so it sorts to top of updated_desc."""
     content = db.query(ContentItem).filter(ContentItem.id == content_id).first()
     if content:
-        content.updated_at = datetime.now(UTC)
+        content.updated_at = updated_at or datetime.now(UTC)
+
+
+def _record_score_revision(
+    db: Session,
+    *,
+    rating: Rating,
+    previous_score: int,
+    new_score: int,
+    source: str,
+    changed_at: datetime,
+    comparison_id: str | None = None,
+) -> None:
+    """Record one primary-score change without recording comment-only edits."""
+    if previous_score == new_score:
+        return
+    db.add(
+        RatingRevision(
+            rating_id=rating.id,
+            content_id=rating.content_id,
+            user_id=rating.user_id,
+            previous_score=previous_score,
+            new_score=new_score,
+            changed_at=changed_at,
+            source=source,
+            comparison_id=comparison_id,
+        )
+    )
 
 
 def _has_activity(score: int, review: str | None) -> bool:
@@ -113,13 +142,24 @@ def upsert_rating(
     If user already rated this content, update the existing rating.
     Also bumps the parent content's updated_at so it sorts to top.
     """
+    now = datetime.now(UTC)
     existing = get_user_rating(db, user_id, content_id)
     was_active = existing is not None and _has_activity(existing.score, existing.review)
     if existing:
+        previous_score = existing.score
         existing.score = score
         existing.recommend = recommend
         existing.review = review
-        _bump_content_updated_at(db, content_id)
+        existing.updated_at = now
+        _record_score_revision(
+            db,
+            rating=existing,
+            previous_score=previous_score,
+            new_score=score,
+            source='manual',
+            changed_at=now,
+        )
+        _bump_content_updated_at(db, content_id, now)
         db.commit()
         db.refresh(existing)
         rating = existing
@@ -130,9 +170,20 @@ def upsert_rating(
             score=score,
             recommend=recommend,
             review=review,
+            created_at=now,
+            updated_at=now,
         )
         db.add(rating)
-        _bump_content_updated_at(db, content_id)
+        db.flush()
+        _record_score_revision(
+            db,
+            rating=rating,
+            previous_score=0,
+            new_score=score,
+            source='initial',
+            changed_at=now,
+        )
+        _bump_content_updated_at(db, content_id, now)
         db.commit()
         db.refresh(rating)
 
@@ -142,9 +193,175 @@ def upsert_rating(
 
 
 def delete_rating(db: Session, rating: Rating) -> None:
-    """Delete a rating."""
+    """Delete a rating and preserve a positive-score deletion event."""
+    if rating.score > 0:
+        now = datetime.now(UTC)
+        _record_score_revision(
+            db,
+            rating=rating,
+            previous_score=rating.score,
+            new_score=0,
+            source='delete',
+            changed_at=now,
+        )
     db.delete(rating)
     db.commit()
+
+
+class RatingCalibrationConflictError(ValueError):
+    """Raised when a rating changed after a calibration page was opened."""
+
+    def __init__(self, conflicts: list[dict[str, int]]) -> None:
+        super().__init__('部分评分已在其他位置发生变化')
+        self.conflicts = conflicts
+
+
+def get_random_calibration_candidates(
+    db: Session,
+    user_id: int,
+    exclude_content_ids: set[int] | None = None,
+    count: int = 1,
+) -> list[dict[str, object]]:
+    """Select positive user ratings that are not excluded by the session."""
+    query = (
+        db.query(Rating, ContentItem)
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(
+            Rating.user_id == user_id,
+            Rating.score > 0,
+            ContentItem.content_type.in_(ANIME_CONTENT_TYPES),
+            ContentItem.deleted_at.is_(None),
+        )
+    )
+    if exclude_content_ids:
+        query = query.filter(~Rating.content_id.in_(exclude_content_ids))
+
+    rows = query.order_by(func.random()).limit(max(1, count)).all()
+    cover_urls = covers.get_content_cover_url_map(db, [content for _, content in rows])
+    return [
+        {
+            'rating_id': rating.id,
+            'content_id': content.id,
+            'title': content.title,
+            'title_alt': content.title_alt or '',
+            'cover_url': cover_urls.get(content.id),
+            'content_type': content.content_type,
+            'old_score': rating.score,
+            'rated_at': rating.created_at,
+            'last_rated_at': rating.updated_at,
+        }
+        for rating, content in rows
+    ]
+
+
+def save_calibration_scores(
+    db: Session,
+    *,
+    user_id: int,
+    items: list[tuple[int, int, int]],
+) -> dict[str, object]:
+    """Save final calibration scores atomically and record only real changes."""
+    content_ids = [content_id for content_id, _, _ in items]
+    if len(content_ids) != len(set(content_ids)):
+        raise ValueError('对比结果包含重复内容')
+
+    ratings = (
+        db.query(Rating).filter(Rating.user_id == user_id, Rating.content_id.in_(content_ids)).all()
+        if content_ids
+        else []
+    )
+    rating_map = {rating.content_id: rating for rating in ratings}
+    missing_ids = [content_id for content_id in content_ids if content_id not in rating_map]
+    if missing_ids:
+        raise ValueError('部分作品已没有可修改的评分')
+
+    conflicts = [
+        {
+            'content_id': content_id,
+            'expected_score': expected_score,
+            'current_score': rating_map[content_id].score,
+        }
+        for content_id, expected_score, _ in items
+        if rating_map[content_id].score != expected_score
+    ]
+    if conflicts:
+        raise RatingCalibrationConflictError(conflicts)
+
+    comparison_id = str(uuid4())
+    now = datetime.now(UTC)
+    updated_content_ids: list[int] = []
+    skipped_content_ids: list[int] = []
+    for content_id, _, new_score in items:
+        rating = rating_map[content_id]
+        if new_score <= 0 or new_score == rating.score:
+            skipped_content_ids.append(content_id)
+            continue
+        previous_score = rating.score
+        rating.score = new_score
+        rating.updated_at = now
+        _record_score_revision(
+            db,
+            rating=rating,
+            previous_score=previous_score,
+            new_score=new_score,
+            source='comparison',
+            changed_at=now,
+            comparison_id=comparison_id,
+        )
+        _bump_content_updated_at(db, content_id, now)
+        updated_content_ids.append(content_id)
+
+    db.commit()
+    return {
+        'comparison_id': comparison_id,
+        'updated_content_ids': updated_content_ids,
+        'skipped_content_ids': skipped_content_ids,
+    }
+
+
+def get_user_rating_revisions(
+    db: Session,
+    user_id: int,
+    *,
+    content_id: int | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[dict[str, object]], int]:
+    """Return a user's score revisions with content metadata."""
+    query = (
+        db.query(RatingRevision, ContentItem)
+        .join(ContentItem, RatingRevision.content_id == ContentItem.id)
+        .filter(RatingRevision.user_id == user_id)
+    )
+    if content_id is not None:
+        query = query.filter(RatingRevision.content_id == content_id)
+
+    total = query.count()
+    rows = (
+        query.order_by(RatingRevision.changed_at.desc(), RatingRevision.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+    cover_urls = covers.get_content_cover_url_map(db, [content for _, content in rows])
+    items = [
+        {
+            'id': revision.id,
+            'rating_id': revision.rating_id,
+            'content_id': revision.content_id,
+            'user_id': revision.user_id,
+            'previous_score': revision.previous_score,
+            'new_score': revision.new_score,
+            'changed_at': revision.changed_at,
+            'source': revision.source,
+            'comparison_id': revision.comparison_id,
+            'content_title': content.title,
+            'content_cover': cover_urls.get(content.id),
+            'content_type': content.content_type,
+        }
+        for revision, content in rows
+    ]
+    return items, total
 
 
 def get_rating_stats(db: Session, content_id: int) -> dict:

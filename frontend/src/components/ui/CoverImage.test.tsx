@@ -39,4 +39,14 @@ describe('CoverImage', () => {
 
     expect(() => act(() => vi.advanceTimersByTime(800))).not.toThrow()
   })
+
+  it('重新挂载同一封面时保留已加载状态', () => {
+    const coverUrl = '/api/covers/bangumi/1002.webp?v=cache-test'
+    const view = render(<CoverImage key="first" src={coverUrl} alt="可复用封面" />)
+    fireEvent.load(view.getByAltText('可复用封面'))
+
+    view.rerender(<CoverImage key="second" src={coverUrl} alt="可复用封面" />)
+
+    expect(view.getByAltText('可复用封面')).toHaveClass('opacity-100')
+  })
 })

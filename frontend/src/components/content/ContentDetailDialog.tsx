@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
 import { CollapsibleText } from '@/components/ui/CollapsibleText'
+import { StarRating } from '@/components/rating/StarRating'
 import { AnimeResourceDialog } from '@/components/content/AnimeResourceDialog'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import type { AvatarCrop, ContentItem } from '@/types'
@@ -66,7 +67,6 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   const username = user?.username
   const userId = user?.id ?? null
   const [score, setScore] = useState(0)
-  const [hoverScore, setHoverScore] = useState(0)
   const [reviewText, setReviewText] = useState('')
   const [myRatingId, setMyRatingId] = useState<number | null>(null)
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
@@ -147,11 +147,6 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   }, [detailOpen])
 
   if (!detailOpen) return null
-
-  // Star click — only update local state, don't save；再点当前分数 = 清空评分
-  const handleStarClick = (newScore: number) => {
-    setScore(prev => (prev === newScore ? 0 : newScore))
-  }
 
   // Save button — actually submit to API
   const handleSave = async () => {
@@ -596,40 +591,12 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
                     </div>
 
                     {/* 星星 — 只改本地状态 */}
-                    <div className="flex items-center gap-1 mb-3">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => {
-                        const display = hoverScore || score
-                        const isFull = display >= i
-                        const isHalf = !isFull && display >= i - 0.5
-                        return (
-                          <button
-                            key={i}
-                            className="relative transition-transform duration-150 hover:scale-125"
-                            style={{ cursor: 'pointer' }}
-                            onMouseMove={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              setHoverScore(e.clientX - rect.left < rect.width / 2 ? i - 0.5 : i)
-                            }}
-                            onMouseLeave={() => setHoverScore(0)}
-                            onClick={(e) => {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              handleStarClick(e.clientX - rect.left < rect.width / 2 ? i - 0.5 : i)
-                            }}
-                          >
-                            <Star size={24} style={{ color: 'var(--border-line)', fill: 'transparent' }} />
-                            {(isFull || isHalf) && (
-                              <div className="absolute inset-0 overflow-hidden" style={{ width: isHalf ? '50%' : '100%' }}>
-                                <Star size={24} style={{ color: '#FB71A7', fill: '#FB71A7' }} />
-                              </div>
-                            )}
-                          </button>
-                        )
-                      })}
-                      {(hoverScore || score) > 0 && (
-                        <span className="ml-2 text-sm font-medium" style={{ color: '#FB71A7' }}>
-                          {(hoverScore || score).toFixed(1)}
-                        </span>
-                      )}
+                    <div className="mb-3">
+                      <StarRating
+                        value={score}
+                        onChange={setScore}
+                        ariaLabel="我的评分"
+                      />
                     </div>
 
                     {/* 评论输入 */}

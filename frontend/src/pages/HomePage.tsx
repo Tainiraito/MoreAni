@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useFavoriteStore } from '@/stores/favorite-store'
@@ -16,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { HeroSection } from '@/components/content/HeroSection'
-import { LayoutGrid, List } from 'lucide-react'
+import { ArrowDownUp, ChartNoAxesCombined, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import type { AiringCalendarWeek, ContentItem } from '@/types'
 import {
   buildContentListParams,
@@ -31,7 +32,7 @@ const RECOMMENDATION_CACHE_PREFIX = 'moreani-recommendations-v1'
 const AIRING_WEEK_CACHE_KEY = 'moreani-airing-week-v2'
 const AIRING_STALE_TIME_MS = 5 * 60 * 1000
 const AIRING_GC_TIME_MS = 30 * 60 * 1000
-type HomeTab = 'anime' | 'calendar' | 'other'
+type HomeTab = 'anime' | 'calendar' | 'other' | 'more'
 
 interface AiringWeekCacheRecord {
   week: AiringCalendarWeek
@@ -83,6 +84,61 @@ function currentWeekStart(): string {
   const month = String(current.getMonth() + 1).padStart(2, '0')
   const date = String(current.getDate()).padStart(2, '0')
   return `${current.getFullYear()}-${month}-${date}`
+}
+
+function MoreFeaturesPanel() {
+  return (
+    <section className="mt-8" aria-label="更多功能">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link
+          to="/ratings/calibration"
+          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
+              >
+                <ArrowDownUp size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>随机比较</h3>
+                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                  随机抽取已评分作品，重新比较并整理你的评分。
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
+          </div>
+        </Link>
+        <Link
+          to="/analytics"
+          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
+              >
+                <ChartNoAxesCombined size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>偏好分析</h3>
+                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                  查看你的评分分布、偏好趋势和内容统计。
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
+          </div>
+        </Link>
+      </div>
+    </section>
+  )
 }
 
 export function HomePage() {
@@ -364,7 +420,7 @@ export function HomePage() {
     isLoadingMoreRef.current = false
     setLoadingMore(false)
 
-    if (userId === undefined || activeTab === 'calendar') {
+    if (userId === undefined || activeTab === 'calendar' || activeTab === 'more') {
       listLoadingRef.current = false
       setLoading(false)
       return
@@ -420,6 +476,7 @@ export function HomePage() {
     const currentQuery = listQueryRef.current
     if (
       currentQuery.activeTab === 'calendar'
+      || currentQuery.activeTab === 'more'
       || isLoadingMoreRef.current
       || !hasMoreRef.current
       || listLoadingRef.current
@@ -552,8 +609,8 @@ export function HomePage() {
           className="flex gap-6 overflow-x-auto mb-4 -mx-6 px-6"
           style={{ borderBottom: '1px solid var(--border-line)' }}
         >
-          {(['anime', 'calendar', 'other'] as const).map(val => {
-            const labels: Record<HomeTab, string> = { anime: '番剧', calendar: '新番周历', other: '其他' }
+          {(['anime', 'calendar', 'other', 'more'] as const).map(val => {
+            const labels: Record<HomeTab, string> = { anime: '番剧', calendar: '新番周历', other: '其他', more: '更多功能' }
             const isActive = activeTab === val
             return (
               <button
@@ -573,7 +630,7 @@ export function HomePage() {
         </div>
 
         {/* 搜索、筛选、排序 */}
-        {activeTab !== 'calendar' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        {activeTab !== 'calendar' && activeTab !== 'more' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
           <div className="relative flex-1 max-w-xs">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
@@ -694,7 +751,9 @@ export function HomePage() {
           </div>}
         </div>}
 
-        {activeTab === 'calendar' ? (
+        {activeTab === 'more' ? (
+          <MoreFeaturesPanel />
+        ) : activeTab === 'calendar' ? (
           <WeeklyAiringPanel
             week={airingQuery.data ?? null}
             loading={airingQuery.isPending}
