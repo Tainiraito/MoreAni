@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ===== Stage 2: 运行时 =====
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # 安装 supervisord + nginx
 RUN apt-get update && apt-get install -y --no-install-recommends \
