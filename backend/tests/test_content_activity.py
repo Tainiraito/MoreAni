@@ -1,4 +1,5 @@
 from conftest import auth_cookie
+
 from models import ContentItem, Rating, UserContentStatus
 from services import covers as covers_svc
 

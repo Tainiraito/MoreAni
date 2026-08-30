@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv venv
-      - run: uv pip install -r backend/requirements-dev.txt ruff
+      - run: uv pip install -r backend/requirements-dev.txt ruff==0.16.3
       - run: .venv/bin/ruff check backend/
       - run: .venv/bin/ruff format --check backend/
       - run: .venv/bin/pytest backend/tests
