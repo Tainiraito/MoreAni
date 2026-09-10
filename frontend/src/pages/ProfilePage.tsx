@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { PageMain } from '@/components/layout/PageContainer'
 import { ScoreBadge } from '@/components/rating/ScoreBadge'
 import { Avatar } from '@/components/ui/Avatar'
+import { ReviewText } from '@/components/review/ReviewText'
 import type { User, Rating } from '@/types'
 
 export function ProfilePage() {
@@ -89,7 +90,13 @@ export function ProfilePage() {
               >
                 <ScoreBadge score={r.score} size="sm" />
                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.content_id}</span>
-                {r.review && <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{r.review}</span>}
+                {r.review && (
+                  <ReviewText
+                    text={r.review}
+                    className="min-w-0 flex-1 truncate text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                  />
+                )}
               </div>
             ))}
           </div>

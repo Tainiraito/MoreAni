@@ -232,6 +232,7 @@ MoreAni/
 │       │   ├── layout/      # 布局组件
 │       │   ├── content/     # 内容组件
 │       │   ├── rating/      # 评分组件
+│       │   ├── review/      # 评论解析与富文本编辑
 │       │   ├── auth/        # 认证组件
 │       │   └── ui/          # 基础 UI 组件
 │       ├── stores/          # Zustand 状态

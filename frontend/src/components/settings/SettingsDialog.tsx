@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { AvatarCropDialog } from '@/components/settings/AvatarCropDialog'
+import { ReviewText } from '@/components/review/ReviewText'
 import { ArrowRight, ChartNoAxesCombined, Pencil, X } from 'lucide-react'
 import type { AvatarCrop } from '@/types'
 
@@ -378,12 +379,6 @@ export function SettingsDialog() {
                     : item.type === 'review'
                       ? { text: '评论', color: '#C77DFF' }
                       : { text: '收藏', color: '#4DA6FF' }
-                const desc =
-                  item.type === 'rating'
-                    ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}`
-                    : item.type === 'review'
-                      ? (item.review || (item.score ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}` : '写了评论'))
-                      : '收藏了'
                 return (
                   <div
                     key={idx}
@@ -414,7 +409,14 @@ export function SettingsDialog() {
                         </span>
                       </div>
                       <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                        {desc} · {new Date(item.updated_at).toLocaleDateString('zh-CN')}
+                        {item.type === 'rating'
+                          ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}`
+                          : item.type === 'review'
+                            ? item.review
+                              ? <ReviewText text={item.review} className="inline" />
+                              : (item.score ? `评分 ${((item.score ?? 0) / 10).toFixed(1)}` : '写了评论')
+                            : '收藏了'}
+                        {' · '}{new Date(item.updated_at).toLocaleDateString('zh-CN')}
                       </div>
                     </div>
                   </div>

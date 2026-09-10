@@ -113,6 +113,79 @@
   }
 }
 
+@layer components {
+  [data-slot="review-editor"] [data-review-format="italic"] {
+    font-style: italic;
+  }
+
+  [data-slot="review-editor"] [data-review-format="bold"] {
+    color: var(--text-primary);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  [data-slot="review-editor"] [data-review-format="underline"] {
+    text-decoration-line: underline;
+  }
+
+  [data-slot="review-editor"] [data-review-format="strike"] {
+    text-decoration-line: line-through;
+  }
+
+  [data-slot="review-editor"] [data-review-format="inline-spoiler"] {
+    padding-inline: 0.125rem;
+    border-radius: 0.125rem;
+    background: #000;
+    color: transparent;
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+    transition: color 150ms ease;
+  }
+
+  [data-slot="review-editor"] [data-review-format="inline-spoiler"][data-review-revealed="true"] {
+    color: var(--text-primary);
+  }
+
+  [data-slot="review-editor"] [data-review-spoiler="true"][data-review-active="true"],
+  [data-slot="review-editor"] [data-review-spoiler="true"]:focus {
+    background: transparent;
+    color: var(--text-primary);
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-active="true"]::before,
+  [data-slot="review-editor"] [data-review-format][data-review-active="true"]::after,
+  [data-slot="review-editor"] [data-review-format][data-review-empty="true"]::before,
+  [data-slot="review-editor"] [data-review-format][data-review-empty="true"]::after {
+    color: var(--text-muted);
+    font-style: normal;
+    font-weight: 400;
+    line-height: inherit;
+    text-decoration: none;
+    pointer-events: none;
+    user-select: none;
+    white-space: pre;
+    opacity: 0.9;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-active="true"]::before,
+  [data-slot="review-editor"] [data-review-format][data-review-empty="true"]::before {
+    content: attr(data-review-token);
+    margin-inline-end: 0.08em;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-active="true"]::after,
+  [data-slot="review-editor"] [data-review-format][data-review-empty="true"]::after {
+    content: attr(data-review-token);
+    margin-inline-start: 0.08em;
+  }
+
+  [data-slot="review-editor"] [data-review-format="inline-spoiler"]:focus-visible {
+    outline: 1px solid var(--text-primary);
+    outline-offset: 1px;
+  }
+}
+
 html {
   background-color: var(--bg-page);
   overflow-x: hidden; /* 防止卡片滚动导致水平滚动条 */

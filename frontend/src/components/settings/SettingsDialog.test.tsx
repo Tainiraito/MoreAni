@@ -75,4 +75,29 @@ describe('SettingsDialog', () => {
     expect(view.getByTestId('location')).toHaveTextContent('/analytics')
     expect(useUIStore.getState().settingsOpen).toBe(false)
   })
+
+  it('renders rich text in the current user activity feed', async () => {
+    vi.mocked(api.getUserActivity).mockResolvedValue({
+      items: [{
+        type: 'review',
+        content_id: 88,
+        content_title: '富文本番剧',
+        content_cover: null,
+        content_type: 'anime',
+        score: 80,
+        review: '**重要剧情** ||我的防剧透||',
+        updated_at: '2026-01-02T00:00:00Z',
+      }],
+      total: 1,
+    })
+
+    const view = render(
+      <MemoryRouter initialEntries={['/']}>
+        <SettingsDialog />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(view.getByText('重要剧情')).toBeInTheDocument())
+    expect(view.getByText('我的防剧透')).toHaveClass('text-black', 'bg-black')
+  })
 })

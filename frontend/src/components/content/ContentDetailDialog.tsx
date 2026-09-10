@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -9,13 +10,14 @@ import { useMaskClose } from '@/hooks/use-mask-close'
 import { api } from '@/lib/api'
 import { contentDetailQueryKey } from '@/lib/content-detail-query'
 import { X, Star, Users, Play, BookOpen, Monitor, Gamepad2, Film, Globe, Building, Calendar, MessageCircle, ExternalLink, Heart, Trash2, Pencil, Search } from 'lucide-react'
-import { Textarea } from '@/components/ui/textarea'
 import { secureUrl } from '@/lib/image-url'
 import { Avatar } from '@/components/ui/Avatar'
 import { CollapsibleText } from '@/components/ui/CollapsibleText'
 import { StarRating } from '@/components/rating/StarRating'
 import { AnimeResourceDialog } from '@/components/content/AnimeResourceDialog'
 import { LoadingIcon } from '@/components/ui/loading-icon'
+import { ReviewEditor } from '@/components/review/ReviewEditor'
+import { ReviewText } from '@/components/review/ReviewText'
 import type { AvatarCrop, ContentItem } from '@/types'
 
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Star; color: string }> = {
@@ -51,6 +53,8 @@ interface ContentDetailData {
 const CONTENT_DETAIL_STALE_TIME_MS = 60_000
 const CONTENT_DETAIL_GC_TIME_MS = 5 * 60_000
 
+type ReviewDiscardAction = 'close-detail' | 'cancel-edit'
+
 interface ContentDetailDialogProps {
   isFavorited?: boolean
   isFavoritePending?: boolean
@@ -59,23 +63,58 @@ interface ContentDetailDialogProps {
 
 export function ContentDetailDialog({ isFavorited = false, isFavoritePending = false, onToggleFavorite }: ContentDetailDialogProps) {
   const { detailOpen, detailContentId, closeDetail, openEditContent, resourceFocus, clearResourceFocus } = useUIStore()
-  const maskProps = useMaskClose(closeDetail)
+  const location = useLocation()
+  const navigate = useNavigate()
   useLockBodyScroll(detailOpen)
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
   const addToast = useToastStore(state => state.addToast)
-  const username = user?.username
   const userId = user?.id ?? null
   const [score, setScore] = useState(0)
   const [reviewText, setReviewText] = useState('')
+  const [savedReviewText, setSavedReviewText] = useState('')
   const [myRatingId, setMyRatingId] = useState<number | null>(null)
   const [bangumiScore, setBangumiScore] = useState<number | null>(null)
   const [bangumiLoading, setBangumiLoading] = useState(false)
   const [savingRating, setSavingRating] = useState(false)
   const [deletingRating, setDeletingRating] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [reviewDiscardAction, setReviewDiscardAction] = useState<ReviewDiscardAction | null>(null)
   const [resourceOpen, setResourceOpen] = useState(false)
   const previousDetailKey = useRef<string | null>(null)
+  const previousLocationRef = useRef(`${location.pathname}${location.search}${location.hash}`)
+
+  const reviewEditorVisible = !myRatingId || editing
+  const reviewDirty = reviewEditorVisible && reviewText !== savedReviewText
+
+  const discardReviewChanges = useCallback(() => {
+    setReviewText(savedReviewText)
+    setEditing(false)
+  }, [savedReviewText])
+
+  const closeDetailWithoutPrompt = useCallback(() => {
+    discardReviewChanges()
+    setReviewDiscardAction(null)
+    closeDetail()
+  }, [closeDetail, discardReviewChanges])
+
+  const requestCloseDetail = useCallback(() => {
+    if (reviewDirty) {
+      setReviewDiscardAction('close-detail')
+      return
+    }
+    closeDetailWithoutPrompt()
+  }, [closeDetailWithoutPrompt, reviewDirty])
+
+  const requestCancelEdit = useCallback(() => {
+    if (reviewDirty) {
+      setReviewDiscardAction('cancel-edit')
+      return
+    }
+    discardReviewChanges()
+  }, [discardReviewChanges, reviewDirty])
+
+  const maskProps = useMaskClose(requestCloseDetail)
 
   const detailQuery = useQuery<ContentDetailData>({
     queryKey: contentDetailQueryKey(detailContentId, userId),
@@ -104,13 +143,15 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
 
   useEffect(() => {
     if (!detailQuery.data) return
-    const mine = username
-      ? detailQuery.data.reviews.find(review => review.username === username)
+    const mine = userId
+      ? detailQuery.data.reviews.find(review => review.user_id === userId)
       : undefined
+    const nextReviewText = mine?.review || ''
     setScore(mine ? mine.score / 10 : 0)
-    setReviewText(mine?.review || '')
+    setReviewText(nextReviewText)
+    setSavedReviewText(nextReviewText)
     setMyRatingId(mine?.id ?? null)
-  }, [detailQuery.data, username])
+  }, [detailQuery.data, userId])
 
   useEffect(() => {
     if (detailQuery.isError) addToast('error', '加载失败')
@@ -131,6 +172,35 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       setResourceOpen(true)
     }
   }, [content, detailOpen, resourceFocus?.contentId])
+
+  useEffect(() => {
+    const currentLocation = `${location.pathname}${location.search}${location.hash}`
+    if (!detailOpen || !reviewDirty) {
+      previousLocationRef.current = currentLocation
+      return
+    }
+    if (previousLocationRef.current === currentLocation) return
+
+    const previousLocation = previousLocationRef.current
+    if (window.confirm('评论内容尚未保存，确定离开当前页面吗？')) {
+      previousLocationRef.current = currentLocation
+      closeDetailWithoutPrompt()
+      return
+    }
+
+    navigate(previousLocation, { replace: true })
+  }, [closeDetailWithoutPrompt, detailOpen, location.hash, location.pathname, location.search, navigate, reviewDirty])
+
+  useEffect(() => {
+    if (!reviewDirty) return
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [reviewDirty])
 
   // Lock body scroll when dialog is open
   useEffect(() => {
@@ -161,6 +231,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
         score: score * 10,
         review: reviewText,
       })
+      setSavedReviewText(reviewText)
       setEditing(false)
       await queryClient.invalidateQueries({ queryKey: contentDetailQueryKey(content.id, userId) })
       // 触发列表刷新；详情数据由上面的查询失效机制更新
@@ -180,6 +251,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       await api.deleteRating(myRatingId)
       setScore(0)
       setReviewText('')
+      setSavedReviewText('')
       setMyRatingId(null)
       if (content) await queryClient.invalidateQueries({ queryKey: contentDetailQueryKey(content.id, userId) })
       // 通知列表刷新（删除评分后 my_score 变化）
@@ -236,12 +308,14 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   const studio = metadata.studio
   const airDate = metadata.air_date || content?.release_date
   const collapsibleResetKey = content ? `${content.id}:${content.updated_at}` : 'empty'
+  const otherReviews = allReviews.filter(review => !user || review.user_id !== user.id)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ animation: 'fade-in 200ms ease-out' }}
-    >
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ animation: 'fade-in 200ms ease-out' }}
+      >
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" {...maskProps} />
 
       <div
@@ -305,7 +379,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
             </button>
           )}
           <button
-            onClick={closeDetail}
+            onClick={requestCloseDetail}
             aria-label="关闭详情"
             className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
             style={{
@@ -526,11 +600,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
                         )}
                       </div>
                     </div>
-                    {reviewText && (
-                      <p className="text-xs whitespace-pre-line" style={{ color: 'var(--text-secondary)' }}>
-                        {reviewText}
-                      </p>
-                    )}
+                    {reviewText && <ReviewText text={reviewText} className="block text-xs" style={{ color: 'var(--text-secondary)' }} />}
                   </div>
                 ) : (
                   /* 编辑态 — 星星 + 评论 + 保存 */
@@ -579,7 +649,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
                               删除
                             </button>
                             <button
-                              onClick={() => setEditing(false)}
+                              onClick={requestCancelEdit}
                               className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md transition-all duration-200 hover:opacity-80"
                               style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
                             >
@@ -600,13 +670,10 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
                     </div>
 
                     {/* 评论输入 */}
-                    <Textarea
+                    <ReviewEditor
                       value={reviewText}
-                      onChange={e => setReviewText(e.target.value)}
-                      placeholder="写点评论吧...（可选）"
+                      onChange={setReviewText}
                       rows={2}
-                      className="resize-none"
-                      style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}
                     />
 
                     {/* 保存（score=0 也可保存：只写评论不打分） */}
@@ -625,14 +692,14 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
               )}
 
               {/* ===== 站内评论（仅他人） ===== */}
-              {allReviews.filter(r => !user || r.username !== user.username).length > 0 && (
+              {otherReviews.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                     <MessageCircle size={16} />
                     站内评论
                   </h3>
                   <div className="space-y-3">
-                    {allReviews.filter(r => !user || r.username !== user.username).map((review) => (
+                    {otherReviews.map((review) => (
                       <div
                         key={review.id}
                         className="p-3 rounded-lg"
@@ -657,9 +724,11 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
                           </div>
                         </div>
                         {review.review && (
-                          <p className="text-xs whitespace-pre-line" style={{ color: 'var(--text-secondary)' }}>
-                            {review.review}
-                          </p>
+                          <ReviewText
+                            text={review.review}
+                            className="text-xs"
+                            style={{ color: 'var(--text-secondary)' }}
+                          />
                         )}
                       </div>
                     ))}
@@ -688,6 +757,47 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
           }}
         />
       )}
-    </div>
+      </div>
+
+      {reviewDiscardAction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="review-discard-title">
+          <div
+            className="w-full max-w-sm rounded-xl p-5"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}
+            onClick={event => event.stopPropagation()}
+          >
+            <h3 id="review-discard-title" className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+              评论内容未保存
+            </h3>
+            <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
+              {reviewDiscardAction === 'close-detail' ? '关闭弹窗将丢失本次评论编辑，确定放弃吗？' : '取消编辑将丢失本次评论编辑，确定放弃吗？'}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReviewDiscardAction(null)}
+                className="h-9 rounded-lg px-4 text-sm transition-opacity hover:opacity-80"
+                style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)', color: 'var(--text-muted)' }}
+              >
+                继续编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = reviewDiscardAction
+                  setReviewDiscardAction(null)
+                  discardReviewChanges()
+                  if (action === 'close-detail') closeDetail()
+                }}
+                className="h-9 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
+              >
+                放弃修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

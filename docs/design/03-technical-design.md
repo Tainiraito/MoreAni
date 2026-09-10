@@ -296,6 +296,7 @@ frontend/src/
 │   ├── layout/             # AppHeader
 │   ├── content/            # ContentCard, ContentGrid, ContentDetailDialog
 │   ├── rating/             # RatingStars, RatingForm
+│   ├── review/             # ReviewText, ReviewEditor
 │   ├── auth/               # AuthDialog（登录+注册合并）
 │   ├── settings/           # SettingsDialog, AvatarPicker
 │   └── ui/                 # shadcn/ui 组件

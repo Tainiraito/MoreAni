@@ -406,7 +406,7 @@ export const api = {
 
   // User
   getUser: (id: number) => request<unknown>(`/user/${id}`),
-  getUserRatings: (id: number) => request<{ items: unknown[] }>(`/user/${id}/ratings`),
+  getUserRatings: (id: number) => request<{ items: unknown[]; total?: number }>(`/user/${id}/ratings`),
   listUsers: () =>
     request<{ items: { id: number; username: string; nickname: string; avatar_id: number; avatar_url?: string | null; avatar_crop?: AvatarCrop | null }[] }>('/user/list'),
   // 上传头像（FormData，不设 Content-Type 让浏览器带 boundary）
