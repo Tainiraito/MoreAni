@@ -24,8 +24,38 @@ ALLOWED_DOMAINS = (
     'upload.wikimedia.org',
     'assets.vercel.com',
 )
-HTTP_PROXY = os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY')
-HTTPS_PROXY = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY')
+
+
+def _configured_proxy(*names: str) -> str | None:
+    """Return the first valid HTTP(S) proxy from the persistent settings."""
+    for name in names:
+        value = os.environ.get(name, '').strip()
+        if value.lower().startswith(('http://', 'https://')):
+            return value
+    return None
+
+
+# Cover URLs are HTTPS in normal Bangumi responses. Prefer the dedicated
+# cover setting so a missing lowercase ``https_proxy`` cannot force direct
+# access from the NAS container.
+HTTP_PROXY = _configured_proxy(
+    'MOREANI_COVER_PROXY',
+    'MOREANI_HTTP_PROXY',
+    'MOREANI_HTTPS_PROXY',
+    'http_proxy',
+    'HTTP_PROXY',
+    'https_proxy',
+    'HTTPS_PROXY',
+)
+HTTPS_PROXY = _configured_proxy(
+    'MOREANI_COVER_PROXY',
+    'MOREANI_HTTPS_PROXY',
+    'MOREANI_HTTP_PROXY',
+    'https_proxy',
+    'HTTPS_PROXY',
+    'http_proxy',
+    'HTTP_PROXY',
+)
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 _clients: dict[str, httpx.AsyncClient] = {}
 _clients_lock = threading.Lock()

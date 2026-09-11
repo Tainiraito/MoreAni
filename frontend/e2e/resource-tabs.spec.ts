@@ -95,7 +95,7 @@ test('资源弹窗默认查询 Mikan，切换后按来源缓存结果', async ({
 
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user, token: 'e2e-token', isGuest: false } })
+  }, { auth: { user, token: 'e2e-token' } })
 
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url())

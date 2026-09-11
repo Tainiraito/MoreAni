@@ -19,7 +19,6 @@ from models import (
     NotificationRead,
     Rating,
     ResourceSubscription,
-    ShareLink,
     User,
     UserContentStatus,
 )
@@ -168,7 +167,7 @@ def delete_user_admin(
     db: Session = Depends(get_db),
     admin: User = Depends(require_role('super_admin')),
 ) -> None:
-    """Delete a user and their ratings / statuses / shares."""
+    """Delete a user and their ratings / statuses."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail='用户不存在')
@@ -187,7 +186,6 @@ def delete_user_admin(
         db.query(ResourceSubscription).filter(ResourceSubscription.user_id == user_id).delete(synchronize_session=False)
         db.query(NotificationRead).filter(NotificationRead.user_id == user_id).delete(synchronize_session=False)
         db.query(Notification).filter(Notification.recipient_user_id == user_id).delete(synchronize_session=False)
-        db.query(ShareLink).filter(ShareLink.created_by == user_id).delete(synchronize_session=False)
         db.query(InviteCode).filter(InviteCode.used_by == user_id).update(
             {InviteCode.used_by: None},
             synchronize_session=False,

@@ -5,7 +5,8 @@ import pytest
 from conftest import auth_cookie
 
 from auth import verify_password
-from models import ContentItem, InviteCode, Rating, ShareLink, User, UserContentStatus
+from main import app
+from models import ContentItem, InviteCode, Rating, User, UserContentStatus
 from routers.v1.admin import delete_user_admin
 from routers.v1.rating import delete_rating
 from scripts import manage_users
@@ -50,8 +51,7 @@ def test_delete_user_transfers_content_and_preserves_other_user_data(db, make_us
     target_status = UserContentStatus(content_id=content.id, user_id=target.id, status='want')
     other_status = UserContentStatus(content_id=content.id, user_id=other.id, status='watched')
     invite = InviteCode(code='USED', max_uses=1, use_count=1, used_by=target.id)
-    share = ShareLink(token='target-share', created_by=target.id)
-    db.add_all([target_rating, other_rating, target_status, other_status, invite, share])
+    db.add_all([target_rating, other_rating, target_status, other_status, invite])
     db.commit()
 
     delete_user_admin(target.id, admin=operator, db=db)
@@ -66,6 +66,12 @@ def test_delete_user_transfers_content_and_preserves_other_user_data(db, make_us
     assert db.query(UserContentStatus).filter_by(user_id=target.id).count() == 0
     assert db.query(InviteCode).filter_by(id=invite.id).one().used_by is None
     assert db.query(User).filter_by(id=target.id).first() is None
+
+
+def test_share_and_guest_routes_are_not_registered():
+    paths = {route.path for route in app.routes}
+
+    assert not any('/share' in path or '/guest' in path for path in paths)
 
 
 def test_private_detail_permissions_and_public_anonymous(client, db, make_user):

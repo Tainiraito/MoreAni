@@ -331,7 +331,10 @@ def get_user_rating_revisions(
     query = (
         db.query(RatingRevision, ContentItem)
         .join(ContentItem, RatingRevision.content_id == ContentItem.id)
-        .filter(RatingRevision.user_id == user_id)
+        .filter(
+            RatingRevision.user_id == user_id,
+            ContentItem.deleted_at.is_(None),
+        )
     )
     if content_id is not None:
         query = query.filter(RatingRevision.content_id == content_id)
@@ -404,6 +407,8 @@ def get_rating_stats_map(db: Session, content_ids: list[int]) -> dict[int, dict]
             ).label('review_count'),
             func.count(case((activity_condition, Rating.id))).label('activity_count'),
         )
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(ContentItem.deleted_at.is_(None))
         .filter(Rating.content_id.in_(content_ids))
         .group_by(Rating.content_id)
         .all()
@@ -428,7 +433,16 @@ def get_user_ratings_map(
     """批量返回当前用户在指定内容上的评分记录。"""
     if user_id is None or not content_ids:
         return {}
-    ratings = db.query(Rating).filter(Rating.user_id == user_id, Rating.content_id.in_(content_ids)).all()
+    ratings = (
+        db.query(Rating)
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(
+            Rating.user_id == user_id,
+            Rating.content_id.in_(content_ids),
+            ContentItem.deleted_at.is_(None),
+        )
+        .all()
+    )
     return {rating.content_id: rating for rating in ratings}
 
 
@@ -447,8 +461,10 @@ def get_recent_reviews_map(
     rows = (
         db.query(Rating, User)
         .join(User, Rating.user_id == User.id)
+        .join(ContentItem, Rating.content_id == ContentItem.id)
         .filter(
             Rating.content_id.in_(content_ids),
+            ContentItem.deleted_at.is_(None),
             (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
         )
         .order_by(Rating.updated_at.desc())
@@ -477,17 +493,13 @@ def get_recent_activity(
     *,
     page: int = 1,
     size: int = 20,
-    guest_mode: bool = False,
 ) -> tuple[list[dict], int]:
-    """Get recent rating activity across all content.
-
-    Returns list of dicts with rating + user + content info.
-    In guest_mode, username/avatar are hidden.
-    """
+    """Get recent rating activity across all content."""
     query = (
         db.query(Rating, User, ContentItem)
         .join(User, Rating.user_id == User.id)
         .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(ContentItem.deleted_at.is_(None))
         .order_by(Rating.updated_at.desc())
     )
 
@@ -507,9 +519,9 @@ def get_recent_activity(
                 'score': rating.score,
                 'recommend': rating.recommend,
                 'review': rating.review,
-                'username': '匿名用户' if guest_mode else user.username,
-                'nickname': '匿名用户' if guest_mode else user.nickname,
-                **avatar_fields(user, anonymous=guest_mode),
+                'username': user.username,
+                'nickname': user.nickname,
+                **avatar_fields(user),
                 'created_at': rating.created_at,
             }
         )
@@ -528,7 +540,10 @@ def get_user_ratings(
     query = (
         db.query(Rating, ContentItem)
         .join(ContentItem, Rating.content_id == ContentItem.id)
-        .filter(Rating.user_id == user_id)
+        .filter(
+            Rating.user_id == user_id,
+            ContentItem.deleted_at.is_(None),
+        )
         .order_by(Rating.created_at.desc())
     )
 
@@ -568,8 +583,10 @@ def get_content_ratings(
     query = (
         db.query(Rating, User)
         .join(User, Rating.user_id == User.id)
+        .join(ContentItem, Rating.content_id == ContentItem.id)
         .filter(
             Rating.content_id == content_id,
+            ContentItem.deleted_at.is_(None),
             # 有评分或写了评论都展示（score=0 的只评论用户不被过滤掉）
             (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
         )

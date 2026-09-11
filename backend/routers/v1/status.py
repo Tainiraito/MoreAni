@@ -99,7 +99,10 @@ def list_my_status(
     records = (
         db.query(UserContentStatus, ContentItem)
         .join(ContentItem, UserContentStatus.content_id == ContentItem.id)
-        .filter(UserContentStatus.user_id == user.id)
+        .filter(
+            UserContentStatus.user_id == user.id,
+            ContentItem.deleted_at.is_(None),
+        )
         .order_by(UserContentStatus.updated_at.desc())
         .all()
     )

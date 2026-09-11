@@ -39,7 +39,7 @@ function notificationResponse(unreadCount = 1): NotificationListResponse {
 
 describe('notification-store 刷新策略', () => {
   afterEach(() => {
-    useAuthStore.setState({ user: null, token: null, isGuest: false })
+    useAuthStore.setState({ user: null, token: null })
     useNotificationStore.setState({
       open: false,
       filter: 'public',
@@ -57,7 +57,7 @@ describe('notification-store 刷新策略', () => {
   })
 
   it('打开面板时强制刷新通知列表，不使用短期缓存', async () => {
-    useAuthStore.setState({ user: { ...user, id: 902 }, token: 'notification-test-token', isGuest: false })
+    useAuthStore.setState({ user: { ...user, id: 902 }, token: 'notification-test-token' })
     const listNotifications = vi.spyOn(api, 'listNotifications').mockResolvedValue(notificationResponse())
     vi.spyOn(api, 'getNotificationUnreadCount').mockResolvedValue({ total: 1, public: 0, private: 1 })
     vi.spyOn(api, 'refreshNotifications').mockResolvedValue({ created: 0 })
@@ -71,7 +71,7 @@ describe('notification-store 刷新策略', () => {
   })
 
   it('面板打开时未读数量变化会同步刷新当前列表', async () => {
-    useAuthStore.setState({ user, token: 'notification-test-token', isGuest: false })
+    useAuthStore.setState({ user, token: 'notification-test-token' })
     const listNotifications = vi.spyOn(api, 'listNotifications').mockResolvedValue(notificationResponse())
     vi.spyOn(api, 'getNotificationUnreadCount').mockResolvedValue({ total: 1, public: 0, private: 1 })
 

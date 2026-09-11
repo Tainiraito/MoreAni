@@ -4,6 +4,7 @@ from typing import ClassVar
 
 import httpx
 
+from routers.v1 import proxy
 from services import covers, mikan
 
 
@@ -75,6 +76,14 @@ def test_cover_download_falls_back_to_direct_after_proxy_failure(monkeypatch):
         'http://127.0.0.1:7890',
         None,
     ]
+
+
+def test_image_proxy_prefers_dedicated_cover_proxy(monkeypatch):
+    """HTTPS image requests use the persistent cover proxy setting."""
+    monkeypatch.setenv('MOREANI_COVER_PROXY', 'http://127.0.0.1:7890')
+    monkeypatch.setenv('https_proxy', '')
+
+    assert proxy._configured_proxy('MOREANI_COVER_PROXY', 'https_proxy') == 'http://127.0.0.1:7890'
 
 
 class FakeMikanResponse:

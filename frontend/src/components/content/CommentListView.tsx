@@ -3,6 +3,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { CoverImage } from '@/components/ui/CoverImage'
 import type { ContentItem } from '@/types'
 import { LoadingIcon } from '@/components/ui/loading-icon'
+import { ReviewText } from '@/components/review/ReviewText'
 
 interface CommentListViewProps {
   items: ContentItem[]
@@ -139,7 +140,8 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                         )}
                       </div>
                       {r.review && (
-                        <p
+                        <ReviewText
+                          text={r.review}
                           className="text-xs mt-0.5 leading-relaxed break-words"
                           style={{
                             color: 'var(--text-secondary)',
@@ -149,9 +151,7 @@ export function CommentListView({ items, onSelect, isFavorited, onToggleFavorite
                             WebkitBoxOrient: activities.length <= 2 ? undefined : 'vertical',
                             overflow: 'hidden',
                           }}
-                        >
-                          {r.review}
-                        </p>
+                        />
                       )}
                     </div>
                   ))}

@@ -217,6 +217,7 @@ async def _fetch_json(
     *,
     operation: str,
     params: dict[str, Any] | None = None,
+    json_body: dict[str, Any] | None = None,
     cache_state: str = 'bypass',
 ) -> Any:
     """Fetch JSON through the configured routes and shared HTTP clients."""
@@ -226,7 +227,10 @@ async def _fetch_json(
         started = time.perf_counter()
         try:
             client = _client_for(proxy)
-            response = await client.get(url, params=params, headers=HEADERS)
+            if json_body is None:
+                response = await client.get(url, params=params, headers=HEADERS)
+            else:
+                response = await client.post(url, params=params, json=json_body, headers=HEADERS)
             if response.status_code == 404:
                 raise BangumiNotFoundError(f'Bangumi subject not found during {operation}')
             response.raise_for_status()
@@ -264,6 +268,7 @@ async def _fetch_cached_json(
     params: dict[str, Any] | None,
     ttl_seconds: float,
     validator: Callable[[Any], bool],
+    json_body: dict[str, Any] | None = None,
 ) -> Any:
     """Read a TTL cache entry or share one upstream JSON request."""
     cache_hit, value = _cache_get(cache_key)
@@ -278,6 +283,7 @@ async def _fetch_cached_json(
             url,
             operation=operation,
             params=params,
+            json_body=json_body,
             cache_state='miss',
         )
 
@@ -306,13 +312,16 @@ async def search_subjects(
     subject_type: int = 2,
     limit: int = 10,
 ) -> dict[str, Any]:
-    """Search Bangumi for subjects with a short-lived normalized cache."""
+    """Search Bangumi subjects through the current v0 search API."""
     normalized_keyword = keyword.strip().casefold()
-    url = f'{BANGUMI_API_BASE}/search/subject/{normalized_keyword}'
+    url = f'{BANGUMI_API_BASE}/v0/search/subjects'
     params = {
-        'responseGroup': 'large',
-        'max_results': limit,
-        'type': subject_type,
+        'limit': limit,
+        'offset': 0,
+    }
+    json_body = {
+        'keyword': normalized_keyword,
+        'filter': {'type': [subject_type]},
     }
 
     try:
@@ -322,6 +331,7 @@ async def search_subjects(
             operation='search',
             url=url,
             params=params,
+            json_body=json_body,
             ttl_seconds=SEARCH_CACHE_SECONDS,
             validator=lambda value: isinstance(value, dict),
         )
@@ -331,7 +341,16 @@ async def search_subjects(
         raise BangumiError('Bangumi search response format is invalid')
 
     results: list[dict[str, Any]] = []
-    for item in data.get('list', []):
+    raw_items = data.get('data')
+    if not isinstance(raw_items, list):
+        # Keep compatibility with the legacy endpoint response while rolling
+        # out the v0 search endpoint across all running workers.
+        raw_items = data.get('list', [])
+    if not isinstance(raw_items, list):
+        raise BangumiError('Bangumi search items format is invalid')
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
         images = item.get('images', {}) or {}
         rating_info = item.get('rating', {}) or {}
         results.append(
@@ -339,17 +358,17 @@ async def search_subjects(
                 'bgm_id': item.get('id', 0),
                 'name': item.get('name', ''),
                 'name_cn': item.get('name_cn', ''),
-                'cover_url': images.get('large', '') or images.get('common', ''),
+                'cover_url': images.get('large', '') or images.get('common', '') or item.get('image', ''),
                 'rating': rating_info.get('score', 0),
                 'tags': [t.get('name', '') for t in (item.get('tags', []) or [])],
-                'eps': item.get('eps_count', 0) or item.get('eps', 0),
-                'air_date': item.get('air_date', ''),
+                'eps': item.get('total_episodes', 0) or item.get('eps_count', 0) or item.get('eps', 0),
+                'air_date': item.get('date', '') or item.get('air_date', ''),
                 'platform': item.get('platform', ''),
                 'summary': item.get('summary', ''),
             }
         )
 
-    return {'total': data.get('results', len(results)), 'items': results}
+    return {'total': data.get('total', data.get('results', len(results))), 'items': results}
 
 
 async def _get_subject_payload(

@@ -105,10 +105,8 @@ def normalize_gif_loop(data: bytes) -> bytes:
     return bytes(normalized[:insert_at] + _GIF_LOOP_EXTENSION + normalized[insert_at:])
 
 
-def avatar_fields(user: Any, *, anonymous: bool = False) -> dict[str, Any]:
+def avatar_fields(user: Any) -> dict[str, Any]:
     """Return the avatar fields shared by user and rating responses."""
-    if anonymous:
-        return {'avatar_id': 0, 'avatar_url': None, 'avatar_crop': None}
     return {
         'avatar_id': user.avatar_id,
         'avatar_url': user.avatar_url,

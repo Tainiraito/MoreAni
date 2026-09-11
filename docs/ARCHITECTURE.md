@@ -3,6 +3,8 @@
 > **生成日期**: 2026-08-15
 > **工具**: CodeGraph 自动分析
 
+> **当前版本范围**：本版本不提供分享链接或游客模式，以下架构清单以当前源码为准。
+
 ---
 
 ## 项目概览
@@ -52,7 +54,7 @@ backend/main.py
 | 路由文件 | 前缀 | 功能 |
 |----------|------|------|
 | auth.py | /auth | 登录/注册/用户信息/修改密码/头像 |
-| content.py | /content | 内容 CRUD/列表/搜索/随机/分享链接 |
+| content.py | /content | 内容 CRUD/列表/搜索/随机 |
 | rating.py | /rating | 评分 CRUD/最近动态/历史记录 |
 | status.py | /status | 观看状态设置/清除/列表 |
 | tag.py | /tag | 标签创建/搜索 |
@@ -154,7 +156,6 @@ function secureUrl(url: string): string {
 | content_tags | 内容-标签关联 | content_id, tag_id |
 | ratings | 评分表 | score(0-100), recommend(0-100), review |
 | user_content_status | 观看状态 | status(want/watching/watched/dropped) |
-| share_links | 分享链接 | token, expires_at, view_count |
 
 ---
 
@@ -232,6 +233,7 @@ MoreAni/
 │       │   ├── layout/      # 布局组件
 │       │   ├── content/     # 内容组件
 │       │   ├── rating/      # 评分组件
+│       │   ├── review/      # 评论解析与富文本编辑
 │       │   ├── auth/        # 认证组件
 │       │   └── ui/          # 基础 UI 组件
 │       ├── stores/          # Zustand 状态

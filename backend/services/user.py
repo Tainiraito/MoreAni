@@ -104,31 +104,60 @@ def update_nickname(db: Session, user: User, nickname: str) -> User:
 
 def get_user_stats(db: Session, user_id: int) -> dict:
     """Get user stats: rating_count, review_count, favorite_count, avg_score, content_count."""
-    rating_count = (db.query(func.count(Rating.id)).filter(Rating.user_id == user_id, Rating.score > 0).scalar()) or 0
+    rating_count = (
+        db.query(func.count(Rating.id))
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(
+            Rating.user_id == user_id,
+            Rating.score > 0,
+            ContentItem.deleted_at.is_(None),
+        )
+        .scalar()
+    ) or 0
 
     review_count = (
         db.query(func.count(Rating.id))
+        .join(ContentItem, Rating.content_id == ContentItem.id)
         .filter(
             Rating.user_id == user_id,
             Rating.review.isnot(None),
             Rating.review != '',
+            ContentItem.deleted_at.is_(None),
         )
         .scalar()
     ) or 0
 
     favorite_count = (
         db.query(func.count(UserContentStatus.id))
+        .join(ContentItem, UserContentStatus.content_id == ContentItem.id)
         .filter(
             UserContentStatus.user_id == user_id,
             UserContentStatus.status == 'want',
+            ContentItem.deleted_at.is_(None),
         )
         .scalar()
     ) or 0
 
-    avg_score = db.query(func.avg(Rating.score)).filter(Rating.user_id == user_id, Rating.score > 0).scalar()
+    avg_score = (
+        db.query(func.avg(Rating.score))
+        .join(ContentItem, Rating.content_id == ContentItem.id)
+        .filter(
+            Rating.user_id == user_id,
+            Rating.score > 0,
+            ContentItem.deleted_at.is_(None),
+        )
+        .scalar()
+    )
     avg_score = round(float(avg_score), 1) if avg_score else None
 
-    content_count = (db.query(func.count(ContentItem.id)).filter(ContentItem.created_by == user_id).scalar()) or 0
+    content_count = (
+        db.query(func.count(ContentItem.id))
+        .filter(
+            ContentItem.created_by == user_id,
+            ContentItem.deleted_at.is_(None),
+        )
+        .scalar()
+    ) or 0
 
     return {
         'rating_count': rating_count,
@@ -153,7 +182,10 @@ def get_user_activity(
     rating_rows = (
         db.query(Rating, ContentItem)
         .join(ContentItem, Rating.content_id == ContentItem.id)
-        .filter(Rating.user_id == user_id)
+        .filter(
+            Rating.user_id == user_id,
+            ContentItem.deleted_at.is_(None),
+        )
         .all()
     )
 
@@ -164,6 +196,7 @@ def get_user_activity(
         .filter(
             UserContentStatus.user_id == user_id,
             UserContentStatus.status == 'want',
+            ContentItem.deleted_at.is_(None),
         )
         .all()
     )

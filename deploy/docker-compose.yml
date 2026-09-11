@@ -1,7 +1,7 @@
 services:
   moreani-app:
     # 预构建镜像（WSL2 构建后 docker save/load 传输，NAS 无法访问 Docker Hub 构建）
-    image: moreani-app:latest
+    image: moreani-app:${MOREANI_IMAGE_TAG:?请在 deploy/.env 中设置 MOREANI_IMAGE_TAG}
     container_name: moreani-app
     restart: unless-stopped
     ports:
@@ -46,9 +46,10 @@ services:
       # Bangumi 封面保存和周历预热：优先走显式代理，失败后回退直连
       - MOREANI_COVER_PROXY=${MOREANI_COVER_PROXY:-}
       - MOREANI_COVER_REQUEST_ORDER=${MOREANI_COVER_REQUEST_ORDER:-proxy_first}
-      # 图片代理：显式代理地址由部署环境提供，不读取 ALL_PROXY
-      - http_proxy=${MOREANI_HTTP_PROXY:-}
-      - https_proxy=${MOREANI_HTTPS_PROXY:-}
+      # 图片代理：从持久化 deploy/.env 注入；四项可使用同一个 HTTP 代理。
+      # 两个大小写环境变量同时设置，避免 HTTPS 封面误走直连。
+      - http_proxy=${MOREANI_HTTP_PROXY:-${MOREANI_HTTPS_PROXY:-${MOREANI_COVER_PROXY:-}}}
+      - https_proxy=${MOREANI_HTTPS_PROXY:-${MOREANI_HTTP_PROXY:-${MOREANI_COVER_PROXY:-}}}
     volumes:
       - ../data:/app/data
       - ../data/nginx-cache:/var/cache/nginx/moreani
@@ -58,7 +59,7 @@ services:
       - moreani
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: ${CLOUDFLARED_IMAGE:?请在 deploy/.env 中设置 CLOUDFLARED_IMAGE}
     container_name: moreani-tunnel
     restart: unless-stopped
     command: tunnel run --protocol http2

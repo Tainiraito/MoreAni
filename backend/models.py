@@ -246,19 +246,6 @@ class ResourceSubscription(Base):
     )
 
 
-class ShareLink(Base):
-    """Share link token for guest access."""
-
-    __tablename__ = 'share_links'
-
-    id = Column(Integer, primary_key=True, index=True)
-    token = Column(String(32), unique=True, nullable=False, index=True)
-    created_by = Column(Integer, ForeignKey('users.id'))
-    expires_at = Column(DateTime, nullable=True)
-    view_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=_utcnow)
-
-
 class Notification(Base):
     """Public announcement or private user notification."""
 

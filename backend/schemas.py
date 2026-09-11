@@ -260,25 +260,6 @@ class RecommendationResponse(BaseModel):
     items: list[ContentItemResponse]
 
 
-class ShareLinkCreate(BaseModel):
-    """Create share link request body."""
-
-    expires_at: datetime | None = None
-
-
-class ShareLinkResponse(BaseModel):
-    """Share link response."""
-
-    id: int
-    token: str
-    url: str
-    expires_at: datetime | None = None
-    view_count: int = 0
-    created_at: datetime
-
-    model_config = {'from_attributes': True}
-
-
 # =============================================================================
 # Rating schemas
 # =============================================================================

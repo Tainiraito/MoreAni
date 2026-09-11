@@ -1,2 +1,2 @@
--r requirements.txt
-pytest>=8.0.0
+-r requirements.lock
+pytest==9.1.1
