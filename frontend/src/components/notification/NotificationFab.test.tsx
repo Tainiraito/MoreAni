@@ -19,13 +19,13 @@ const user: User = {
 describe('NotificationCenter 前台刷新', () => {
   afterEach(() => {
     cleanup()
-    useAuthStore.setState({ user: null, token: null, isGuest: false })
+    useAuthStore.setState({ user: null, token: null })
     useNotificationStore.setState({ open: false, filter: 'public', unreadCount: 0, publicUnread: 0, privateUnread: 0 })
     vi.restoreAllMocks()
   })
 
   it('窗口重新获得焦点时立即刷新未读数量', async () => {
-    useAuthStore.setState({ user, token: 'notification-focus-token', isGuest: false })
+    useAuthStore.setState({ user, token: 'notification-focus-token' })
     const getNotificationUnreadCount = vi.spyOn(api, 'getNotificationUnreadCount').mockResolvedValue({ total: 0, public: 0, private: 0 })
 
     render(<NotificationCenter />)

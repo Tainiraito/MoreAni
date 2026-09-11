@@ -3,8 +3,6 @@ import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { HomePage } from '@/pages/HomePage'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { ContentDetailDialog } from '@/components/content/ContentDetailDialog'
-import { AuthDialog } from '@/components/auth/AuthDialog'
 import { ToastContainer } from '@/components/ui/toast'
 import { AdminDialog } from '@/components/admin/admin-dialog-loader'
 import { useAuthStore } from '@/stores/auth-store'
@@ -22,6 +20,8 @@ const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => 
 const RatingCalibrationPage = lazy(() => import('@/pages/RatingCalibrationPage').then(module => ({ default: module.RatingCalibrationPage })))
 const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
 const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
+const ContentDetailDialog = lazy(() => import('@/components/content/ContentDetailDialog').then(module => ({ default: module.ContentDetailDialog })))
+const AuthDialog = lazy(() => import('@/components/auth/AuthDialog').then(module => ({ default: module.AuthDialog })))
 function AdminDialogLoading() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }} role="status" aria-label="后台管理加载中">
@@ -133,6 +133,7 @@ function AuthValidator({ children }: { children: React.ReactNode }) {
 function GlobalDialogs() {
   const queryClient = useQueryClient()
   const {
+    detailOpen,
     detailContentId,
     addAnimeOpen,
     addAnimePreset,
@@ -162,11 +163,15 @@ function GlobalDialogs() {
 
   return (
     <>
-      <ContentDetailDialog
-        isFavorited={detailContentId ? isFavorited(detailContentId) : false}
-        isFavoritePending={detailContentId ? isFavoritePending(detailContentId) : false}
-        onToggleFavorite={toggleFavorite}
-      />
+      <Suspense fallback={null}>
+        {detailOpen && (
+          <ContentDetailDialog
+            isFavorited={detailContentId ? isFavorited(detailContentId) : false}
+            isFavoritePending={detailContentId ? isFavoritePending(detailContentId) : false}
+            onToggleFavorite={toggleFavorite}
+          />
+        )}
+      </Suspense>
       <Suspense fallback={null}>
         {addAnimeOpen && (
           <ContentFormDialog
@@ -191,6 +196,8 @@ function GlobalDialogs() {
 }
 
 export default function App() {
+  const authOpen = useUIStore(state => state.authOpen)
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -207,7 +214,11 @@ export default function App() {
 
           {/* Global Dialogs */}
           <GlobalDialogs />
-          <AuthDialog />
+          {authOpen && (
+            <Suspense fallback={null}>
+              <AuthDialog />
+            </Suspense>
+          )}
           <ToastContainer />
         </AuthValidator>
       </BrowserRouter>

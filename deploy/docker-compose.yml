@@ -1,7 +1,7 @@
 services:
   moreani-app:
     # 预构建镜像（WSL2 构建后 docker save/load 传输，NAS 无法访问 Docker Hub 构建）
-    image: moreani-app:latest
+    image: moreani-app:${MOREANI_IMAGE_TAG:?请在 deploy/.env 中设置 MOREANI_IMAGE_TAG}
     container_name: moreani-app
     restart: unless-stopped
     ports:
@@ -59,7 +59,7 @@ services:
       - moreani
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: ${CLOUDFLARED_IMAGE:?请在 deploy/.env 中设置 CLOUDFLARED_IMAGE}
     container_name: moreani-tunnel
     restart: unless-stopped
     command: tunnel run --protocol http2

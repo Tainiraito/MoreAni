@@ -137,11 +137,8 @@ def get_recent_activity(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ) -> dict:
-    """Get recent rating activity across all content.
-
-    Anonymous for guests (no username).
-    """
-    items, total = rating_svc.get_recent_activity(db, page=page, size=size, guest_mode=False)
+    """Get recent rating activity across all content."""
+    items, total = rating_svc.get_recent_activity(db, page=page, size=size)
     return {'items': items, 'total': total}
 
 

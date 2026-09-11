@@ -45,7 +45,7 @@ test('用户信息弹窗展示本人四个统计区域并可跳转全站分析',
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-theme', 'dark')
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user: currentUser, token: 'profile-analytics-token', isGuest: false } })
+  }, { auth: { user: currentUser, token: 'profile-analytics-token' } })
   if (testInfo.project.name === 'chromium') {
     await page.setViewportSize({ width: 1600, height: 1000 })
   }

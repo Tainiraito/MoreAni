@@ -4,6 +4,8 @@
 > **日期**: 2026-08-14
 > **状态**: 🔄 待确认
 
+> **当前版本范围**：分享链接、游客会话及其匿名化方案已取消，不属于当前实现；本文不应据此新增 `/share` 或 `/guest` 接口。
+
 ---
 
 ## 1. 技术栈
@@ -160,19 +162,6 @@ CREATE TABLE invite_codes (
 );
 ```
 
-#### share_links
-
-```sql
-CREATE TABLE share_links (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    token      VARCHAR(32) NOT NULL UNIQUE,
-    created_by INTEGER     REFERENCES users(id),
-    expires_at DATETIME    DEFAULT NULL,
-    view_count INTEGER     DEFAULT 0,
-    created_at DATETIME    DEFAULT CURRENT_TIMESTAMP
-);
-```
-
 ### 2.3 索引
 
 ```sql
@@ -208,7 +197,6 @@ CREATE INDEX idx_tags_name ON tags(name);
 | POST | /content | 创建 |
 | PUT | /content/:id | 更新 |
 | DELETE | /content/:id | 删除 |
-| POST | /content/:id/share | 创建分享链接 |
 
 **列表参数**：`?type=&status=&tag=&q=&sort=&page=&size=`
 
@@ -243,15 +231,7 @@ CREATE INDEX idx_tags_name ON tags(name);
 | GET | /user/:id | 公开信息 |
 | GET | /user/:id/ratings | 评分历史 |
 
-### 3.7 分享链接（游客）
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | /guest/:token | 获取临时权限 |
-| GET | /guest/:token/content | 浏览内容 |
-| GET | /guest/:token/search | 搜索内容 |
-
-### 3.8 Bangumi
+### 3.7 Bangumi
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -352,7 +332,6 @@ JWT + httpOnly cookie，中间件校验。
 | 角色 | 权限 |
 |------|------|
 | 未登录 | 只看到登录页 |
-| 游客（分享链接） | 全站只读（浏览+搜索） |
 | 普通用户 | 全部读写 |
 | 管理员 | 全部 + 用户管理 |
 

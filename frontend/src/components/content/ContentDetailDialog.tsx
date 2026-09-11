@@ -81,8 +81,21 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
   const [editing, setEditing] = useState(false)
   const [reviewDiscardAction, setReviewDiscardAction] = useState<ReviewDiscardAction | null>(null)
   const [resourceOpen, setResourceOpen] = useState(false)
+  const [readyDetailKey, setReadyDetailKey] = useState<string | null>(null)
   const previousDetailKey = useRef<string | null>(null)
   const previousLocationRef = useRef(`${location.pathname}${location.search}${location.hash}`)
+
+  const currentDetailKey = detailOpen && detailContentId !== null
+    ? `${detailContentId}:${userId ?? 'guest'}`
+    : null
+
+  useEffect(() => {
+    setReadyDetailKey(null)
+    if (!currentDetailKey) return
+
+    const timer = window.setTimeout(() => setReadyDetailKey(currentDetailKey), 0)
+    return () => window.clearTimeout(timer)
+  }, [currentDetailKey])
 
   const reviewEditorVisible = !myRatingId || editing
   const reviewDirty = reviewEditorVisible && reviewText !== savedReviewText
@@ -118,7 +131,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
 
   const detailQuery = useQuery<ContentDetailData>({
     queryKey: contentDetailQueryKey(detailContentId, userId),
-    enabled: detailOpen && detailContentId !== null,
+    enabled: currentDetailKey !== null && readyDetailKey === currentDetailKey,
     queryFn: async ({ signal }) => {
       const contentId = detailContentId
       if (contentId === null) throw new Error('缺少内容 ID')

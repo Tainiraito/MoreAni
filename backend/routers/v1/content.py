@@ -1,12 +1,10 @@
-"""Content router — CRUD, list, search, random, share."""
-
-import secrets
+"""Content router — CRUD, list, search, and random selection."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_current_user_optional, get_db
-from models import ContentItem, ShareLink, User
+from models import ContentItem, User
 from schemas import (
     AnimeResourceListResponse,
     AnimeResourcePagination,
@@ -17,8 +15,6 @@ from schemas import (
     ContentListResponse,
     RecentReview,
     RecommendationResponse,
-    ShareLinkCreate,
-    ShareLinkResponse,
     TagResponse,
 )
 from services import animegarden  # noqa: F401 - kept for existing test/integration monkeypatches
@@ -390,41 +386,3 @@ def delete_content(
         raise HTTPException(status_code=403, detail='No permission to delete this content')
 
     content_svc.delete_content(db, item)
-
-
-@router.post('/{content_id}/share', response_model=ShareLinkResponse)
-def create_share_link(
-    content_id: int,
-    body: ShareLinkCreate,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> ShareLinkResponse:
-    """Create a share link for a content item.
-
-    Returns a token-based URL for guest access.
-    """
-    item = content_svc.get_content_by_id(db, content_id)
-    if not item:
-        raise HTTPException(status_code=404, detail='Content not found')
-    # 仅创建者或 admin 可创建分享链接
-    if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
-        raise HTTPException(status_code=403, detail='No permission to share this content')
-
-    token = secrets.token_urlsafe(24)[:32]
-    link = ShareLink(
-        token=token,
-        created_by=user.id,
-        expires_at=body.expires_at,
-    )
-    db.add(link)
-    db.commit()
-    db.refresh(link)
-
-    return ShareLinkResponse(
-        id=link.id,
-        token=link.token,
-        url=f'/guest/{link.token}',
-        expires_at=link.expires_at,
-        view_count=link.view_count,
-        created_at=link.created_at,
-    )

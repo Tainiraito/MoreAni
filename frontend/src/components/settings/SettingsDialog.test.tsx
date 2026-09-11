@@ -36,7 +36,7 @@ function LocationProbe() {
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
-    useAuthStore.setState({ user: currentUser, token: 'token', isGuest: false })
+    useAuthStore.setState({ user: currentUser, token: 'token' })
     useUIStore.setState({ settingsOpen: true })
     vi.mocked(api.getUser).mockResolvedValue({
       rating_count: 3,
@@ -51,7 +51,7 @@ describe('SettingsDialog', () => {
     cleanup()
     vi.clearAllMocks()
     useUIStore.setState({ settingsOpen: false })
-    useAuthStore.setState({ user: null, token: null, isGuest: false })
+    useAuthStore.setState({ user: null, token: null })
   })
 
   it('keeps account details on the left and opens the global analytics route', async () => {

@@ -50,7 +50,7 @@ test('未关联周历条目可以添加番剧或前往 Bangumi', async ({ page }
 
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user, token: 'calendar-e2e-token', isGuest: false } })
+  }, { auth: { user, token: 'calendar-e2e-token' } })
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request()

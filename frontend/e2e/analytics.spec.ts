@@ -46,7 +46,7 @@ test('统计分析支持区间恢复、稳定拖动、标签联动、URL 状态�
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-theme', 'dark')
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user: currentUser, token: 'analytics-e2e-token', isGuest: false } })
+  }, { auth: { user: currentUser, token: 'analytics-e2e-token' } })
   if (testInfo.project.name === 'chromium') {
     await page.setViewportSize({ width: 1180, height: 900 })
   }

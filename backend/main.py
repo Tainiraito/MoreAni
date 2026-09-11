@@ -17,6 +17,7 @@ from starlette.types import Scope
 
 from database import Base, SessionLocal, engine
 from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
+from migrations import Migration, run_pending_migrations
 from models import ContentItem, Rating, RatingRevision, ResourceSubscription
 from routers.v1.admin import router as admin_router
 from routers.v1.airing import router as airing_router
@@ -41,15 +42,9 @@ from services.notifications import run_worker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup + lightweight migrations."""
+    """Create the development schema and apply recorded migrations on startup."""
     Base.metadata.create_all(bind=engine)
-    _migrate_rating_revisions()
-    _migrate_legacy_anime_movies()
-    _migrate_invite_codes_expires()
-    _migrate_users_avatar_crop()
-    _migrate_resource_subscriptions()
-    _migrate_legacy_cover_assets()
-    _migrate_airing_calendar_failure_tracking()
+    run_pending_migrations(engine, MIGRATIONS)
     worker_task = None
     airing_task = None
     stop_event = asyncio.Event()
@@ -86,7 +81,7 @@ def _migrate_invite_codes_expires() -> None:
                 conn.commit()
                 print('[migrate] invite_codes.expires_at 已添加')
     except Exception as e:  # noqa: BLE001
-        print(f'[migrate] invite_codes 迁移跳过: {e}')
+        raise RuntimeError(f'[migrate] invite_codes 迁移失败: {e}') from e
 
     # users.avatar_url（头像上传）
     try:
@@ -99,7 +94,7 @@ def _migrate_invite_codes_expires() -> None:
                 conn.commit()
                 print('[migrate] users.avatar_url 已添加')
     except Exception as e:  # noqa: BLE001
-        print(f'[migrate] users.avatar_url 迁移跳过: {e}')
+        raise RuntimeError(f'[migrate] users.avatar_url 迁移失败: {e}') from e
 
 
 def _migrate_users_avatar_crop() -> None:
@@ -114,7 +109,7 @@ def _migrate_users_avatar_crop() -> None:
                 conn.commit()
                 print('[migrate] users.avatar_crop 已添加')
     except Exception as e:  # noqa: BLE001
-        print(f'[migrate] users.avatar_crop 迁移跳过: {e}')
+        raise RuntimeError(f'[migrate] users.avatar_crop 迁移失败: {e}') from e
 
 
 def _migrate_legacy_anime_movies() -> None:
@@ -144,7 +139,7 @@ def _migrate_legacy_anime_movies() -> None:
                 db.commit()
             print(f'[migrate] legacy anime_movie 条目: {migrated}')
     except Exception as exc:  # noqa: BLE001
-        print(f'[migrate] anime_movie 迁移跳过: {exc}')
+        raise RuntimeError(f'[migrate] anime_movie 迁移失败: {exc}') from exc
 
 
 def _migrate_resource_subscriptions() -> None:
@@ -193,7 +188,7 @@ def _migrate_resource_subscriptions() -> None:
             conn.exec_driver_sql('PRAGMA foreign_keys=ON')
         print('[migrate] resource_subscriptions 已升级为多资源源订阅表')
     except Exception as exc:  # noqa: BLE001
-        print(f'[migrate] resource_subscriptions 迁移跳过: {exc}')
+        raise RuntimeError(f'[migrate] resource_subscriptions 迁移失败: {exc}') from exc
 
 
 def _migrate_legacy_cover_assets() -> None:
@@ -203,7 +198,7 @@ def _migrate_legacy_cover_assets() -> None:
             migrated = covers_svc.register_legacy_local_covers(db)
             print(f'[migrate] legacy cover assets: {migrated}')
     except Exception as exc:  # noqa: BLE001
-        print(f'[migrate] cover_assets 迁移跳过: {exc}')
+        raise RuntimeError(f'[migrate] cover_assets 迁移失败: {exc}') from exc
 
 
 def _migrate_airing_calendar_failure_tracking() -> None:
@@ -226,7 +221,7 @@ def _migrate_airing_calendar_failure_tracking() -> None:
                         text(f'ALTER TABLE airing_calendar_sync_state ADD COLUMN {column} {definition}'),
                     )
     except Exception as exc:  # noqa: BLE001
-        print(f'[migrate] airing calendar failure tracking migration skipped: {exc}')
+        raise RuntimeError(f'[migrate] airing calendar failure tracking 迁移失败: {exc}') from exc
 
 
 def _migrate_rating_revisions() -> None:
@@ -256,7 +251,26 @@ def _migrate_rating_revisions() -> None:
                 db.commit()
                 print(f'[migrate] rating revisions baseline snapshots: {len(snapshots)}')
     except Exception as exc:  # noqa: BLE001
-        print(f'[migrate] rating revisions migration skipped: {exc}')
+        raise RuntimeError(f'[migrate] rating revisions 迁移失败: {exc}') from exc
+
+
+MIGRATIONS = (
+    Migration(
+        '0001-invite-codes-expires-and-user-avatar',
+        '补充邀请有效期和用户头像地址字段',
+        _migrate_invite_codes_expires,
+    ),
+    Migration('0002-user-avatar-crop', '补充用户头像裁剪字段', _migrate_users_avatar_crop),
+    Migration('0003-legacy-anime-movie-type', '迁移旧番剧电影内容类型', _migrate_legacy_anime_movies),
+    Migration('0004-resource-subscriptions-source', '升级资源订阅为多来源结构', _migrate_resource_subscriptions),
+    Migration('0005-legacy-cover-assets', '登记历史本地封面资源', _migrate_legacy_cover_assets),
+    Migration(
+        '0006-airing-calendar-failure-tracking',
+        '补充周历同步失败追踪字段',
+        _migrate_airing_calendar_failure_tracking,
+    ),
+    Migration('0007-rating-revision-baseline', '为历史评分建立修订基线', _migrate_rating_revisions),
+)
 
 
 app = FastAPI(

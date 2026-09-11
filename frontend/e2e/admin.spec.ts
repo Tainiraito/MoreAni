@@ -16,7 +16,7 @@ test('首次打开后台管理不刷新页面并正确显示公告内容', async
 
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user, token: 'admin-e2e-token', isGuest: false } })
+  }, { auth: { user, token: 'admin-e2e-token' } })
 
   await page.route('**/api/v1/**', async route => {
     const url = new URL(route.request().url())

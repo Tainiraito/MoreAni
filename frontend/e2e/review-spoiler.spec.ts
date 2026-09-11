@@ -90,7 +90,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
     window.localStorage.setItem('moreani-view', 'list')
-  }, { auth: { user: viewer, token: 'review-e2e-token', isGuest: false } })
+  }, { auth: { user: viewer, token: 'review-e2e-token' } })
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request()
@@ -363,7 +363,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
 
   const longBoldReview = `**${'a'.repeat(176)}**`
   await editor.fill('')
-  await editor.pressSequentially(longBoldReview)
+  await editor.fill(longBoldReview)
   await expect(editor.locator('[data-review-format="bold"]')).toHaveText(/a{176}/)
   const boldMetrics = await editor.evaluate(element => ({
     scrollHeight: element.scrollHeight,
@@ -374,7 +374,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
 
   const longChineseReview = '中文'.repeat(120)
   await editor.fill('')
-  await editor.pressSequentially(longChineseReview)
+  await editor.fill(longChineseReview)
   expect(await editor.evaluate(element => element.textContent)).toBe(longChineseReview)
 
   await editor.fill('评论')

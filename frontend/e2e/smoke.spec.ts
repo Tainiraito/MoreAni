@@ -152,7 +152,7 @@ test('私人番剧动态通知可以打开对应详情', async ({ page }) => {
 
   await page.addInitScript(({ auth }) => {
     window.localStorage.setItem('moreani-auth', JSON.stringify({ state: auth, version: 0 }))
-  }, { auth: { user, token: 'activity-e2e-token', isGuest: false } })
+  }, { auth: { user, token: 'activity-e2e-token' } })
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request()
