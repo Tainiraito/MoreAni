@@ -250,8 +250,8 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       // 触发列表刷新；详情数据由上面的查询失效机制更新
       useRefreshStore.getState().triggerRefresh()
       addToast('success', '评分已保存')
-    } catch (err: any) {
-      addToast('error', err.message || '保存失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setSavingRating(false)
     }
@@ -271,7 +271,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       useRefreshStore.getState().triggerRefresh()
       addToast('success', '评分已删除')
     } catch {
-      addToast('error', '删除失败')
+      // 全局 request() 已处理 toast
     } finally {
       setDeletingRating(false)
     }
@@ -300,7 +300,7 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
       const res = await api.getBangumiScore(bgmId)
       setBangumiScore(res.score)
     } catch {
-      addToast('error', '查询失败')
+      // 全局 request() 已处理 toast
     } finally {
       setBangumiLoading(false)
     }
@@ -373,20 +373,24 @@ export function ContentDetailDialog({ isFavorited = false, isFavoritePending = f
           {user && content && (
             <button
               onClick={() => openEditContent(content.id)}
-              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200"
+              disabled={content.created_by !== user.id && user.role !== 'admin' && user.role !== 'super_admin'}
+              className="w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border-line)',
                 color: 'var(--text-muted)',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#FB71A7'
-                e.currentTarget.style.color = '#FB71A7'
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.borderColor = '#FB71A7'
+                  e.currentTarget.style.color = '#FB71A7'
+                }
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = 'var(--border-line)'
                 e.currentTarget.style.color = 'var(--text-muted)'
               }}
+              title={content.created_by !== user.id && user.role !== 'admin' && user.role !== 'super_admin' ? '无权编辑' : '编辑'}
             >
               <Pencil size={14} />
             </button>

@@ -527,8 +527,8 @@ export function AnimeResourceDialog({
         setSubscriptions(previous => [...previous, created])
         useToastStore.getState().addToast('success', `已关注 ${group.name} 的新资源`)
       }
-    } catch (err: any) {
-      useToastStore.getState().addToast('error', err.message || '关注操作失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setTogglingKey(null)
     }

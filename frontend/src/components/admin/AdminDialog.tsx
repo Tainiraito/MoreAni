@@ -150,8 +150,8 @@ function UserManageTab() {
       setUsers(p === 1 ? data.items : prev => [...prev, ...data.items])
       setTotal(data.total)
       setPage(p)
-    } catch (err: any) {
-      useToastStore.getState().addToast('error', err.message || '加载用户失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setLoading(false)
       loadingUsersRef.current = false
@@ -222,9 +222,9 @@ function UserManageTab() {
       useToastStore.getState().addToast('success', `已删除 ${u.nickname}`)
       setConfirmDelete(null)
       loadUsers(1, q)
-    } catch (err: any) {
+    } catch {
       setConfirmDelete(null)
-      useToastStore.getState().addToast('error', err.message || '删除失败')
+      // 全局 request() 已处理 toast
     } finally {
       setDeletingUserId(null)
     }
@@ -408,8 +408,8 @@ function InviteManageTab() {
       setInvites(p === 1 ? data.items : prev => [...prev, ...data.items])
       setTotal(data.total)
       setPage(p)
-    } catch (err: any) {
-      useToastStore.getState().addToast('error', err.message || '加载邀请码失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setLoading(false)
       loadingInvitesRef.current = false
@@ -473,9 +473,9 @@ function InviteManageTab() {
       useToastStore.getState().addToast('success', `已删除邀请码 ${i.code}`)
       setConfirmDelete(null)
       loadInvites(1, q)
-    } catch (err: any) {
+    } catch {
       setConfirmDelete(null)
-      useToastStore.getState().addToast('error', err.message || '删除失败')
+      // 全局 request() 已处理 toast
     } finally {
       setDeletingInviteId(null)
     }
@@ -674,8 +674,8 @@ function AnnouncementManageTab() {
     try {
       const response = await api.adminListAnnouncements({ page: '1', size: '50' })
       setAnnouncements(response.items)
-    } catch (err: any) {
-      useToastStore.getState().addToast('error', err.message || '加载公共通知失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setLoading(false)
       loadingAnnouncementsRef.current = false
@@ -754,8 +754,8 @@ function AnnouncementManageTab() {
       await api.adminDeleteAnnouncement(announcement.id)
       useToastStore.getState().addToast('success', '公共通知已删除')
       await loadAnnouncements()
-    } catch (err: any) {
-      useToastStore.getState().addToast('error', err.message || '删除失败')
+    } catch {
+      // 全局 request() 已处理 toast
     } finally {
       setDeletingAnnouncementId(null)
     }

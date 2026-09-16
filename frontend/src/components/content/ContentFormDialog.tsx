@@ -3,6 +3,7 @@ import { X, Search, Star, Tv, Save, Trash2, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useToastStore } from '@/stores/toast-store'
 import { useUIStore } from '@/stores/ui-store'
+import { useAuthStore } from '@/stores/auth-store'
 import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll'
 import { useMaskClose } from '@/hooks/use-mask-close'
 import { secureUrl } from '@/lib/image-url'
@@ -136,6 +137,7 @@ export function ContentFormDialog({
 }: ContentFormDialogProps) {
   useLockBodyScroll(open)
   const addToast = useToastStore(state => state.addToast)
+  const { user } = useAuthStore()
   const isEditMode = contentId != null
   // 必须放在 if (!open) return null 之前（hook 无条件调用）
   const maskProps = useMaskClose(() => {
@@ -152,6 +154,7 @@ export function ContentFormDialog({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [contentCreatedBy, setContentCreatedBy] = useState<number | null>(null)
   const [coverPreviewRetry, setCoverPreviewRetry] = useState(0)
   const [coverPreviewState, setCoverPreviewState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
 
@@ -176,8 +179,13 @@ export function ContentFormDialog({
     if (!open || !isEditMode) return
     setLoading(true)
     ;(api.getContent(contentId!) as Promise<ContentItem & { tags?: TagResponse[] }>)
-      .then(item => setForm(toForm(item)))
-      .catch(() => addToast('error', '加载内容失败'))
+      .then(item => {
+        setForm(toForm(item))
+        setContentCreatedBy(item.created_by ?? null)
+      })
+      .catch(() => {
+        // 全局 request() 已处理 toast，这里不做重复提示
+      })
       .finally(() => setLoading(false))
   }, [open, contentId, isEditMode, addToast])
 
@@ -283,6 +291,7 @@ export function ContentFormDialog({
       setShowDropdown(false)
       setConfirmDelete(false)
       setDeleting(false)
+      setContentCreatedBy(null)
     }
   }, [open, isEditMode])
 
@@ -783,10 +792,11 @@ export function ContentFormDialog({
             {isEditMode ? (
               <button
                 onClick={() => setConfirmDelete(true)}
-                disabled={deleting || saving}
+                disabled={deleting || saving || (contentCreatedBy !== null && contentCreatedBy !== user?.id && user?.role !== 'admin' && user?.role !== 'super_admin')}
                 aria-busy={deleting || undefined}
-                className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+                className="h-9 flex items-center gap-1.5 px-3 rounded-lg text-sm transition-all duration-200 hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444' }}
+                title={contentCreatedBy !== null && contentCreatedBy !== user?.id && user?.role !== 'admin' && user?.role !== 'super_admin' ? '无权删除' : '删除'}
               >
                 {deleting ? (
                   <LoadingIcon size={14} />
