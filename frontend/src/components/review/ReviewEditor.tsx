@@ -251,38 +251,63 @@ export function ReviewEditor({
     const sel = window.getSelection()
     const token = REVIEW_MARKUP_TOKENS[format]
 
-    // 有选区且在编辑器内
     if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0)
-      if (editor.contains(range.commonAncestorContainer) && !range.collapsed) {
-        // 检查选区是否已被该格式包裹 → 取消格式
-        const startEl = getClosestFormatElement(range.startContainer, editor, format)
-        const endEl = getClosestFormatElement(range.endContainer, editor, format)
-        if (startEl && startEl === endEl) {
-          // 已包裹 → 移除格式（保留内容）
-          const parent = startEl.parentNode
+      if (!editor.contains(range.commonAncestorContainer)) return
+
+      if (range.collapsed) {
+        // ── 光标无选区：检查光标是否在同格式块内 → 取消该格式块 ──
+        const existing = getClosestFormatElement(range.startContainer, editor, format)
+        if (existing) {
+          const parent = existing.parentNode
           if (parent) {
-            while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
-            startEl.remove()
+            while (existing.firstChild) parent.insertBefore(existing.firstChild, existing)
+            existing.remove()
           }
           syncFromDom()
           return
         }
-
-        // 包裹选中文本
+        // 光标不在同格式块内 → 插入空格式块
         const wrapper = createFormatWrapper(format, token)
-        wrapper.appendChild(range.extractContents())
+        const emptyText = document.createTextNode('\u200B')
+        wrapper.appendChild(emptyText)
         range.insertNode(wrapper)
-        const selectedRange = document.createRange()
-        selectedRange.selectNodeContents(wrapper)
+        // 把光标放到零宽字符后面
+        const newRange = document.createRange()
+        newRange.setStart(emptyText, 1)
+        newRange.collapse(true)
         sel.removeAllRanges()
-        sel.addRange(selectedRange)
+        sel.addRange(newRange)
         syncFromDom()
         return
       }
+
+      // ── 有选区：检查是否已被该格式包裹 → 取消格式 ──
+      const startEl = getClosestFormatElement(range.startContainer, editor, format)
+      const endEl = getClosestFormatElement(range.endContainer, editor, format)
+      if (startEl && startEl === endEl) {
+        const parent = startEl.parentNode
+        if (parent) {
+          while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
+          startEl.remove()
+        }
+        syncFromDom()
+        return
+      }
+
+      // 包裹选中文本
+      const wrapper = createFormatWrapper(format, token)
+      wrapper.appendChild(range.extractContents())
+      range.insertNode(wrapper)
+      const selectedRange = document.createRange()
+      selectedRange.selectNodeContents(wrapper)
+      sel.removeAllRanges()
+      sel.addRange(selectedRange)
+      syncFromDom()
+      return
     }
 
-    // 无选区 / 选区不在编辑器内 → 格式化全部内容
+    // 无 Selection / 无 Range → 格式化全部内容
     const allRange = document.createRange()
     allRange.selectNodeContents(editor)
     const wrapper = createFormatWrapper(format, token)
