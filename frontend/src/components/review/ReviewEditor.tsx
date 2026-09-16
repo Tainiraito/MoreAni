@@ -193,10 +193,24 @@ function getAdjacentFormatAtCaret(
 ): HTMLElement | null {
   if (!range.collapsed) return null
 
-  const container = range.startContainer
+  let container: Node = range.startContainer
+  let offset = range.startOffset
+
+  // 当光标在文本节点内时，判断是否在节点边界，然后提升到父元素
+  if (container.nodeType === Node.TEXT_NODE) {
+    const textLength = container.nodeValue?.length ?? 0
+    if (side === 'start' && offset > 0) return null
+    if (side === 'end' && offset < textLength) return null
+    const parent = container.parentNode ?? editor
+    const textNode = container
+    container = parent
+    offset = Array.from(parent.childNodes).indexOf(textNode as ChildNode)
+    if (offset < 0) return null
+  }
+
   if (!(container instanceof HTMLElement || container === editor)) return null
 
-  const candidateIndex = side === 'start' ? range.startOffset : range.startOffset - 1
+  const candidateIndex = side === 'start' ? offset - 1 : offset
   const candidate = container.childNodes[candidateIndex]
   return candidate instanceof HTMLElement && candidate.dataset.reviewFormat ? candidate : null
 }
@@ -208,6 +222,7 @@ function getCaretBoundaryFormat(
 ): HTMLElement | null {
   if (range.collapsed === false) return null
 
+  // 1. 检查光标是否在语法块边界（内部边界）
   let current: Node | null = range.startContainer
   while (current && current !== editor) {
     if (current instanceof HTMLElement && current.dataset.reviewFormat && isCaretAtFormatBoundary(range, current, side)) {
@@ -215,6 +230,10 @@ function getCaretBoundaryFormat(
     }
     current = current.parentNode
   }
+
+  // 2. 检查光标是否与语法块相邻（外部相邻）
+  //    Backspace at side='start': 光标在语法块前面，向前删除应删除语法块
+  //    Delete at side='end': 光标在语法块后面，向后删除应删除语法块
   return getAdjacentFormatAtCaret(editor, range, side)
 }
 
@@ -443,6 +462,8 @@ export function ReviewEditor({
 
     const selection = window.getSelection()
     const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+
+    // 检测光标是否在语法块内部（向上遍历所有祖先）
     if (keepCaretInsideFormatRef.current) {
       let current: Node | null = range?.collapsed ? range.startContainer : null
       let caretInsideFormat = false
@@ -453,8 +474,10 @@ export function ReviewEditor({
         }
         current = current.parentNode
       }
+      // 光标已移出语法块，重置标志
       if (!caretInsideFormat) keepCaretInsideFormatRef.current = false
     }
+
     const selectionInsideEditor = range !== null && editor.contains(range.commonAncestorContainer)
     const formatElements = editor.querySelectorAll<HTMLElement>('[data-review-format]')
 
@@ -535,6 +558,27 @@ export function ReviewEditor({
   const emitCurrentValue = useCallback((rehydrate: boolean, preserveFormatCaret = false): void => {
     const editor = editorRef.current
     if (!editor) return
+
+    // 安全检查：如果 preserveFormatCaret 为 true 但光标实际不在语法块内，强制关闭
+    if (preserveFormatCaret && keepCaretInsideFormatRef.current) {
+      const selection = window.getSelection()
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+      if (range?.collapsed) {
+        let current: Node | null = range.startContainer
+        let insideFormat = false
+        while (current && current !== editor) {
+          if (current instanceof HTMLElement && current.dataset.reviewFormat) {
+            insideFormat = true
+            break
+          }
+          current = current.parentNode
+        }
+        if (!insideFormat) {
+          keepCaretInsideFormatRef.current = false
+          preserveFormatCaret = false
+        }
+      }
+    }
 
     const nextValue = serializeReviewEditor(editor)
     const shouldEmit = nextValue !== lastEmittedValueRef.current
