@@ -51,6 +51,17 @@ const MIN_EDITOR_HEIGHT_PX = 64
 
 // ── DOM 辅助 ──
 
+function rangeIntersectsElement(range: Range, element: HTMLElement): boolean {
+  if (range.intersectsNode) {
+    try { return range.intersectsNode(element) } catch { return false }
+  }
+  // fallback
+  const r = document.createRange()
+  r.selectNodeContents(element)
+  return range.compareBoundaryPoints(Range.END_TO_START, r) < 0
+    && range.compareBoundaryPoints(Range.START_TO_END, r) > 0
+}
+
 function getClosestFormatElement(node: Node | null, editor: HTMLElement, format: string): HTMLElement | null {
   let current = node
   while (current && current !== editor) {
@@ -152,6 +163,8 @@ export function ReviewEditor({
   const sourceRef = useRef(value)
   const composingRef = useRef(false)
   const [spoilerRevealed, setSpoilerRevealed] = useState<ReadonlySet<string>>(new Set())
+  const historyRef = useRef<string[]>([value])
+  const historyIndexRef = useRef(0)
 
   // 初始化 DOM（同步，确保首次渲染后立即可用）
   useEffect(() => {
@@ -177,13 +190,19 @@ export function ReviewEditor({
     }
   }, [value, spoilerRevealed])
 
-  // 序列化 DOM → source → onChange
+  // 序列化 DOM → source → onChange（带历史记录）
   const syncFromDom = useCallback(() => {
     const editor = editorRef.current
     if (!editor) return
     const nextSource = serializeReviewEditor(editor)
     if (nextSource !== sourceRef.current) {
       sourceRef.current = nextSource
+      // 记录历史
+      const history = historyRef.current
+      const idx = historyIndexRef.current
+      history.length = idx + 1
+      history.push(nextSource)
+      historyIndexRef.current = history.length - 1
       onChange(nextSource)
     }
   }, [onChange])
@@ -212,6 +231,19 @@ export function ReviewEditor({
 
   // ── 格式操作 ──
 
+  function createFormatWrapper(format: ReviewMarkupFormat, token: string): HTMLSpanElement {
+    const wrapper = document.createElement('span')
+    wrapper.dataset.reviewFormat = format
+    wrapper.dataset.reviewToken = token
+    if (format === 'inline-spoiler') {
+      wrapper.dataset.reviewSpoiler = 'true'
+      wrapper.dataset.reviewNodeId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      wrapper.setAttribute('role', 'button')
+      wrapper.setAttribute('tabindex', '0')
+    }
+    return wrapper
+  }
+
   const applyFormat = useCallback((format: ReviewMarkupFormat) => {
     const editor = editorRef.current
     if (!editor || disabled) return
@@ -238,9 +270,7 @@ export function ReviewEditor({
         }
 
         // 包裹选中文本
-        const wrapper = document.createElement('span')
-        wrapper.dataset.reviewFormat = format
-        wrapper.dataset.reviewToken = token
+        const wrapper = createFormatWrapper(format, token)
         wrapper.appendChild(range.extractContents())
         range.insertNode(wrapper)
         const selectedRange = document.createRange()
@@ -255,9 +285,7 @@ export function ReviewEditor({
     // 无选区 / 选区不在编辑器内 → 格式化全部内容
     const allRange = document.createRange()
     allRange.selectNodeContents(editor)
-    const wrapper = document.createElement('span')
-    wrapper.dataset.reviewFormat = format
-    wrapper.dataset.reviewToken = token
+    const wrapper = createFormatWrapper(format, token)
     wrapper.appendChild(allRange.extractContents())
     allRange.insertNode(wrapper)
     const caretRange = document.createRange()
@@ -271,9 +299,46 @@ export function ReviewEditor({
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return
 
-    // Ctrl/Cmd + B/I/U/S 格式快捷键
+    // Ctrl/Cmd 操作
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const shortcut = e.key.toLowerCase()
+
+      // Ctrl+Z 撤销
+      if (shortcut === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        const idx = historyIndexRef.current
+        if (idx > 0) {
+          historyIndexRef.current = idx - 1
+          const prev = historyRef.current[idx - 1]
+          sourceRef.current = prev
+          const editor = editorRef.current
+          if (editor) {
+            editor.innerHTML = renderEditableReviewMarkup(prev, spoilerRevealed)
+          }
+          onChange(prev)
+        }
+        return
+      }
+
+      // Ctrl+Shift+Z / Ctrl+Y 重做
+      if ((shortcut === 'z' && e.shiftKey) || shortcut === 'y') {
+        e.preventDefault()
+        const history = historyRef.current
+        const idx = historyIndexRef.current
+        if (idx < history.length - 1) {
+          historyIndexRef.current = idx + 1
+          const next = history[idx + 1]
+          sourceRef.current = next
+          const editor = editorRef.current
+          if (editor) {
+            editor.innerHTML = renderEditableReviewMarkup(next, spoilerRevealed)
+          }
+          onChange(next)
+        }
+        return
+      }
+
+      // Ctrl+B/I/U/S 格式快捷键
       const format = SHORTCUT_FORMATS[shortcut]
       if (format) {
         e.preventDefault()
@@ -363,14 +428,55 @@ export function ReviewEditor({
       if (insertTextAtSelection('\n')) syncFromDom()
       return
     }
-  }, [disabled, applyFormat, syncFromDom])
+  }, [disabled, applyFormat, syncFromDom, spoilerRevealed, onChange])
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     if (disabled) return
     e.preventDefault()
     const text = e.clipboardData.getData('text/plain')
-    if (text && insertTextAtSelection(text)) syncFromDom()
+    if (!text) return
+    const editor = editorRef.current
+    if (!editor) return
+
+    // 直接在光标位置插入文本（不依赖 Selection API）
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      if (editor.contains(range.commonAncestorContainer)) {
+        range.deleteContents()
+        // 直接插入文本节点（保留 \n，让 serializeReviewEditor 处理换行）
+        range.insertNode(document.createTextNode(text))
+        syncFromDom()
+        return
+      }
+    }
+    // fallback: 追加到末尾
+    editor.appendChild(document.createTextNode(text))
+    syncFromDom()
   }, [disabled, syncFromDom])
+
+  // ── Active format 标记 ──
+
+  const updateActiveFormats = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const sel = window.getSelection()
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null
+    const insideEditor = range !== null && editor.contains(range.commonAncestorContainer)
+
+    editor.querySelectorAll<HTMLElement>('[data-review-format]').forEach(el => {
+      if (insideEditor && range && rangeIntersectsElement(range, el)) {
+        el.setAttribute('data-review-active', 'true')
+      } else {
+        el.removeAttribute('data-review-active')
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', updateActiveFormats)
+    return () => document.removeEventListener('selectionchange', updateActiveFormats)
+  }, [updateActiveFormats])
 
   // ── 剧透切换 ──
 
@@ -380,21 +486,47 @@ export function ReviewEditor({
       : null
     if (!target || !editorRef.current?.contains(target)) return
 
+    // 选中文字时不触发切换
+    const sel = window.getSelection()
+    if (sel && !sel.isCollapsed && sel.toString().length > 0) return
+
     const nodeId = target.dataset.reviewNodeId
     if (!nodeId) return
 
     setSpoilerRevealed(prev => {
       const next = new Set(prev)
-      if (next.has(nodeId)) next.delete(nodeId)
-      else next.add(nodeId)
-      // 更新 DOM 中的 revealed 属性
-      if (target.hasAttribute('data-review-revealed')) {
+      if (next.has(nodeId)) {
+        next.delete(nodeId)
         target.removeAttribute('data-review-revealed')
       } else {
+        next.add(nodeId)
         target.setAttribute('data-review-revealed', 'true')
       }
       return next
     })
+  }, [])
+
+  const handleKeyDownOnSpoiler = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const target = e.target instanceof HTMLElement
+        ? e.target.closest<HTMLElement>('[data-review-spoiler="true"]')
+        : null
+      if (!target || !editorRef.current?.contains(target)) return
+      e.preventDefault()
+      const nodeId = target.dataset.reviewNodeId
+      if (!nodeId) return
+      setSpoilerRevealed(prev => {
+        const next = new Set(prev)
+        if (next.has(nodeId)) {
+          next.delete(nodeId)
+          target.removeAttribute('data-review-revealed')
+        } else {
+          next.add(nodeId)
+          target.setAttribute('data-review-revealed', 'true')
+        }
+        return next
+      })
+    }
   }, [])
 
   // ── 渲染 ──
@@ -428,6 +560,7 @@ export function ReviewEditor({
           onPaste={handlePaste}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onKeyDownCapture={handleKeyDownOnSpoiler}
           onClick={handleClick}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
