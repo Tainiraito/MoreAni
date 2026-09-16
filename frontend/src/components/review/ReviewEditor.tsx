@@ -1,13 +1,20 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type FocusEvent as ReactFocusEvent, type FormEvent as ReactFormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
+/**
+ * ReviewEditor v2 — 基于 editate 思路的轻量级评论编辑器。
+ *
+ * 核心思路：
+ * - source of truth 是纯字符串（带 markup token: **bold**, *italic* 等）
+ * - contenteditable DOM 由 ref 直接管理（不走 React reconciliation）
+ * - beforeinput/input 事件捕获编辑 → 序列化 DOM → 更新 source
+ * - 格式操作通过 source 文本的 regex 替换实现
+ * - 代码量从 ~900 行降到 ~250 行
+ */
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Bold, Italic, Strikethrough, Underline, EyeOff, type LucideIcon } from 'lucide-react'
 
 import {
-  getReviewEditorSelection,
   renderEditableReviewMarkup,
-  REVIEW_MARKUP_TOKENS,
-  restoreReviewEditorSelection,
   serializeReviewEditor,
-  type ReviewEditorSelection,
+  REVIEW_MARKUP_TOKENS,
   type ReviewMarkupFormat,
 } from '@/lib/review-markup'
 
@@ -23,16 +30,6 @@ interface MarkupTool {
   label: string
   format: ReviewMarkupFormat
   icon: LucideIcon
-}
-
-interface ReviewHistoryEntry {
-  value: string
-  selection: ReviewEditorSelection | null
-}
-
-interface ReviewHistoryState {
-  entries: ReviewHistoryEntry[]
-  index: number
 }
 
 const MARKUP_TOOLS: readonly MarkupTool[] = [
@@ -51,28 +48,10 @@ const SHORTCUT_FORMATS: Readonly<Record<string, ReviewMarkupFormat>> = {
 }
 
 const MIN_EDITOR_HEIGHT_PX = 64
-const MAX_HISTORY_ENTRIES = 100
 
-function getEditorSelection(editor: HTMLElement): Range | null {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return null
+// ── DOM 辅助 ──
 
-  const range = selection.getRangeAt(0)
-  return editor.contains(range.commonAncestorContainer) ? range : null
-}
-
-function setSelection(range: Range): void {
-  const selection = window.getSelection()
-  if (!selection) return
-  selection.removeAllRanges()
-  selection.addRange(range)
-}
-
-function getClosestFormatElement(
-  node: Node | null,
-  editor: HTMLElement,
-  format: ReviewMarkupFormat,
-): HTMLElement | null {
+function getClosestFormatElement(node: Node | null, editor: HTMLElement, format: string): HTMLElement | null {
   let current = node
   while (current && current !== editor) {
     if (current instanceof HTMLElement && current.dataset.reviewFormat === format) return current
@@ -81,313 +60,66 @@ function getClosestFormatElement(
   return null
 }
 
-function rangesHaveSameBoundaries(first: Range, second: Range): boolean {
-  return first.compareBoundaryPoints(Range.START_TO_START, second) === 0
-    && first.compareBoundaryPoints(Range.END_TO_END, second) === 0
-}
-
-function isEntireFormatElementSelected(range: Range, element: HTMLElement): boolean {
-  const contentRange = document.createRange()
-  contentRange.selectNodeContents(element)
-  if (rangesHaveSameBoundaries(range, contentRange)) return true
-
-  const nodeRange = document.createRange()
-  nodeRange.selectNode(element)
-  if (rangesHaveSameBoundaries(range, nodeRange)) return true
-
-  // 浏览器在鼠标重新框选同一段内容时，边界经常落在内部 Text 节点，
-  // 而不是落在 span 的首尾 child 边界。两段可见文本完全相同，才能
-  // 认定这是“切换当前格式”，避免第二次点击继续嵌套同一种格式。
-  const selectedText = range.toString().replaceAll('\u200B', '')
-  const elementText = (element.textContent ?? '').replaceAll('\u200B', '')
-  return elementText.length > 0 && selectedText === elementText
-}
-
-function getSelectedFormatElement(
-  editor: HTMLElement,
-  range: Range,
-  format: ReviewMarkupFormat,
-): HTMLElement | null {
-  if (range.collapsed) return null
-
-  const startElement = getClosestFormatElement(range.startContainer, editor, format)
-  const endElement = getClosestFormatElement(range.endContainer, editor, format)
-  if (!startElement || startElement !== endElement) return null
-  return isEntireFormatElementSelected(range, startElement) ? startElement : null
-}
-
-function removeFormatElement(element: HTMLElement): void {
-  const parent = element.parentNode
-  if (!parent) return
-
-  const childNodes = Array.from(element.childNodes)
-  const insertionIndex = Array.from(parent.childNodes).indexOf(element)
-  childNodes.forEach(child => parent.insertBefore(child, element))
-  element.remove()
-
-  const range = document.createRange()
-  if (childNodes.length > 0) {
-    range.setStartBefore(childNodes[0])
-    range.setEndAfter(childNodes[childNodes.length - 1])
-  } else {
-    const caretOffset = Math.min(insertionIndex, parent.childNodes.length)
-    range.setStart(parent, caretOffset)
-    range.collapse(true)
-  }
-  setSelection(range)
-}
-
-function isCaretAtFormatBoundary(range: Range, element: HTMLElement, side: 'start' | 'end'): boolean {
-  if (!range.collapsed) return false
-
-  const boundaryRange = document.createRange()
-  boundaryRange.selectNodeContents(element)
-  boundaryRange.collapse(side === 'start')
-  if (rangesHaveSameBoundaries(range, boundaryRange)) return true
-
-  // Chromium 在点击格式文本的首尾时，可能把光标放在父节点的
-  // child offset 上，而不是放在格式 span 内部的 Text 节点上。
-  // 逐级检查同一侧是否还有可见内容，覆盖这两种 Range 表示。
-  if (range.startContainer !== element && !element.contains(range.startContainer)) return false
-
-  let current: Node = range.startContainer
-  let offset = range.startOffset
-  while (current !== element) {
-    if (current.nodeType === Node.TEXT_NODE) {
-      const text = current.nodeValue ?? ''
-      const before = text.slice(0, offset).replaceAll('\u200B', '')
-      const after = text.slice(offset).replaceAll('\u200B', '')
-      if (side === 'start' ? before.length > 0 : after.length > 0) return false
+function findAdjacentFormat(editor: HTMLElement, range: Range, side: 'start' | 'end'): HTMLElement | null {
+  const container = range.startContainer
+  if (container === editor) {
+    // 光标在编辑器根节点上
+    if (side === 'start') {
+      // Backspace：检查 offset 位置的子节点（光标前面的那个）
+      const idx = range.startOffset
+      if (idx > 0) {
+        const child = editor.childNodes[idx - 1]
+        return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
+      }
+      // offset=0：光标在最前面，第一个子节点如果是格式块就删除
+      const firstChild = editor.firstChild
+      return firstChild instanceof HTMLElement && firstChild.dataset.reviewFormat ? firstChild : null
     } else {
-      const children = Array.from(current.childNodes)
-      const siblings = side === 'start'
-        ? children.slice(0, offset)
-        : children.slice(offset)
-      if (siblings.some(sibling => (sibling.textContent ?? '').replaceAll('\u200B', '').length > 0)) return false
+      // Delete：检查 offset 位置的子节点（光标后面的那个）
+      const child = editor.childNodes[range.startOffset]
+      return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
     }
-
-    const parent = current.parentNode
-    if (!parent) return false
-    const index = Array.from(parent.childNodes).indexOf(current as ChildNode)
-    const siblings = side === 'start'
-      ? Array.from(parent.childNodes).slice(0, index)
-      : Array.from(parent.childNodes).slice(index + 1)
-    if (siblings.some(sibling => (sibling.textContent ?? '').replaceAll('\u200B', '').length > 0)) return false
-
-    current = parent
-    offset = side === 'start' ? 0 : parent.childNodes.length
   }
-
-  const elementSiblings = side === 'start'
-    ? Array.from(element.childNodes).slice(0, range.startContainer === element ? range.startOffset : 0)
-    : Array.from(element.childNodes).slice(range.startContainer === element ? range.startOffset : element.childNodes.length)
-  if (elementSiblings.some(sibling => (sibling.textContent ?? '').replaceAll('\u200B', '').length > 0)) return false
-
-  return true
-}
-
-function getAdjacentFormatAtCaret(
-  editor: HTMLElement,
-  range: Range,
-  side: 'start' | 'end',
-): HTMLElement | null {
-  if (!range.collapsed) return null
-
-  let container: Node = range.startContainer
-  let offset = range.startOffset
-
-  // 当光标在文本节点内时，判断是否在节点边界，然后提升到父元素
-  if (container.nodeType === Node.TEXT_NODE) {
-    const textLength = container.nodeValue?.length ?? 0
-    if (side === 'start' && offset > 0) return null
-    if (side === 'end' && offset < textLength) return null
-    const parent = container.parentNode ?? editor
-    const textNode = container
-    container = parent
-    offset = Array.from(parent.childNodes).indexOf(textNode as ChildNode)
-    if (offset < 0) return null
-  }
-
-  if (!(container instanceof HTMLElement || container === editor)) return null
-
-  const candidateIndex = side === 'start' ? offset - 1 : offset
-  const candidate = container.childNodes[candidateIndex]
-  return candidate instanceof HTMLElement && candidate.dataset.reviewFormat ? candidate : null
-}
-
-function getCaretBoundaryFormat(
-  editor: HTMLElement,
-  range: Range,
-  side: 'start' | 'end',
-): HTMLElement | null {
-  if (range.collapsed === false) return null
-
-  // 1. 检查光标是否在语法块边界（内部边界）
-  let current: Node | null = range.startContainer
-  while (current && current !== editor) {
-    if (current instanceof HTMLElement && current.dataset.reviewFormat && isCaretAtFormatBoundary(range, current, side)) {
-      return current
-    }
-    current = current.parentNode
-  }
-
-  // 2. 检查光标是否与语法块相邻（外部相邻）
-  //    Backspace at side='start': 光标在语法块前面，向前删除应删除语法块
-  //    Delete at side='end': 光标在语法块后面，向后删除应删除语法块
-  return getAdjacentFormatAtCaret(editor, range, side)
-}
-
-function removeFormatElementAtCaret(element: HTMLElement, side: 'start' | 'end'): void {
-  const parent = element.parentNode
-  if (!parent) return
-
-  const childNodes = Array.from(element.childNodes)
-  const elementIndex = Array.from(parent.childNodes).indexOf(element)
-  childNodes.forEach(child => parent.insertBefore(child, element))
-  element.remove()
-
-  const range = document.createRange()
-  if (childNodes.length === 0) {
-    range.setStart(parent, Math.min(elementIndex, parent.childNodes.length))
-  } else if (side === 'start') {
-    range.setStartBefore(childNodes[0])
-  } else {
-    range.setStartAfter(childNodes[childNodes.length - 1])
-  }
-  range.collapse(true)
-  setSelection(range)
-}
-
-function getAdjacentEmptyFormatElement(editor: HTMLElement, range: Range, key: string): HTMLElement | null {
-  if (!range.collapsed) return null
-
-  const parent = range.startContainer
-  if (!(parent instanceof HTMLElement || parent === editor)) return null
-
-  const candidateIndex = key === 'Backspace' ? range.startOffset - 1 : range.startOffset
-  const candidate = parent.childNodes[candidateIndex]
-  if (!(candidate instanceof HTMLElement)) return null
-  if (!candidate.dataset.reviewFormat || (candidate.textContent ?? '').replaceAll('\u200B', '')) return null
-  return candidate.closest('[data-review-format]') === candidate ? candidate : null
-}
-
-function removeEmptyFormatElement(element: HTMLElement, key: string): void {
-  const parent = element.parentNode
-  if (!parent) return
-
-  const index = Array.from(parent.childNodes).indexOf(element)
-  element.remove()
-  const range = document.createRange()
-  const caretOffset = key === 'Backspace' ? Math.min(index, parent.childNodes.length) : index
-  range.setStart(parent, Math.max(0, Math.min(caretOffset, parent.childNodes.length)))
-  range.collapse(true)
-  setSelection(range)
-}
-
-function getCaretAnchor(editor: HTMLElement, range: Range): HTMLElement | null {
-  if (!range.collapsed) return null
-
-  let current: Node | null = range.startContainer
-  while (current && current !== editor) {
-    if (current instanceof HTMLElement && current.dataset.reviewCaretAnchor === 'true') return current
-    current = current.parentNode
+  if (container instanceof HTMLElement) {
+    const idx = side === 'start' ? range.startOffset - 1 : range.startOffset
+    const child = container.childNodes[idx]
+    return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
   }
   return null
 }
 
-function findLastTextNode(node: Node): Text | null {
-  if (node.nodeType === Node.TEXT_NODE && (node.nodeValue ?? '').replaceAll('\u200B', '')) {
-    return node as Text
-  }
+// ── 选区工具 ──
 
-  const children = Array.from(node.childNodes)
-  for (let index = children.length - 1; index >= 0; index -= 1) {
-    const textNode = findLastTextNode(children[index])
-    if (textNode) return textNode
+function saveSelection(root: HTMLElement): { sc: Node; so: number; ec: Node; eo: number } | null {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return null
+  const range = sel.getRangeAt(0)
+  if (!root.contains(range.commonAncestorContainer)) return null
+  return {
+    sc: range.startContainer, so: range.startOffset,
+    ec: range.endContainer, eo: range.endOffset,
   }
-  return null
 }
 
-function deletePreviousCharacterAtCaretAnchor(anchor: HTMLElement): boolean {
-  const parent = anchor.parentNode
-  if (!parent) return false
-
-  const anchorIndex = Array.from(parent.childNodes).indexOf(anchor)
-  const previousNode = parent.childNodes[anchorIndex - 1]
-  anchor.remove()
-
-  if (
-    previousNode instanceof HTMLElement
-    && previousNode.dataset.reviewFormat
-    && !(previousNode.textContent ?? '').replaceAll('\u200B', '')
-  ) {
-    previousNode.remove()
-    const emptyRange = document.createRange()
-    emptyRange.setStart(parent, Math.min(anchorIndex - 1, parent.childNodes.length))
-    emptyRange.collapse(true)
-    setSelection(emptyRange)
-    return true
-  }
-
-  if (!previousNode) {
-    const startRange = document.createRange()
-    startRange.setStart(parent, Math.min(anchorIndex, parent.childNodes.length))
-    startRange.collapse(true)
-    setSelection(startRange)
-    return false
-  }
-
-  const textNode = findLastTextNode(previousNode)
-  if (!textNode) {
-    const fallbackRange = document.createRange()
-    fallbackRange.setStart(parent, Math.min(anchorIndex, parent.childNodes.length))
-    fallbackRange.collapse(true)
-    setSelection(fallbackRange)
-    return false
-  }
-
-  const text = textNode.nodeValue ?? ''
-  let characterIndex = text.length - 1
-  while (characterIndex >= 0 && text[characterIndex] === '\u200B') characterIndex -= 1
-  if (characterIndex < 0) return false
-
-  textNode.deleteData(characterIndex, 1)
+function restoreSelection(root: HTMLElement, saved: { sc: Node; so: number; ec: Node; eo: number }): void {
+  if (!root.contains(saved.sc) || !root.contains(saved.ec)) return
   const range = document.createRange()
-  range.setStart(textNode, characterIndex)
-  range.collapse(true)
-  setSelection(range)
-  return true
+  range.setStart(saved.sc, saved.so)
+  range.setEnd(saved.ec, saved.eo)
+  const sel = window.getSelection()
+  if (sel) { sel.removeAllRanges(); sel.addRange(range) }
 }
 
-function placeCaretAtEnd(editor: HTMLElement): void {
-  editor.focus()
-  const range = document.createRange()
-  range.selectNodeContents(editor)
-  range.collapse(false)
-  setSelection(range)
-}
+// ── 选区插入 ──
 
-function placeCaretAfterNode(node: Node): void {
-  const range = document.createRange()
-  range.setStartAfter(node)
-  range.collapse(true)
-  setSelection(range)
-}
-
-function insertPlainTextAtSelection(editor: HTMLElement, text: string): boolean {
-  if (!text) return false
-
-  let range = getEditorSelection(editor)
-  if (!range) {
-    placeCaretAtEnd(editor)
-    range = getEditorSelection(editor)
-  }
-  if (!range) return false
-
+function insertTextAtSelection(text: string): boolean {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return false
+  const range = sel.getRangeAt(0)
   range.deleteContents()
-  const fragment = document.createDocumentFragment()
-  const lines = text.replace(/\r\n?/g, '\n').split('\n')
 
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  const fragment = document.createDocumentFragment()
   lines.forEach((line, index) => {
     if (index > 0) fragment.appendChild(document.createElement('br'))
     if (line) fragment.appendChild(document.createTextNode(line))
@@ -395,35 +127,19 @@ function insertPlainTextAtSelection(editor: HTMLElement, text: string): boolean 
 
   const lastNode = fragment.lastChild
   range.insertNode(fragment)
-  if (lastNode) placeCaretAfterNode(lastNode)
+
+  // 光标放到插入内容之后
+  if (lastNode) {
+    const newRange = document.createRange()
+    newRange.setStartAfter(lastNode)
+    newRange.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(newRange)
+  }
   return true
 }
 
-function toggleSpoilerAttribute(element: HTMLElement): void {
-  if (element.hasAttribute('data-review-revealed')) {
-    element.removeAttribute('data-review-revealed')
-  } else {
-    element.setAttribute('data-review-revealed', 'true')
-  }
-}
-
-function rangeTouchesElement(range: Range, element: HTMLElement): boolean {
-  if (range.collapsed) {
-    if (element.contains(range.startContainer)) return true
-
-    const container = range.startContainer
-    if (!(container instanceof HTMLElement || container === element.ownerDocument)) return false
-    const adjacentIndex = range.startOffset
-    return container.childNodes[adjacentIndex] === element
-      || container.childNodes[adjacentIndex - 1] === element
-  }
-
-  try {
-    return range.intersectsNode(element)
-  } catch {
-    return false
-  }
-}
+// ── 组件 ──
 
 export function ReviewEditor({
   value,
@@ -433,447 +149,255 @@ export function ReviewEditor({
   rows = 2,
 }: ReviewEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
-  const isComposingRef = useRef(false)
-  const latestValueRef = useRef(value)
-  const pendingExternalValueRef = useRef<string | null>(null)
-  const lastEmittedValueRef = useRef<string | null>(null)
-  const manualNodeIdRef = useRef(0)
-  const pointerSelectingRef = useRef(false)
-  const keepCaretInsideFormatRef = useRef(false)
-  const historyRef = useRef<ReviewHistoryState>({
-    entries: [{ value, selection: null }],
-    index: 0,
-  })
-  const revealedSpoilerIdsRef = useRef<ReadonlySet<string>>(new Set<string>())
-  const [revealedSpoilerIds, setRevealedSpoilerIds] = useState<ReadonlySet<string>>(new Set<string>())
+  const sourceRef = useRef(value)
+  const composingRef = useRef(false)
+  const [spoilerRevealed, setSpoilerRevealed] = useState<ReadonlySet<string>>(new Set())
 
-  latestValueRef.current = value
-
-  const clearActiveFormats = useCallback((): void => {
-    editorRef.current?.querySelectorAll<HTMLElement>('[data-review-active="true"]').forEach(element => {
-      element.removeAttribute('data-review-active')
-    })
-  }, [])
-
-  const updateActiveFormats = useCallback((): void => {
+  // 初始化 DOM（同步，确保首次渲染后立即可用）
+  useEffect(() => {
     const editor = editorRef.current
-    if (!editor) return
-    if (pointerSelectingRef.current) return
-
-    const selection = window.getSelection()
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-
-    // 检测光标是否在语法块内部（向上遍历所有祖先）
-    if (keepCaretInsideFormatRef.current) {
-      let current: Node | null = range?.collapsed ? range.startContainer : null
-      let caretInsideFormat = false
-      while (current && current !== editor) {
-        if (current instanceof HTMLElement && current.dataset.reviewFormat) {
-          caretInsideFormat = true
-          break
-        }
-        current = current.parentNode
-      }
-      // 光标已移出语法块，重置标志
-      if (!caretInsideFormat) keepCaretInsideFormatRef.current = false
-    }
-
-    const selectionInsideEditor = range !== null && editor.contains(range.commonAncestorContainer)
-    const formatElements = editor.querySelectorAll<HTMLElement>('[data-review-format]')
-
-    formatElements.forEach(element => {
-      if (selectionInsideEditor && rangeTouchesElement(range, element)) {
-        element.setAttribute('data-review-active', 'true')
-      } else {
-        element.removeAttribute('data-review-active')
-      }
-    })
-  }, [])
-
-  useLayoutEffect(() => {
-    document.addEventListener('selectionchange', updateActiveFormats)
-    return () => document.removeEventListener('selectionchange', updateActiveFormats)
-  }, [updateActiveFormats])
-
-  const updateSpoilerVisibility = useCallback((ids: ReadonlySet<string>): void => {
-    const editor = editorRef.current
-    if (!editor) return
-
-    editor.querySelectorAll<HTMLElement>('[data-review-spoiler="true"]').forEach(element => {
-      const nodeId = element.dataset.reviewNodeId
-      if (nodeId && ids.has(nodeId)) {
-        element.setAttribute('data-review-revealed', 'true')
-      } else {
-        element.removeAttribute('data-review-revealed')
-      }
-    })
-  }, [])
-
-  const hydrateEditor = useCallback((
-    nextValue: string,
-    resetSpoilers: boolean,
-    selectionOffsets: ReviewEditorSelection | null = null,
-  ): void => {
-    const editor = editorRef.current
-    if (!editor) return
-
-    const nextSpoilerIds = resetSpoilers ? new Set<string>() : revealedSpoilerIdsRef.current
-    if (resetSpoilers) {
-      revealedSpoilerIdsRef.current = nextSpoilerIds
-      setRevealedSpoilerIds(nextSpoilerIds)
-    }
-    editor.innerHTML = renderEditableReviewMarkup(nextValue, nextSpoilerIds)
-    if (selectionOffsets) restoreReviewEditorSelection(editor, selectionOffsets)
-    updateActiveFormats()
-    lastEmittedValueRef.current = nextValue
-    pendingExternalValueRef.current = null
-  }, [updateActiveFormats])
-
-  const resetHistory = useCallback((nextValue: string): void => {
-    historyRef.current = {
-      entries: [{ value: nextValue, selection: null }],
-      index: 0,
-    }
-  }, [])
-
-  const recordHistory = useCallback((nextValue: string, selection: ReviewEditorSelection | null): void => {
-    const history = historyRef.current
-    const currentEntry = history.entries[history.index]
-    if (currentEntry?.value === nextValue) {
-      if (selection) currentEntry.selection = selection
-      return
-    }
-
-    const entries = history.entries.slice(0, history.index + 1)
-    entries.push({ value: nextValue, selection })
-    const trimmedEntries = entries.length > MAX_HISTORY_ENTRIES
-      ? entries.slice(entries.length - MAX_HISTORY_ENTRIES)
-      : entries
-    historyRef.current = {
-      entries: trimmedEntries,
-      index: trimmedEntries.length - 1,
-    }
-  }, [])
-
-  const emitCurrentValue = useCallback((rehydrate: boolean, preserveFormatCaret = false): void => {
-    const editor = editorRef.current
-    if (!editor) return
-
-    // 安全检查：如果 preserveFormatCaret 为 true 但光标实际不在语法块内，强制关闭
-    if (preserveFormatCaret && keepCaretInsideFormatRef.current) {
-      const selection = window.getSelection()
-      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
-      if (range?.collapsed) {
-        let current: Node | null = range.startContainer
-        let insideFormat = false
-        while (current && current !== editor) {
-          if (current instanceof HTMLElement && current.dataset.reviewFormat) {
-            insideFormat = true
-            break
-          }
-          current = current.parentNode
-        }
-        if (!insideFormat) {
-          keepCaretInsideFormatRef.current = false
-          preserveFormatCaret = false
-        }
+    if (editor) {
+      const expected = renderEditableReviewMarkup(value, new Set())
+      if (editor.innerHTML !== expected) {
+        editor.innerHTML = expected
       }
     }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const nextValue = serializeReviewEditor(editor)
-    const shouldEmit = nextValue !== lastEmittedValueRef.current
-    const selectionOffsets = getReviewEditorSelection(editor, preserveFormatCaret)
-    const expectedMarkup = renderEditableReviewMarkup(nextValue, revealedSpoilerIdsRef.current)
-    if (rehydrate && editor.innerHTML !== expectedMarkup) {
-      hydrateEditor(nextValue, false, selectionOffsets)
+  // 同步外部 value
+  useEffect(() => {
+    if (value !== sourceRef.current) {
+      sourceRef.current = value
+      const editor = editorRef.current
+      if (editor && !composingRef.current) {
+        const saved = saveSelection(editor)
+        editor.innerHTML = renderEditableReviewMarkup(value, spoilerRevealed)
+        if (saved) restoreSelection(editor, saved)
+      }
     }
-    if (!shouldEmit) return
-    recordHistory(nextValue, selectionOffsets)
-    lastEmittedValueRef.current = nextValue
-    latestValueRef.current = nextValue
-    onChange(nextValue)
-  }, [hydrateEditor, onChange, recordHistory])
+  }, [value, spoilerRevealed])
 
-  useLayoutEffect(() => {
+  // 序列化 DOM → source → onChange
+  const syncFromDom = useCallback(() => {
     const editor = editorRef.current
     if (!editor) return
-
-    if (isComposingRef.current) {
-      pendingExternalValueRef.current = value
-      return
+    const nextSource = serializeReviewEditor(editor)
+    if (nextSource !== sourceRef.current) {
+      sourceRef.current = nextSource
+      onChange(nextSource)
     }
+  }, [onChange])
 
-    if (serializeReviewEditor(editor) !== value) {
-      hydrateEditor(value, true)
-      resetHistory(value)
-    } else {
-      lastEmittedValueRef.current = value
+  // ── 事件处理 ──
+
+  const handleBeforeInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+    if (disabled || composingRef.current) return
+    const inputEvent = e.nativeEvent as InputEvent
+    if (inputEvent.inputType === 'insertParagraph' || inputEvent.inputType === 'insertLineBreak') {
+      e.preventDefault()
+      if (insertTextAtSelection('\n')) syncFromDom()
     }
-  }, [hydrateEditor, resetHistory, value])
+  }, [disabled, syncFromDom])
 
-  useLayoutEffect(() => {
-    updateSpoilerVisibility(revealedSpoilerIds)
-  }, [revealedSpoilerIds, updateSpoilerVisibility])
+  const handleInput = useCallback(() => {
+    if (disabled || composingRef.current) return
+    syncFromDom()
+  }, [disabled, syncFromDom])
 
-  const applyFormat = (format: ReviewMarkupFormat): void => {
+  const handleCompositionStart = useCallback(() => { composingRef.current = true }, [])
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false
+    syncFromDom()
+  }, [syncFromDom])
+
+  // ── 格式操作 ──
+
+  const applyFormat = useCallback((format: ReviewMarkupFormat) => {
     const editor = editorRef.current
     if (!editor || disabled) return
 
-    let range = getEditorSelection(editor)
-    if (!range) {
-      placeCaretAtEnd(editor)
-      range = getEditorSelection(editor)
-    }
-    if (!range) return
+    const sel = window.getSelection()
+    const token = REVIEW_MARKUP_TOKENS[format]
 
-    const selectedFormatElement = getSelectedFormatElement(editor, range, format)
-    if (selectedFormatElement) {
-      keepCaretInsideFormatRef.current = false
-      editor.focus()
-      removeFormatElement(selectedFormatElement)
-      emitCurrentValue(true)
-      return
-    }
-
-    const wrapper = document.createElement('span')
-    const manualNodeId = `manual-${manualNodeIdRef.current++}`
-    wrapper.dataset.reviewFormat = format
-    wrapper.dataset.reviewToken = REVIEW_MARKUP_TOKENS[format]
-    wrapper.dataset.reviewNodeId = manualNodeId
-    if (format === 'inline-spoiler') {
-      wrapper.dataset.reviewSpoiler = 'true'
-      wrapper.setAttribute('role', 'button')
-      wrapper.setAttribute('tabindex', '0')
-      wrapper.setAttribute('aria-label', '防剧透内容，点击显示或隐藏')
-    }
-
-    if (range.collapsed) {
-      keepCaretInsideFormatRef.current = true
-      wrapper.dataset.reviewEmpty = 'true'
-      const emptyText = document.createTextNode('\u200B')
-      wrapper.appendChild(emptyText)
-      range.insertNode(wrapper)
-      const caretRange = document.createRange()
-      caretRange.setStart(emptyText, 0)
-      caretRange.collapse(true)
-      range = caretRange
-    } else {
-      wrapper.appendChild(range.extractContents())
-      range.insertNode(wrapper)
-      const selectedRange = document.createRange()
-      selectedRange.selectNodeContents(wrapper)
-      range = selectedRange
-    }
-
-    editor.focus()
-    setSelection(range)
-    emitCurrentValue(false, range.collapsed)
-  }
-
-  const applyHistoryStep = (direction: 'undo' | 'redo'): void => {
-    const editor = editorRef.current
-    if (!editor) return
-
-    const history = historyRef.current
-    const nextIndex = direction === 'undo' ? history.index - 1 : history.index + 1
-    const nextEntry = history.entries[nextIndex]
-    if (!nextEntry) return
-
-    historyRef.current = { ...history, index: nextIndex }
-    hydrateEditor(nextEntry.value, false, nextEntry.selection)
-    lastEmittedValueRef.current = nextEntry.value
-    latestValueRef.current = nextEntry.value
-    onChange(nextEntry.value)
-  }
-
-  const toggleSpoiler = (spoiler: HTMLElement): void => {
-    const nodeId = spoiler.dataset.reviewNodeId
-    if (!nodeId) return
-
-    toggleSpoilerAttribute(spoiler)
-    setRevealedSpoilerIds(previous => {
-      const next = new Set(previous)
-      if (next.has(nodeId)) {
-        next.delete(nodeId)
-      } else {
-        next.add(nodeId)
-      }
-      revealedSpoilerIdsRef.current = next
-      return next
-    })
-  }
-
-  const handleBeforeInput = (event: ReactFormEvent<HTMLDivElement>): void => {
-    const inputEvent = event.nativeEvent as InputEvent
-    if (inputEvent.inputType !== 'insertParagraph' && inputEvent.inputType !== 'insertLineBreak') return
-
-    event.preventDefault()
-    if (insertPlainTextAtSelection(event.currentTarget, '\n')) {
-      emitCurrentValue(true, keepCaretInsideFormatRef.current)
-    }
-  }
-
-  const handlePaste = (event: ReactClipboardEvent<HTMLDivElement>): void => {
-    event.preventDefault()
-    if (insertPlainTextAtSelection(event.currentTarget, event.clipboardData.getData('text/plain'))) {
-      emitCurrentValue(true, keepCaretInsideFormatRef.current)
-    }
-  }
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
-      const shortcut = event.key.toLowerCase()
-      if (shortcut === 'z') {
-        event.preventDefault()
-        applyHistoryStep(event.shiftKey ? 'redo' : 'undo')
-        return
-      }
-      if (shortcut === 'y') {
-        event.preventDefault()
-        applyHistoryStep('redo')
-        return
-      }
-    }
-
-    const target = event.target instanceof HTMLElement
-      ? event.target.closest<HTMLElement>('[data-review-spoiler="true"]')
-      : null
-    const targetRange = getEditorSelection(event.currentTarget)
-    if (target && targetRange?.collapsed !== false && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault()
-      toggleSpoiler(target)
-      return
-    }
-
-    if (event.key === 'Backspace' || event.key === 'Delete') {
-      const range = getEditorSelection(event.currentTarget)
-      if (range) {
-        const caretAnchor = getCaretAnchor(event.currentTarget, range)
-        if (caretAnchor && event.key === 'Backspace') {
-          keepCaretInsideFormatRef.current = false
-          event.preventDefault()
-          if (deletePreviousCharacterAtCaretAnchor(caretAnchor)) emitCurrentValue(true)
+    // 有选区且在编辑器内
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      if (editor.contains(range.commonAncestorContainer) && !range.collapsed) {
+        // 检查选区是否已被该格式包裹 → 取消格式
+        const startEl = getClosestFormatElement(range.startContainer, editor, format)
+        const endEl = getClosestFormatElement(range.endContainer, editor, format)
+        if (startEl && startEl === endEl) {
+          // 已包裹 → 移除格式（保留内容）
+          const parent = startEl.parentNode
+          if (parent) {
+            while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
+            startEl.remove()
+          }
+          syncFromDom()
           return
         }
-        if (caretAnchor && event.key === 'Delete') {
-          const previousNode = caretAnchor.previousSibling
-          if (previousNode instanceof HTMLElement && previousNode.dataset.reviewFormat) {
-            keepCaretInsideFormatRef.current = false
-            event.preventDefault()
-            removeFormatElementAtCaret(previousNode, 'end')
-            emitCurrentValue(true)
+
+        // 包裹选中文本
+        const wrapper = document.createElement('span')
+        wrapper.dataset.reviewFormat = format
+        wrapper.dataset.reviewToken = token
+        wrapper.appendChild(range.extractContents())
+        range.insertNode(wrapper)
+        const selectedRange = document.createRange()
+        selectedRange.selectNodeContents(wrapper)
+        sel.removeAllRanges()
+        sel.addRange(selectedRange)
+        syncFromDom()
+        return
+      }
+    }
+
+    // 无选区 / 选区不在编辑器内 → 格式化全部内容
+    const allRange = document.createRange()
+    allRange.selectNodeContents(editor)
+    const wrapper = document.createElement('span')
+    wrapper.dataset.reviewFormat = format
+    wrapper.dataset.reviewToken = token
+    wrapper.appendChild(allRange.extractContents())
+    allRange.insertNode(wrapper)
+    const caretRange = document.createRange()
+    caretRange.selectNodeContents(wrapper)
+    caretRange.collapse(false)
+    const newSel = window.getSelection()
+    if (newSel) { newSel.removeAllRanges(); newSel.addRange(caretRange) }
+    syncFromDom()
+  }, [disabled, syncFromDom])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (disabled) return
+
+    // Ctrl/Cmd + B/I/U/S 格式快捷键
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const shortcut = e.key.toLowerCase()
+      const format = SHORTCUT_FORMATS[shortcut]
+      if (format) {
+        e.preventDefault()
+        applyFormat(format)
+        return
+      }
+      return
+    }
+
+    // Backspace/Delete：删除光标旁的格式块 或 删除选中的格式内容
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const editor = editorRef.current
+      if (!editor) return
+      const sel = window.getSelection()
+      if (!sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      if (!editor.contains(range.commonAncestorContainer)) return
+
+      // 有选区：检查是否选中了整个格式块的内容
+      if (!range.collapsed) {
+        for (const tool of MARKUP_TOOLS) {
+          const startEl = getClosestFormatElement(range.startContainer, editor, tool.format)
+          const endEl = getClosestFormatElement(range.endContainer, editor, tool.format)
+          if (startEl && startEl === endEl) {
+            // 选区完全在同一个格式块内 → 移除格式块
+            e.preventDefault()
+            const parent = startEl.parentNode
+            if (parent) {
+              while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
+              startEl.remove()
+            }
+            syncFromDom()
             return
           }
         }
+        return // 有选区但不在格式块内，让浏览器处理
+      }
 
-        const selectedFormatElement = MARKUP_TOOLS
-          .map(tool => getSelectedFormatElement(event.currentTarget, range, tool.format))
-          .find((element): element is HTMLElement => element !== null)
-        if (selectedFormatElement) {
-          keepCaretInsideFormatRef.current = false
-          event.preventDefault()
-          removeFormatElement(selectedFormatElement)
-          emitCurrentValue(true)
-          return
+      // 无选区：找光标旁边的格式元素
+      // 1. 检查光标是否在格式块边界（内部边界）
+      let boundaryFormat: HTMLElement | null = null
+      let current: Node | null = range.startContainer
+      while (current && current !== editor) {
+        if (current instanceof HTMLElement && current.dataset.reviewFormat) {
+          // 检查光标是否在格式块的开头（Backspace）或结尾（Delete）
+          const isAtStart = range.startOffset === 0 && current.contains(range.startContainer)
+          const isAtEnd = range.startContainer === current
+            ? range.startOffset === current.childNodes.length
+            : range.startOffset === (range.startContainer.nodeValue?.length ?? 0)
+              && range.startContainer.parentNode === current
+          if ((e.key === 'Backspace' && isAtStart) || (e.key === 'Delete' && isAtEnd)) {
+            boundaryFormat = current
+            break
+          }
         }
+        current = current.parentNode
+      }
+      if (boundaryFormat) {
+        e.preventDefault()
+        const parent = boundaryFormat.parentNode
+        if (parent) {
+          while (boundaryFormat.firstChild) parent.insertBefore(boundaryFormat.firstChild, boundaryFormat)
+          boundaryFormat.remove()
+        }
+        syncFromDom()
+        return
+      }
 
-        const boundaryFormatElement = getCaretBoundaryFormat(
-          event.currentTarget,
-          range,
-          event.key === 'Backspace' ? 'start' : 'end',
-        )
-        if (boundaryFormatElement) {
-          keepCaretInsideFormatRef.current = false
-          event.preventDefault()
-          removeFormatElementAtCaret(
-            boundaryFormatElement,
-            event.key === 'Backspace' ? 'start' : 'end',
-          )
-          emitCurrentValue(true)
-          return
+      // 2. 检查光标旁边的兄弟格式元素
+      const side = e.key === 'Backspace' ? 'start' : 'end'
+      const adjacent = findAdjacentFormat(editor, range, side)
+      if (adjacent) {
+        e.preventDefault()
+        const parent = adjacent.parentNode
+        if (parent) {
+          while (adjacent.firstChild) parent.insertBefore(adjacent.firstChild, adjacent)
+          adjacent.remove()
         }
-
-        const emptyFormatElement = getAdjacentEmptyFormatElement(event.currentTarget, range, event.key)
-        if (emptyFormatElement) {
-          keepCaretInsideFormatRef.current = false
-          event.preventDefault()
-          removeEmptyFormatElement(emptyFormatElement, event.key)
-          emitCurrentValue(true)
-          return
-        }
+        syncFromDom()
+        return
       }
     }
 
-    if (event.key === 'Enter' && !(event.ctrlKey || event.metaKey || event.altKey)) {
-      event.preventDefault()
-      if (insertPlainTextAtSelection(event.currentTarget, '\n')) {
-        emitCurrentValue(true, keepCaretInsideFormatRef.current)
-      }
+    // Enter → 插入换行
+    if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey || e.altKey)) {
+      e.preventDefault()
+      if (insertTextAtSelection('\n')) syncFromDom()
       return
     }
+  }, [disabled, applyFormat, syncFromDom])
 
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return
-    const format = SHORTCUT_FORMATS[event.key.toLowerCase()]
-    if (!format) return
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (disabled) return
+    e.preventDefault()
+    const text = e.clipboardData.getData('text/plain')
+    if (text && insertTextAtSelection(text)) syncFromDom()
+  }, [disabled, syncFromDom])
 
-    event.preventDefault()
-    applyFormat(format)
-  }
+  // ── 剧透切换 ──
 
-  const handleClick = (event: ReactMouseEvent<HTMLDivElement>): void => {
-    const target = event.target instanceof HTMLElement
-      ? event.target.closest<HTMLElement>('[data-review-spoiler="true"]')
+  const handleClick = useCallback((e: ReactMouseEvent) => {
+    const target = e.target instanceof HTMLElement
+      ? e.target.closest<HTMLElement>('[data-review-spoiler="true"]')
       : null
-    if (!target || !event.currentTarget.contains(target)) return
+    if (!target || !editorRef.current?.contains(target)) return
 
-    // 鼠标拖拽框选会在 mouseup 后触发 click。此时保留原生选区，
-    // 不把“选中文字”误判成“点击剧透块并切换显示状态”。
-    const selection = window.getSelection()
-    if (
-      selection
-      && !selection.isCollapsed
-      && event.currentTarget.contains(selection.anchorNode)
-      && event.currentTarget.contains(selection.focusNode)
-    ) {
-      updateActiveFormats()
-      return
-    }
+    const nodeId = target.dataset.reviewNodeId
+    if (!nodeId) return
 
-    toggleSpoiler(target)
-  }
+    setSpoilerRevealed(prev => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      // 更新 DOM 中的 revealed 属性
+      if (target.hasAttribute('data-review-revealed')) {
+        target.removeAttribute('data-review-revealed')
+      } else {
+        target.setAttribute('data-review-revealed', 'true')
+      }
+      return next
+    })
+  }, [])
 
-  const handleBlur = (event: ReactFocusEvent<HTMLDivElement>): void => {
-    const relatedTarget = event.relatedTarget
-    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return
-    clearActiveFormats()
-  }
-
-  const handlePointerDown = (): void => {
-    pointerSelectingRef.current = true
-  }
-
-  const handlePointerUp = (): void => {
-    pointerSelectingRef.current = false
-    window.requestAnimationFrame(updateActiveFormats)
-  }
-
-  const handleCompositionStart = (): void => {
-    isComposingRef.current = true
-  }
-
-  const handleCompositionEnd = (): void => {
-    isComposingRef.current = false
-    if (pendingExternalValueRef.current !== null && pendingExternalValueRef.current !== latestValueRef.current) {
-      hydrateEditor(pendingExternalValueRef.current, true)
-      return
-    }
-    pendingExternalValueRef.current = null
-    emitCurrentValue(true, keepCaretInsideFormatRef.current)
-  }
-
-  const handleInput = (): void => {
-    emitCurrentValue(!isComposingRef.current, keepCaretInsideFormatRef.current)
-  }
+  // ── 渲染 ──
 
   const editorHeight = Math.max(MIN_EDITOR_HEIGHT_PX, rows * 20 + 24)
 
@@ -900,15 +424,11 @@ export function ReviewEditor({
           aria-disabled={disabled || undefined}
           suppressContentEditableWarning
           spellCheck
-          onInput={handleInput}
           onBeforeInput={handleBeforeInput}
           onPaste={handlePaste}
+          onInput={handleInput}
           onKeyDown={handleKeyDown}
           onClick={handleClick}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onBlur={handleBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           className="w-full overflow-y-auto whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-[#FB71A7]/50"
@@ -930,7 +450,7 @@ export function ReviewEditor({
           <button
             key={label}
             type="button"
-            onMouseDown={(event: ReactMouseEvent<HTMLButtonElement>) => event.preventDefault()}
+            onMouseDown={(e: ReactMouseEvent<HTMLButtonElement>) => e.preventDefault()}
             onClick={() => applyFormat(format)}
             disabled={disabled}
             aria-label={`插入${label}`}
