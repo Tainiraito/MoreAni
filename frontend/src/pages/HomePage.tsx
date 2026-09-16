@@ -604,257 +604,276 @@ export function HomePage() {
           </div>
         )}
 
-        {/* Tab 分类 */}
+        {/* Tab 分类 + 搜索筛选 — 吸顶区域 */}
         <div
-          className="flex gap-6 overflow-x-auto mb-4 -mx-6 px-6"
-          style={{ borderBottom: '1px solid var(--border-line)' }}
+          className="sticky top-11 sm:top-12 z-30 -mx-6 px-6 pt-2"
+          style={{ background: 'var(--bg-page)' }}
         >
-          {(['anime', 'calendar', 'other', 'more'] as const).map(val => {
-            const labels: Record<HomeTab, string> = { anime: '番剧', calendar: '新番周历', other: '其他', more: '更多功能' }
-            const isActive = activeTab === val
-            return (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setActiveTab(val)}
-                className="relative min-h-[3.75rem] cursor-pointer whitespace-nowrap pb-3 text-lg font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                style={{
-                  color: isActive ? '#FB71A7' : 'var(--text-muted)',
-                  borderBottom: isActive ? '2px solid #FB71A7' : '2px solid transparent',
-                }}
+          {/* Tab 分类 */}
+          <div
+            className="flex gap-6 overflow-x-auto mb-4"
+            style={{ borderBottom: '1px solid var(--border-line)' }}
+          >
+            {(['anime', 'calendar', 'other', 'more'] as const).map(val => {
+              const labels: Record<HomeTab, string> = { anime: '番剧', calendar: '新番周历', other: '其他', more: '更多功能' }
+              const isActive = activeTab === val
+              return (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setActiveTab(val)}
+                  className="relative min-h-[3.75rem] cursor-pointer whitespace-nowrap pb-3 text-lg font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                  style={{
+                    color: isActive ? '#FB71A7' : 'var(--text-muted)',
+                    borderBottom: isActive ? '2px solid #FB71A7' : '2px solid transparent',
+                  }}
+                >
+                  {labels[val]}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* 搜索、筛选、排序 */}
+          {activeTab !== 'calendar' && activeTab !== 'more' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4 pb-3">
+            {/* 左侧：搜索 + 筛选 */}
+            <div className="flex flex-1 flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[160px] max-w-xs">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                  style={{ color: 'var(--text-muted)' }}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <Input
+                  placeholder={activeTab === 'other' ? '搜索其他内容、标签...' : '搜索番剧、标签...'}
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+                  onCompositionStart={handleSearchCompositionStart}
+                  onCompositionEnd={handleSearchCompositionEnd}
+                  onKeyDown={handleSearchKeyDown}
+                  clearable
+                  onClear={() => {
+                    searchCompositionRef.current = false
+                    setSearchInput('')
+                    commitSearchQuery('')
+                  }}
+                  className="pl-9 text-sm"
+                />
+              </div>
+              {activeTab === 'anime' && <Select
+                value={seasonFilter}
+                onChange={setSeasonFilter}
+                className="w-[128px]"
+                placeholder="放送季度"
+                options={[{ value: '', label: '全部季度' }, ...seasonOptions]}
+              />}
+              <Select
+                value={userFilter}
+                onChange={setUserFilter}
+                className="w-[128px]"
+                placeholder="按用户"
+                options={[{ value: '', label: '全部用户' }, ...userOptions.map(u => ({ value: String(u.id), label: u.nickname }))]}
+              />
+              <Select
+                value={myFilter}
+                onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited')}
+                className="w-[130px]"
+                groups={[
+                  {
+                    label: '我的状态',
+                    options: [
+                      { value: '', label: '全部状态' },
+                      { value: 'rated', label: '已评分' },
+                      { value: 'unrated', label: '未评分' },
+                      { value: 'reviewed', label: '已评论' },
+                      { value: 'unreviewed', label: '未评论' },
+                      { value: 'favorited', label: '已收藏' },
+                      { value: 'unfavorited', label: '未收藏' },
+                    ],
+                  },
+                ]}
+              />
+              <Select
+                value={sortBy}
+                onChange={setSortBy}
+                className="w-[130px]"
+                options={[
+                  { value: 'updated_desc', label: '最近编辑' },
+                  { value: 'air_date_desc', label: '放送日期↓' },
+                  { value: 'air_date_asc', label: '放送日期↑' },
+                  { value: 'rating', label: '评分最高' },
+                  { value: 'newest', label: '最新添加' },
+                  { value: 'oldest', label: '最早添加' },
+                  { value: 'title', label: '标题排序' },
+                ]}
+              />
+            </div>
+            {/* 右侧：添加番剧 + 视图切换 */}
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab === 'anime' && user && (
+                <button
+                  onClick={() => openAddAnime()}
+                  className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
+                  style={{
+                    background: '#FB71A7',
+                    color: 'white',
+                    border: 'none',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                >
+                  + 添加番剧
+                </button>
+              )}
+              {/* 视图切换（组合式：评论列表 / 卡片网格） */}
+              {activeTab === 'anime' && <div
+                className="flex items-center rounded-lg overflow-hidden"
+                style={{ border: '1px solid var(--border-line)' }}
               >
-                {labels[val]}
-              </button>
-            )
-          })}
+                <button
+                  onClick={() => switchView('list')}
+                  title="评论列表视图"
+                  className="w-9 h-9 flex items-center justify-center transition-all duration-150"
+                  style={{
+                    background: viewMode === 'list' ? 'var(--bg-card)' : 'transparent',
+                    color: viewMode === 'list' ? '#FB71A7' : 'var(--text-muted)',
+                    boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+                  }}
+                >
+                  <List size={14} />
+                </button>
+                <button
+                  onClick={() => switchView('grid')}
+                  title="卡片网格视图"
+                  className="w-9 h-9 flex items-center justify-center transition-all duration-150"
+                  style={{
+                    background: viewMode === 'grid' ? 'var(--bg-card)' : 'transparent',
+                    color: viewMode === 'grid' ? '#FB71A7' : 'var(--text-muted)',
+                    borderLeft: '1px solid var(--border-line)',
+                    boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
+                  }}
+                >
+                  <LayoutGrid size={14} />
+                </button>
+              </div>}
+            </div>
+          </div>}
         </div>
 
-        {/* 搜索、筛选、排序 */}
-        {activeTab !== 'calendar' && activeTab !== 'more' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
-          <div className="relative flex-1 max-w-xs">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-              style={{ color: 'var(--text-muted)' }}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <Input
-              placeholder={activeTab === 'other' ? '搜索其他内容、标签...' : '搜索番剧、标签...'}
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              onCompositionStart={handleSearchCompositionStart}
-              onCompositionEnd={handleSearchCompositionEnd}
-              onKeyDown={handleSearchKeyDown}
-              clearable
-              onClear={() => {
-                searchCompositionRef.current = false
-                setSearchInput('')
-                commitSearchQuery('')
-              }}
-              className="pl-9 text-sm"
+        {activeTab === 'more' ? (
+          <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+            <MoreFeaturesPanel />
+          </div>
+        ) : activeTab === 'calendar' ? (
+          <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+            <WeeklyAiringPanel
+              week={airingQuery.data ?? null}
+              loading={airingQuery.isPending}
+              error={airingQuery.error instanceof Error ? airingQuery.error.message : null}
+              onOpenContent={openDetail}
+              onAddAnime={item => openAddAnime({
+                bangumiId: item.subject_id,
+                title: item.title,
+                titleAlt: item.title_alt,
+                openDetailAfterSave: true,
+              })}
+              isFavorited={isFavorited}
+              isFavoritePending={favoritePending}
+              onToggleFavorite={toggleFavorite}
             />
           </div>
-          {activeTab === 'anime' && <Select
-            value={seasonFilter}
-            onChange={setSeasonFilter}
-            className="w-[128px]"
-            placeholder="放送季度"
-            options={[{ value: '', label: '全部季度' }, ...seasonOptions]}
-          />}
-          <Select
-            value={userFilter}
-            onChange={setUserFilter}
-            className="w-[128px]"
-            placeholder="按用户"
-            options={[{ value: '', label: '全部用户' }, ...userOptions.map(u => ({ value: String(u.id), label: u.nickname }))]}
-          />
-          <Select
-            value={myFilter}
-            onChange={v => setMyFilter(v as '' | 'rated' | 'unrated' | 'reviewed' | 'unreviewed' | 'favorited' | 'unfavorited')}
-            className="w-[130px]"
-            groups={[
-              {
-                label: '我的状态',
-                options: [
-                  { value: '', label: '全部' },
-                  { value: 'rated', label: '已评分' },
-                  { value: 'unrated', label: '未评分' },
-                  { value: 'reviewed', label: '已评论' },
-                  { value: 'unreviewed', label: '未评论' },
-                  { value: 'favorited', label: '已收藏' },
-                  { value: 'unfavorited', label: '未收藏' },
-                ],
-              },
-            ]}
-          />
-          <Select
-            value={sortBy}
-            onChange={setSortBy}
-            className="w-[130px]"
-            options={[
-              { value: 'updated_desc', label: '最近编辑' },
-              { value: 'air_date_desc', label: '放送日期↓' },
-              { value: 'air_date_asc', label: '放送日期↑' },
-              { value: 'rating', label: '评分最高' },
-              { value: 'newest', label: '最新添加' },
-              { value: 'oldest', label: '最早添加' },
-              { value: 'title', label: '标题排序' },
-            ]}
-          />
-          {/* 仅管理员显示新增按钮（普通用户无权限，避免操作后报错）；super_admin 同样有权限 */}
-          {activeTab === 'anime' && (user?.role === 'admin' || user?.role === 'super_admin') && (
-            <button
-              onClick={() => openAddAnime()}
-              className="flex h-9 items-center gap-1 px-4 text-xs font-medium rounded-lg transition-all duration-200"
-              style={{
-                background: '#FB71A7',
-                color: 'white',
-                border: 'none',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-            >
-              + 添加番剧
-            </button>
-          )}
-          {/* 视图切换（组合式：评论列表 / 卡片网格） */}
-          {activeTab === 'anime' && <div
-            className="flex items-center ml-1 rounded-lg overflow-hidden"
-            style={{ border: '1px solid var(--border-line)' }}
-          >
-            <button
-              onClick={() => switchView('list')}
-              title="评论列表视图"
-              className="w-9 h-9 flex items-center justify-center transition-all duration-150"
-              style={{
-                background: viewMode === 'list' ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === 'list' ? '#FB71A7' : 'var(--text-muted)',
-                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
-              }}
-            >
-              <List size={14} />
-            </button>
-            <button
-              onClick={() => switchView('grid')}
-              title="卡片网格视图"
-              className="w-9 h-9 flex items-center justify-center transition-all duration-150"
-              style={{
-                background: viewMode === 'grid' ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === 'grid' ? '#FB71A7' : 'var(--text-muted)',
-                borderLeft: '1px solid var(--border-line)',
-                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
-              }}
-            >
-              <LayoutGrid size={14} />
-            </button>
-          </div>}
-        </div>}
-
-        {activeTab === 'more' ? (
-          <MoreFeaturesPanel />
-        ) : activeTab === 'calendar' ? (
-          <WeeklyAiringPanel
-            week={airingQuery.data ?? null}
-            loading={airingQuery.isPending}
-            error={airingQuery.error instanceof Error ? airingQuery.error.message : null}
-            onOpenContent={openDetail}
-            onAddAnime={item => openAddAnime({
-              bangumiId: item.subject_id,
-              title: item.title,
-              titleAlt: item.title_alt,
-              openDetailAfterSave: true,
-            })}
-            isFavorited={isFavorited}
-            isFavoritePending={favoritePending}
-            onToggleFavorite={toggleFavorite}
-          />
-        ) : loading && items.length === 0 ? (
-          <div className="flex items-center justify-center py-32" role="status" aria-label="列表加载中">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
-          </div>
-        ) : listError && items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-32" role="alert">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{listError}</p>
-            <button
-              type="button"
-              onClick={handleRetryList}
-              disabled={loading}
-              aria-busy={loading || undefined}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: '#FB71A7' }}
-            >
-              {loading ? <LoadingIcon size={14} /> : null} 重试
-            </button>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex items-center justify-center py-32">
-            <p className="text-lg" style={{ color: 'var(--text-muted)' }}>
-              暂无内容
-            </p>
-          </div>
         ) : (
-          <>
-            {loading && (
-              <div className="mb-4 flex items-center justify-center py-2" role="status" aria-label="列表刷新中">
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>正在更新列表...</p>
+          <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+            {loading && items.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center" role="status" aria-label="列表加载中">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
               </div>
-            )}
-            {listError && (
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-lg px-3 py-2" role="alert" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{listError}</p>
-                <button type="button" onClick={handleRetryList} disabled={loading} aria-busy={loading || undefined} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium hover:opacity-80 disabled:opacity-50" style={{ color: '#FB71A7' }}>{loading ? <LoadingIcon size={13} /> : null}重试</button>
+            ) : listError && items.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3" role="alert">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{listError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetryList}
+                  disabled={loading}
+                  aria-busy={loading || undefined}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-80"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', color: '#FB71A7' }}
+                >
+                  {loading ? <LoadingIcon size={14} /> : null} 重试
+                </button>
               </div>
-            )}
-            {activeTab === 'other' ? (
-              <section className="mt-8">
-                <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} isFavoritePending={favoritePending} onToggleFavorite={toggleFavorite} />
-                {loadingMore && <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p></div>}
-                {!hasMore && items.length > 0 && <div className="flex items-center justify-center py-8"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>已显示全部 {totalCount} 条内容</p></div>}
-              </section>
+            ) : items.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-lg" style={{ color: 'var(--text-muted)' }}>
+                  暂无内容
+                </p>
+              </div>
             ) : (
-            animeItems.length > 0 && (
-              <section className="mt-8">
-                {viewMode === 'list' ? (
-                  <CommentListView
-                    items={animeItems}
-                    onSelect={openDetail}
-                    isFavorited={isFavorited}
-                    isFavoritePending={favoritePending}
-                    onToggleFavorite={toggleFavorite}
-                  />
+              <>
+                {loading && (
+                  <div className="mb-4 flex items-center justify-center py-2" role="status" aria-label="列表刷新中">
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>正在更新列表...</p>
+                  </div>
+                )}
+                {listError && (
+                  <div className="mb-4 flex items-center justify-between gap-3 rounded-lg px-3 py-2" role="alert" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{listError}</p>
+                    <button type="button" onClick={handleRetryList} disabled={loading} aria-busy={loading || undefined} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium hover:opacity-80 disabled:opacity-50" style={{ color: '#FB71A7' }}>{loading ? <LoadingIcon size={13} /> : null}重试</button>
+                  </div>
+                )}
+                {activeTab === 'other' ? (
+                  <section className="mt-8">
+                    <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} isFavoritePending={isFavoritePending} onToggleFavorite={toggleFavorite} />
+                    {loadingMore && <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p></div>}
+                    {!hasMore && items.length > 0 && <div className="flex items-center justify-center py-8"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>已显示全部 {totalCount} 条内容</p></div>}
+                  </section>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                    {animeItems.map(item => (
-                      <AnimeCard
-                        key={item.id}
-                        content={item}
-                        mode="grid"
-                        isFavorited={isFavorited(item.id)}
-                        isFavoritePending={isFavoritePending(item.id)}
+                animeItems.length > 0 && (
+                  <section className="mt-8">
+                    {viewMode === 'list' ? (
+                      <CommentListView
+                        items={animeItems}
                         onSelect={openDetail}
+                        isFavorited={isFavorited}
+                        isFavoritePending={isFavoritePending}
                         onToggleFavorite={toggleFavorite}
                       />
-                    ))}
-                  </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                        {animeItems.map(item => (
+                          <AnimeCard
+                            key={item.id}
+                            content={item}
+                            mode="grid"
+                            isFavorited={isFavorited(item.id)}
+                            isFavoritePending={isFavoritePending(item.id)}
+                            onSelect={openDetail}
+                            onToggleFavorite={toggleFavorite}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* 无限滚动加载状态 */}
+                    {loadingMore && (
+                      <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多">
+                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
+                      </div>
+                    )}
+                    {!hasMore && animeItems.length > 0 && (
+                      <div className="flex items-center justify-center py-8">
+                        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                          已显示全部 {totalCount} 部番剧
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                )
                 )}
-                {/* 无限滚动加载状态 */}
-                {loadingMore && (
-                  <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多">
-                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p>
-                  </div>
-                )}
-                {!hasMore && animeItems.length > 0 && (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                      已显示全部 {totalCount} 部番剧
-                    </p>
-                  </div>
-                )}
-              </section>
-            )
+              </>
             )}
-          </>
+          </div>
         )}
       </div>
     </PageMain>

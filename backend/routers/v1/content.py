@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_current_user_optional, get_db
-from models import ContentItem, User
+from models import ContentItem, Rating, User
 from schemas import (
     AnimeResourceListResponse,
     AnimeResourcePagination,
@@ -308,12 +308,7 @@ def create_content(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ContentItemResponse:
-    """Create a new content item.
-
-    Only admins can add new content (friends review & rate, admins curate).
-    """
-    if user.role not in ('admin', 'super_admin'):
-        raise HTTPException(status_code=403, detail='No permission to add content')
+    """Create a new content item."""
     try:
         item = content_svc.create_content(
             db,
@@ -377,12 +372,30 @@ def delete_content(
 ) -> None:
     """Delete a content item.
 
-    Only the creator or admin can delete. Cascades to ratings, statuses, tags.
+    Creator or admin can delete. Non-admin creators cannot delete
+    if other users have rated the content.
     """
     item = content_svc.get_content_by_id(db, content_id)
     if not item:
         raise HTTPException(status_code=404, detail='Content not found')
     if item.created_by != user.id and user.role not in ('admin', 'super_admin'):
         raise HTTPException(status_code=403, detail='No permission to delete this content')
+
+    # 普通成员删自己的内容时，校验是否有其他人评过分
+    if item.created_by == user.id and user.role not in ('admin', 'super_admin'):
+        other_rated = (
+            db.query(Rating.id)
+            .filter(
+                Rating.content_id == content_id,
+                Rating.user_id != user.id,
+                (Rating.score > 0) | (Rating.review.isnot(None) & (Rating.review != '')),
+            )
+            .first()
+        )
+        if other_rated:
+            raise HTTPException(
+                status_code=409,
+                detail='该番剧已有其他人的评分或评论，无法删除',
+            )
 
     content_svc.delete_content(db, item)
