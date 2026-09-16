@@ -1,12 +1,12 @@
 /**
- * ReviewEditor v2 — 基于 editate 思路的轻量级评论编辑器。
+ * ReviewEditor v3 — 源字符串为唯一真相，DOM 是渲染结果。
  *
- * 核心思路：
- * - source of truth 是纯字符串（带 markup token: **bold**, *italic* 等）
- * - contenteditable DOM 由 ref 直接管理（不走 React reconciliation）
- * - beforeinput/input 事件捕获编辑 → 序列化 DOM → 更新 source
- * - 格式操作通过 source 文本的 regex 替换实现
- * - 代码量从 ~900 行降到 ~250 行
+ * 核心思路（借鉴 editate）：
+ * - 源字符串是唯一真相（**bold**, *italic* 等 markup token）
+ * - DOM 由 renderEditableReviewMarkup 从源字符串渲染
+ * - 每次编辑后，serializeReviewEditor 把 DOM 序列化回源字符串
+ * - 如果源字符串变了，重新渲染 DOM 并恢复光标
+ * - 格式操作直接修改源字符串，不手动操作 DOM
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Bold, Italic, Strikethrough, Underline, EyeOff, type LucideIcon } from 'lucide-react'
@@ -14,9 +14,61 @@ import { Bold, Italic, Strikethrough, Underline, EyeOff, type LucideIcon } from 
 import {
   renderEditableReviewMarkup,
   serializeReviewEditor,
+  getReviewEditorSelection,
+  restoreReviewEditorSelection,
   REVIEW_MARKUP_TOKENS,
   type ReviewMarkupFormat,
+  type ReviewEditorSelection,
 } from '@/lib/review-markup'
+
+// ── 格式检测 ──
+
+/** 检查选区是否被匹配的格式 token 对包围，或恰好匹配一个格式块 */
+function isSelectionWrappedByFormat(source: string, start: number, end: number, token: string): boolean {
+  const tLen = token.length
+  if (start < 0 || end > source.length) return false
+
+  // 向前搜索匹配的开头 token（遇到非 token 文本不停止，继续搜索）
+  function findOpenToken(pos: number): number {
+    for (let i = pos - 1; i >= 0; i--) {
+      if (source.slice(i, i + tLen) === token) return i
+    }
+    return -1
+  }
+
+  // 向后搜索匹配的结尾 token
+  function findCloseToken(pos: number): number {
+    for (let j = pos; j <= source.length - tLen; j++) {
+      if (source.slice(j, j + tLen) === token) return j
+    }
+    return -1
+  }
+
+  // 检查两个 token 之间是否有非空白内容
+  function hasContentBetween(openEnd: number, closeStart: number): boolean {
+    return source.slice(openEnd, closeStart).replaceAll(/\s/g, '').length > 0
+  }
+
+  // Case 1: 选区在 token 对内部（选区不包含 token）
+  {
+    const openPos = findOpenToken(start)
+    if (openPos >= 0) {
+      const closePos = findCloseToken(end)
+      if (closePos >= 0 && hasContentBetween(openPos + tLen, closePos)) return true
+    }
+  }
+
+  // Case 2: 选区恰好包含 token 对（选中了整个格式块包括 token）
+  if (start >= tLen && end + tLen <= source.length) {
+    if (source.slice(start - tLen, start) === token
+      && source.slice(end, end + tLen) === token
+      && hasContentBetween(start, end)) {
+      return true
+    }
+  }
+
+  return false
+}
 
 interface ReviewEditorProps {
   value: string
@@ -49,105 +101,17 @@ const SHORTCUT_FORMATS: Readonly<Record<string, ReviewMarkupFormat>> = {
 
 const MIN_EDITOR_HEIGHT_PX = 64
 
-// ── DOM 辅助 ──
+// ── 源字符串操作 ──
 
-function rangeIntersectsElement(range: Range, element: HTMLElement): boolean {
-  if (range.intersectsNode) {
-    try { return range.intersectsNode(element) } catch { return false }
-  }
-  // fallback
-  const r = document.createRange()
-  r.selectNodeContents(element)
-  return range.compareBoundaryPoints(Range.END_TO_START, r) < 0
-    && range.compareBoundaryPoints(Range.START_TO_END, r) > 0
+/** 在源字符串的指定偏移处插入文本 */
+function insertIntoSource(source: string, offset: number, text: string): string {
+  return source.slice(0, offset) + text + source.slice(offset)
 }
 
-function getClosestFormatElement(node: Node | null, editor: HTMLElement, format: string): HTMLElement | null {
-  let current = node
-  while (current && current !== editor) {
-    if (current instanceof HTMLElement && current.dataset.reviewFormat === format) return current
-    current = current.parentNode
-  }
-  return null
-}
-
-function findAdjacentFormat(editor: HTMLElement, range: Range, side: 'start' | 'end'): HTMLElement | null {
-  const container = range.startContainer
-  if (container === editor) {
-    // 光标在编辑器根节点上
-    if (side === 'start') {
-      // Backspace：检查 offset 位置的子节点（光标前面的那个）
-      const idx = range.startOffset
-      if (idx > 0) {
-        const child = editor.childNodes[idx - 1]
-        return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
-      }
-      // offset=0：光标在最前面，第一个子节点如果是格式块就删除
-      const firstChild = editor.firstChild
-      return firstChild instanceof HTMLElement && firstChild.dataset.reviewFormat ? firstChild : null
-    } else {
-      // Delete：检查 offset 位置的子节点（光标后面的那个）
-      const child = editor.childNodes[range.startOffset]
-      return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
-    }
-  }
-  if (container instanceof HTMLElement) {
-    const idx = side === 'start' ? range.startOffset - 1 : range.startOffset
-    const child = container.childNodes[idx]
-    return child instanceof HTMLElement && child.dataset.reviewFormat ? child : null
-  }
-  return null
-}
-
-// ── 选区工具 ──
-
-function saveSelection(root: HTMLElement): { sc: Node; so: number; ec: Node; eo: number } | null {
-  const sel = window.getSelection()
-  if (!sel || sel.rangeCount === 0) return null
-  const range = sel.getRangeAt(0)
-  if (!root.contains(range.commonAncestorContainer)) return null
-  return {
-    sc: range.startContainer, so: range.startOffset,
-    ec: range.endContainer, eo: range.endOffset,
-  }
-}
-
-function restoreSelection(root: HTMLElement, saved: { sc: Node; so: number; ec: Node; eo: number }): void {
-  if (!root.contains(saved.sc) || !root.contains(saved.ec)) return
-  const range = document.createRange()
-  range.setStart(saved.sc, saved.so)
-  range.setEnd(saved.ec, saved.eo)
-  const sel = window.getSelection()
-  if (sel) { sel.removeAllRanges(); sel.addRange(range) }
-}
-
-// ── 选区插入 ──
-
-function insertTextAtSelection(text: string): boolean {
-  const sel = window.getSelection()
-  if (!sel || sel.rangeCount === 0) return false
-  const range = sel.getRangeAt(0)
-  range.deleteContents()
-
-  const lines = text.replace(/\r\n?/g, '\n').split('\n')
-  const fragment = document.createDocumentFragment()
-  lines.forEach((line, index) => {
-    if (index > 0) fragment.appendChild(document.createElement('br'))
-    if (line) fragment.appendChild(document.createTextNode(line))
-  })
-
-  const lastNode = fragment.lastChild
-  range.insertNode(fragment)
-
-  // 光标放到插入内容之后
-  if (lastNode) {
-    const newRange = document.createRange()
-    newRange.setStartAfter(lastNode)
-    newRange.collapse(true)
-    sel.removeAllRanges()
-    sel.addRange(newRange)
-  }
-  return true
+/** 在源字符串中包裹格式 token */
+function wrapWithFormat(source: string, start: number, end: number, format: ReviewMarkupFormat): string {
+  const token = REVIEW_MARKUP_TOKENS[format]
+  return source.slice(0, start) + token + source.slice(start, end) + token + source.slice(end)
 }
 
 // ── 组件 ──
@@ -166,14 +130,25 @@ export function ReviewEditor({
   const historyRef = useRef<string[]>([value])
   const historyIndexRef = useRef(0)
 
-  // 初始化 DOM（同步，确保首次渲染后立即可用）
+  // ── 从源字符串渲染 DOM ──
+
+  const renderFromSource = useCallback((source: string, selection?: ReviewEditorSelection) => {
+    const editor = editorRef.current
+    if (!editor) return
+    const html = renderEditableReviewMarkup(source, spoilerRevealed)
+    if (editor.innerHTML !== html) {
+      editor.innerHTML = html
+    }
+    if (selection) {
+      restoreReviewEditorSelection(editor, selection)
+    }
+  }, [spoilerRevealed])
+
+  // 初始化 DOM
   useEffect(() => {
     const editor = editorRef.current
     if (editor) {
-      const expected = renderEditableReviewMarkup(value, new Set())
-      if (editor.innerHTML !== expected) {
-        editor.innerHTML = expected
-      }
+      editor.innerHTML = renderEditableReviewMarkup(value, new Set())
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -183,143 +158,189 @@ export function ReviewEditor({
       sourceRef.current = value
       const editor = editorRef.current
       if (editor && !composingRef.current) {
-        const saved = saveSelection(editor)
+        // 保存当前选区
+        const sel = getReviewEditorSelection(editor)
         editor.innerHTML = renderEditableReviewMarkup(value, spoilerRevealed)
-        if (saved) restoreSelection(editor, saved)
+        if (sel) restoreReviewEditorSelection(editor, sel)
       }
     }
   }, [value, spoilerRevealed])
 
-  // 序列化 DOM → source → onChange（带历史记录）
-  const syncFromDom = useCallback(() => {
+  // ── 核心：输入后同步源字符串 ──
+
+  const syncAfterInput = useCallback(() => {
     const editor = editorRef.current
     if (!editor) return
-    const nextSource = serializeReviewEditor(editor)
-    if (nextSource !== sourceRef.current) {
-      sourceRef.current = nextSource
+
+    // 1. 保存当前选区为源偏移
+    const sel = getReviewEditorSelection(editor)
+
+    // 2. 序列化 DOM → 新源字符串
+    const newSource = serializeReviewEditor(editor)
+
+    // 3. 如果源字符串变了，更新并重新渲染
+    if (newSource !== sourceRef.current) {
+      sourceRef.current = newSource
+
       // 记录历史
       const history = historyRef.current
       const idx = historyIndexRef.current
       history.length = idx + 1
-      history.push(nextSource)
+      history.push(newSource)
       historyIndexRef.current = history.length - 1
-      onChange(nextSource)
+
+      onChange(newSource)
+
+      // 重新渲染（使用保存的选区）
+      const html = renderEditableReviewMarkup(newSource, spoilerRevealed)
+      if (editor.innerHTML !== html) {
+        editor.innerHTML = html
+        if (sel) restoreReviewEditorSelection(editor, sel)
+      }
     }
-  }, [onChange])
+  }, [onChange, spoilerRevealed])
 
   // ── 事件处理 ──
+
+  const handleInput = useCallback(() => {
+    if (disabled || composingRef.current) return
+    syncAfterInput()
+  }, [disabled, syncAfterInput])
 
   const handleBeforeInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
     if (disabled || composingRef.current) return
     const inputEvent = e.nativeEvent as InputEvent
+    // Enter 键：插入换行而非段落
     if (inputEvent.inputType === 'insertParagraph' || inputEvent.inputType === 'insertLineBreak') {
       e.preventDefault()
-      if (insertTextAtSelection('\n')) syncFromDom()
+      const editor = editorRef.current
+      if (!editor) return
+      const sel = getReviewEditorSelection(editor)
+      if (!sel) return
+      const newSource = insertIntoSource(sourceRef.current, sel.start, '\n')
+      sourceRef.current = newSource
+      const history = historyRef.current
+      const idx = historyIndexRef.current
+      history.length = idx + 1
+      history.push(newSource)
+      historyIndexRef.current = history.length - 1
+      onChange(newSource)
+      renderFromSource(newSource, { start: sel.start + 1, end: sel.start + 1 })
     }
-  }, [disabled, syncFromDom])
-
-  const handleInput = useCallback(() => {
-    if (disabled || composingRef.current) return
-    syncFromDom()
-  }, [disabled, syncFromDom])
+  }, [disabled, onChange, renderFromSource])
 
   const handleCompositionStart = useCallback(() => { composingRef.current = true }, [])
   const handleCompositionEnd = useCallback(() => {
     composingRef.current = false
-    syncFromDom()
-  }, [syncFromDom])
+    syncAfterInput()
+  }, [syncAfterInput])
 
-  // ── 格式操作 ──
-
-  function createFormatWrapper(format: ReviewMarkupFormat, token: string): HTMLSpanElement {
-    const wrapper = document.createElement('span')
-    wrapper.dataset.reviewFormat = format
-    wrapper.dataset.reviewToken = token
-    if (format === 'inline-spoiler') {
-      wrapper.dataset.reviewSpoiler = 'true'
-      wrapper.dataset.reviewNodeId = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      wrapper.setAttribute('role', 'button')
-      wrapper.setAttribute('tabindex', '0')
-    }
-    return wrapper
-  }
+  // ── 格式操作（直接修改源字符串） ──
 
   const applyFormat = useCallback((format: ReviewMarkupFormat) => {
     const editor = editorRef.current
     if (!editor || disabled) return
 
-    const sel = window.getSelection()
+    const sel = getReviewEditorSelection(editor)
+    if (!sel) return
+
     const token = REVIEW_MARKUP_TOKENS[format]
+    const source = sourceRef.current
 
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0)
-      if (!editor.contains(range.commonAncestorContainer)) return
 
-      if (range.collapsed) {
-        // ── 光标无选区：检查光标是否在同格式块内 → 取消该格式块 ──
-        const existing = getClosestFormatElement(range.startContainer, editor, format)
-        if (existing) {
-          const parent = existing.parentNode
-          if (parent) {
-            while (existing.firstChild) parent.insertBefore(existing.firstChild, existing)
-            existing.remove()
-          }
-          syncFromDom()
+    if (sel.start === sel.end) {
+      // ── 光标无选区 ──
+      // 检查光标是否在匹配的格式 token 对内部
+      if (isSelectionWrappedByFormat(source, sel.start, sel.start, token)) {
+        // 光标在格式块内 → 找到 token 对并移除
+        let openPos = -1
+        for (let i = sel.start - 1; i >= 0; i--) {
+          if (source.slice(i, i + token.length) === token) { openPos = i; break }
+        }
+        let closePos = -1
+        for (let j = sel.start; j <= source.length - token.length; j++) {
+          if (source.slice(j, j + token.length) === token) { closePos = j; break }
+        }
+        if (openPos >= 0 && closePos >= 0) {
+          const newSource = source.slice(0, openPos) + source.slice(openPos + token.length, closePos) + source.slice(closePos + token.length)
+          sourceRef.current = newSource
+          const history = historyRef.current
+          const idx = historyIndexRef.current
+          history.length = idx + 1
+          history.push(newSource)
+          historyIndexRef.current = history.length - 1
+          onChange(newSource)
+          renderFromSource(newSource, { start: sel.start - token.length, end: sel.start - token.length })
           return
         }
-        // 光标不在同格式块内 → 插入空格式块
-        const wrapper = createFormatWrapper(format, token)
-        const emptyText = document.createTextNode('\u200B')
-        wrapper.appendChild(emptyText)
-        range.insertNode(wrapper)
-        // 把光标放到零宽字符后面
-        const newRange = document.createRange()
-        newRange.setStart(emptyText, 1)
-        newRange.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(newRange)
-        syncFromDom()
-        return
       }
-
-      // ── 有选区：检查是否已被该格式包裹 → 取消格式 ──
-      const startEl = getClosestFormatElement(range.startContainer, editor, format)
-      const endEl = getClosestFormatElement(range.endContainer, editor, format)
-      if (startEl && startEl === endEl) {
-        const parent = startEl.parentNode
-        if (parent) {
-          while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
-          startEl.remove()
-        }
-        syncFromDom()
-        return
-      }
-
-      // 包裹选中文本
-      const wrapper = createFormatWrapper(format, token)
-      wrapper.appendChild(range.extractContents())
-      range.insertNode(wrapper)
-      const selectedRange = document.createRange()
-      selectedRange.selectNodeContents(wrapper)
-      sel.removeAllRanges()
-      sel.addRange(selectedRange)
-      syncFromDom()
+      // 光标不在同格式块内 → 插入空格式对
+      const newSource = insertIntoSource(source, sel.start, token + token)
+      sourceRef.current = newSource
+      const history = historyRef.current
+      const idx = historyIndexRef.current
+      history.length = idx + 1
+      history.push(newSource)
+      historyIndexRef.current = history.length - 1
+      onChange(newSource)
+      // 光标放在两个 token 之间
+      renderFromSource(newSource, { start: sel.start + token.length, end: sel.start + token.length })
       return
     }
 
-    // 无 Selection / 无 Range → 格式化全部内容
-    const allRange = document.createRange()
-    allRange.selectNodeContents(editor)
-    const wrapper = createFormatWrapper(format, token)
-    wrapper.appendChild(allRange.extractContents())
-    allRange.insertNode(wrapper)
-    const caretRange = document.createRange()
-    caretRange.selectNodeContents(wrapper)
-    caretRange.collapse(false)
-    const newSel = window.getSelection()
-    if (newSel) { newSel.removeAllRanges(); newSel.addRange(caretRange) }
-    syncFromDom()
-  }, [disabled, syncFromDom])
+    // ── 有选区 ──
+    // 检查选区是否已被该格式 token 对包围
+    if (isSelectionWrappedByFormat(source, sel.start, sel.end, token)) {
+      const tLen = token.length
+      // 向前搜索匹配的开头 token
+      let openPos = -1
+      for (let i = sel.start - 1; i >= 0; i--) {
+        if (source.slice(i, i + tLen) === token) { openPos = i; break }
+      }
+      // 向后搜索匹配的结尾 token
+      let closePos = -1
+      for (let j = sel.end; j <= source.length - tLen; j++) {
+        if (source.slice(j, j + tLen) === token) { closePos = j; break }
+      }
+
+      // Case 2: 选区恰好包含 token 对
+      if (openPos < 0 && sel.start >= tLen && sel.end + tLen <= source.length) {
+        if (source.slice(sel.start - tLen, sel.start) === token
+          && source.slice(sel.end, sel.end + tLen) === token) {
+          openPos = sel.start - tLen
+          closePos = sel.end
+        }
+      }
+
+      if (openPos >= 0 && closePos >= 0) {
+        const newSource = source.slice(0, openPos) + source.slice(openPos + tLen, closePos) + source.slice(closePos + tLen)
+        sourceRef.current = newSource
+        const history = historyRef.current
+        const idx = historyIndexRef.current
+        history.length = idx + 1
+        history.push(newSource)
+        historyIndexRef.current = history.length - 1
+        onChange(newSource)
+        const newStart = Math.min(sel.start - tLen, openPos + tLen)
+        const newEnd = Math.min(sel.end - tLen, closePos)
+        renderFromSource(newSource, { start: Math.max(0, newStart), end: Math.max(0, newEnd) })
+        return
+      }
+    }
+
+    // 包裹选中文本
+    const newSource = wrapWithFormat(source, sel.start, sel.end, format)
+    sourceRef.current = newSource
+    const history = historyRef.current
+    const idx = historyIndexRef.current
+    history.length = idx + 1
+    history.push(newSource)
+    historyIndexRef.current = history.length - 1
+    onChange(newSource)
+    renderFromSource(newSource, { start: sel.end + token.length, end: sel.end + token.length })
+  }, [disabled, onChange, renderFromSource])
+
+  // ── 键盘处理 ──
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (disabled) return
@@ -336,11 +357,8 @@ export function ReviewEditor({
           historyIndexRef.current = idx - 1
           const prev = historyRef.current[idx - 1]
           sourceRef.current = prev
-          const editor = editorRef.current
-          if (editor) {
-            editor.innerHTML = renderEditableReviewMarkup(prev, spoilerRevealed)
-          }
           onChange(prev)
+          renderFromSource(prev)
         }
         return
       }
@@ -354,11 +372,8 @@ export function ReviewEditor({
           historyIndexRef.current = idx + 1
           const next = history[idx + 1]
           sourceRef.current = next
-          const editor = editorRef.current
-          if (editor) {
-            editor.innerHTML = renderEditableReviewMarkup(next, spoilerRevealed)
-          }
           onChange(next)
+          renderFromSource(next)
         }
         return
       }
@@ -373,112 +388,87 @@ export function ReviewEditor({
       return
     }
 
-    // Backspace/Delete：删除光标旁的格式块 或 删除选中的格式内容
+    // Backspace/Delete：选中文本时，如果选区在格式块内，清除格式 token
     if (e.key === 'Backspace' || e.key === 'Delete') {
       const editor = editorRef.current
       if (!editor) return
-      const sel = window.getSelection()
-      if (!sel || sel.rangeCount === 0) return
-      const range = sel.getRangeAt(0)
-      if (!editor.contains(range.commonAncestorContainer)) return
+      const sel = getReviewEditorSelection(editor)
+      if (!sel || sel.start === sel.end) return
 
-      // 有选区：检查是否选中了整个格式块的内容
-      if (!range.collapsed) {
-        for (const tool of MARKUP_TOOLS) {
-          const startEl = getClosestFormatElement(range.startContainer, editor, tool.format)
-          const endEl = getClosestFormatElement(range.endContainer, editor, tool.format)
-          if (startEl && startEl === endEl) {
-            // 选区完全在同一个格式块内 → 移除格式块
-            e.preventDefault()
-            const parent = startEl.parentNode
-            if (parent) {
-              while (startEl.firstChild) parent.insertBefore(startEl.firstChild, startEl)
-              startEl.remove()
+      const source = sourceRef.current
+      // 检查每个格式的 token 是否包围了选区
+      for (const tool of MARKUP_TOOLS) {
+        const token = REVIEW_MARKUP_TOKENS[tool.format]
+        if (isSelectionWrappedByFormat(source, sel.start, sel.end, token)) {
+          e.preventDefault()
+          const tLen = token.length
+          let openPos = -1
+          let closePos = -1
+
+          // Case 1: 选区在 token 对内部
+          for (let i = sel.start - 1; i >= 0; i--) {
+            if (source.slice(i, i + tLen) === token) { openPos = i; break }
+            if (source[i] !== ' ' && source[i] !== '\n' && source[i] !== '\t') break
+          }
+          if (openPos >= 0) {
+            for (let j = sel.end; j <= source.length - tLen; j++) {
+              if (source.slice(j, j + tLen) === token) { closePos = j; break }
+              if (source[j] !== ' ' && source[j] !== '\n' && source[j] !== '\t') break
             }
-            syncFromDom()
+          }
+
+          // Case 2: 选区恰好包含 token 对
+          if (openPos < 0 && sel.start >= tLen && sel.end + tLen <= source.length) {
+            if (source.slice(sel.start - tLen, sel.start) === token
+              && source.slice(sel.end, sel.end + tLen) === token) {
+              openPos = sel.start - tLen
+              closePos = sel.end
+            }
+          }
+
+          if (openPos >= 0 && closePos >= 0) {
+            const newSource = source.slice(0, openPos) + source.slice(openPos + tLen, closePos) + source.slice(closePos + tLen)
+            sourceRef.current = newSource
+            const history = historyRef.current
+            const idx = historyIndexRef.current
+            history.length = idx + 1
+            history.push(newSource)
+            historyIndexRef.current = history.length - 1
+            onChange(newSource)
+            const newStart = Math.min(sel.start - tLen, openPos + tLen)
+            const newEnd = Math.min(sel.end - tLen, closePos)
+            renderFromSource(newSource, { start: Math.max(0, newStart), end: Math.max(0, newEnd) })
             return
           }
         }
-        return // 有选区但不在格式块内，让浏览器处理
       }
-
-      // 无选区：找光标旁边的格式元素
-      // 1. 检查光标是否在格式块边界（内部边界）
-      let boundaryFormat: HTMLElement | null = null
-      let current: Node | null = range.startContainer
-      while (current && current !== editor) {
-        if (current instanceof HTMLElement && current.dataset.reviewFormat) {
-          // 检查光标是否在格式块的开头（Backspace）或结尾（Delete）
-          const isAtStart = range.startOffset === 0 && current.contains(range.startContainer)
-          const isAtEnd = range.startContainer === current
-            ? range.startOffset === current.childNodes.length
-            : range.startOffset === (range.startContainer.nodeValue?.length ?? 0)
-              && range.startContainer.parentNode === current
-          if ((e.key === 'Backspace' && isAtStart) || (e.key === 'Delete' && isAtEnd)) {
-            boundaryFormat = current
-            break
-          }
-        }
-        current = current.parentNode
-      }
-      if (boundaryFormat) {
-        e.preventDefault()
-        const parent = boundaryFormat.parentNode
-        if (parent) {
-          while (boundaryFormat.firstChild) parent.insertBefore(boundaryFormat.firstChild, boundaryFormat)
-          boundaryFormat.remove()
-        }
-        syncFromDom()
-        return
-      }
-
-      // 2. 检查光标旁边的兄弟格式元素
-      const side = e.key === 'Backspace' ? 'start' : 'end'
-      const adjacent = findAdjacentFormat(editor, range, side)
-      if (adjacent) {
-        e.preventDefault()
-        const parent = adjacent.parentNode
-        if (parent) {
-          while (adjacent.firstChild) parent.insertBefore(adjacent.firstChild, adjacent)
-          adjacent.remove()
-        }
-        syncFromDom()
-        return
-      }
+      return // 让浏览器处理普通删除
     }
+  }, [disabled, applyFormat, onChange, renderFromSource])
 
-    // Enter → 插入换行
-    if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey || e.altKey)) {
-      e.preventDefault()
-      if (insertTextAtSelection('\n')) syncFromDom()
-      return
-    }
-  }, [disabled, applyFormat, syncFromDom, spoilerRevealed, onChange])
+  // ── 粘贴 ──
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     if (disabled) return
     e.preventDefault()
     const text = e.clipboardData.getData('text/plain')
     if (!text) return
+
     const editor = editorRef.current
     if (!editor) return
+    const sel = getReviewEditorSelection(editor)
+    if (!sel) return
 
-    // 直接在光标位置插入文本（不依赖 Selection API）
-    const sel = window.getSelection()
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0)
-      if (editor.contains(range.commonAncestorContainer)) {
-        range.deleteContents()
-        // 直接插入文本节点（保留 \n，让 serializeReviewEditor 处理换行）
-        range.insertNode(document.createTextNode(text))
-        syncFromDom()
-        return
-      }
-    }
-    // fallback: 追加到末尾
-    editor.appendChild(document.createTextNode(text))
-    syncFromDom()
-  }, [disabled, syncFromDom])
+    const newSource = insertIntoSource(sourceRef.current, sel.start, text)
+    sourceRef.current = newSource
+    const history = historyRef.current
+    const idx = historyIndexRef.current
+    history.length = idx + 1
+    history.push(newSource)
+    historyIndexRef.current = history.length - 1
+    onChange(newSource)
+    renderFromSource(newSource, { start: sel.start + text.length, end: sel.start + text.length })
+  }, [disabled, onChange, renderFromSource])
 
   // ── Active format 标记 ──
 
@@ -490,7 +480,7 @@ export function ReviewEditor({
     const insideEditor = range !== null && editor.contains(range.commonAncestorContainer)
 
     editor.querySelectorAll<HTMLElement>('[data-review-format]').forEach(el => {
-      if (insideEditor && range && rangeIntersectsElement(range, el)) {
+      if (insideEditor && range && el.contains(range.commonAncestorContainer)) {
         el.setAttribute('data-review-active', 'true')
       } else {
         el.removeAttribute('data-review-active')
@@ -511,7 +501,6 @@ export function ReviewEditor({
       : null
     if (!target || !editorRef.current?.contains(target)) return
 
-    // 选中文字时不触发切换
     const sel = window.getSelection()
     if (sel && !sel.isCollapsed && sel.toString().length > 0) return
 
@@ -522,10 +511,8 @@ export function ReviewEditor({
       const next = new Set(prev)
       if (next.has(nodeId)) {
         next.delete(nodeId)
-        target.removeAttribute('data-review-revealed')
       } else {
         next.add(nodeId)
-        target.setAttribute('data-review-revealed', 'true')
       }
       return next
     })
@@ -544,10 +531,8 @@ export function ReviewEditor({
         const next = new Set(prev)
         if (next.has(nodeId)) {
           next.delete(nodeId)
-          target.removeAttribute('data-review-revealed')
         } else {
           next.add(nodeId)
-          target.setAttribute('data-review-revealed', 'true')
         }
         return next
       })
