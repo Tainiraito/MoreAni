@@ -143,9 +143,8 @@ export function ReviewEditor({
     const editor = editorRef.current
     if (!editor) return
     const html = renderEditableReviewMarkup(source, spoilerRevealed)
-    if (editor.innerHTML !== html) {
-      editor.innerHTML = html
-    }
+    // 总是更新 innerHTML（spoilerRevealed 变化时 HTML 会不同）
+    editor.innerHTML = html
     if (selection) {
       restoreReviewEditorSelection(editor, selection)
     }
@@ -407,9 +406,101 @@ export function ReviewEditor({
       const editor = editorRef.current
       if (!editor) return
       const sel = getReviewEditorSelection(editor)
-      if (!sel || sel.start === sel.end) return
+      if (!sel) return
 
       const source = sourceRef.current
+
+      // ── Collapsed: 检查光标是否在格式块边界 ──
+      if (sel.start === sel.end) {
+        for (const tool of MARKUP_TOOLS) {
+          const token = REVIEW_MARKUP_TOKENS[tool.format]
+          const tLen = token.length
+          // 光标在开头 token 内部（Backspace → 删除整个格式块）
+          if (e.key === 'Backspace' && source.slice(sel.start - tLen, sel.start) === token) {
+            // 向前找到完整的开头 token
+            const openStart = sel.start - tLen
+            // 向后找到匹配的结尾 token
+            for (let j = sel.start; j <= source.length - tLen; j++) {
+              if (source.slice(j, j + tLen) === token) {
+                e.preventDefault()
+                const newSource = source.slice(0, openStart) + source.slice(openStart + tLen, j) + source.slice(j + tLen)
+                sourceRef.current = newSource
+                const history = historyRef.current
+                const idx = historyIndexRef.current
+                history.length = idx + 1
+                history.push(newSource)
+                historyIndexRef.current = history.length - 1
+                onChange(newSource)
+                renderFromSource(newSource, { start: openStart, end: openStart })
+                return
+              }
+            }
+          }
+          // 光标在结尾 token 内部（Delete → 删除整个格式块）
+          if (e.key === 'Delete' && source.slice(sel.start, sel.start + tLen) === token) {
+            const closeStart = sel.start
+            // 向前找到匹配的开头 token
+            for (let i = closeStart - 1; i >= 0; i--) {
+              if (source.slice(i, i + tLen) === token) {
+                e.preventDefault()
+                const newSource = source.slice(0, i) + source.slice(i + tLen, closeStart) + source.slice(closeStart + tLen)
+                sourceRef.current = newSource
+                const history = historyRef.current
+                const idx = historyIndexRef.current
+                history.length = idx + 1
+                history.push(newSource)
+                historyIndexRef.current = history.length - 1
+                onChange(newSource)
+                renderFromSource(newSource, { start: i, end: i })
+                return
+              }
+            }
+          }
+        }
+
+        // 空格式对 Backspace: 光标在 `token + token` 中间，或紧接在 `token + token` 后面
+        for (const tool of MARKUP_TOOLS) {
+          const token = REVIEW_MARKUP_TOKENS[tool.format]
+          const tLen = token.length
+          // Case A: 光标在两个 token 中间
+          if (e.key === 'Backspace'
+            && sel.start >= tLen && sel.start <= source.length - tLen
+            && source.slice(sel.start - tLen, sel.start) === token
+            && source.slice(sel.start, sel.start + tLen) === token) {
+            e.preventDefault()
+            const newSource = source.slice(0, sel.start - tLen) + source.slice(sel.start + tLen)
+            sourceRef.current = newSource
+            const history = historyRef.current
+            const idx = historyIndexRef.current
+            history.length = idx + 1
+            history.push(newSource)
+            historyIndexRef.current = history.length - 1
+            onChange(newSource)
+            renderFromSource(newSource, { start: sel.start - tLen, end: sel.start - tLen })
+            return
+          }
+          // Case B: 光标紧接在 `token + token` 后面
+          if (e.key === 'Backspace'
+            && sel.start >= tLen * 2
+            && source.slice(sel.start - tLen * 2, sel.start) === token + token) {
+            e.preventDefault()
+            const newSource = source.slice(0, sel.start - tLen * 2) + source.slice(sel.start)
+            sourceRef.current = newSource
+            const history = historyRef.current
+            const idx = historyIndexRef.current
+            history.length = idx + 1
+            history.push(newSource)
+            historyIndexRef.current = history.length - 1
+            onChange(newSource)
+            renderFromSource(newSource, { start: sel.start - tLen * 2, end: sel.start - tLen * 2 })
+            return
+          }
+        }
+
+        return // collapsed 无匹配，让浏览器处理
+      }
+
+      // ── Non-collapsed: 选中文本时清除格式 token ──
       // 按 token 长度降序检查，避免 ** 被 * 先匹配
       const sortedTools = [...MARKUP_TOOLS].sort((a, b) =>
         REVIEW_MARKUP_TOKENS[b.format].length - REVIEW_MARKUP_TOKENS[a.format].length
@@ -547,12 +638,15 @@ export function ReviewEditor({
     const nodeId = target.dataset.reviewNodeId
     if (!nodeId) return
 
+    // 直接操作 DOM 属性（不触发 re-render，保持元素引用稳定）
     setSpoilerRevealed(prev => {
       const next = new Set(prev)
       if (next.has(nodeId)) {
         next.delete(nodeId)
+        target.removeAttribute('data-review-revealed')
       } else {
         next.add(nodeId)
+        target.setAttribute('data-review-revealed', 'true')
       }
       return next
     })
