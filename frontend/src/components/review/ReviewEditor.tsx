@@ -1,4 +1,5 @@
 import { Mark, markInputRule, mergeAttributes, type Editor } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useCallback, useEffect, useRef, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
@@ -174,6 +175,41 @@ function syncProseMirrorSelection(editor: Editor): void {
   editor.commands.setTextSelection(nextSelection)
 }
 
+function clearInheritedReviewMarksAtParagraphEnd(editor: Editor): boolean {
+  const { selection, storedMarks } = editor.state
+  if (!(selection instanceof TextSelection) || !selection.empty || storedMarks !== null) return false
+
+  const { $from } = selection
+  if ($from.pos !== $from.end()) return false
+
+  const hasReviewMark = $from.marks().some(mark => (
+    Object.values(REVIEW_TIPTAP_MARK_NAMES).includes(mark.type.name)
+  ))
+  if (!hasReviewMark) return false
+
+  editor.view.dispatch(editor.state.tr.setStoredMarks([]))
+  return true
+}
+
+function collapseSelectionOutsideReviewMark(editor: Editor): boolean {
+  const { selection } = editor.state
+  if (!(selection instanceof TextSelection) || selection.empty) return false
+
+  const target = selection.$to
+  if (target.pos !== target.end()) return false
+
+  const hasReviewMark = target.marks().some(mark => (
+    Object.values(REVIEW_TIPTAP_MARK_NAMES).includes(mark.type.name)
+  ))
+  if (!hasReviewMark) return false
+
+  const transaction = editor.state.tr
+    .setSelection(TextSelection.create(editor.state.doc, target.pos))
+    .setStoredMarks([])
+  editor.view.dispatch(transaction)
+  return true
+}
+
 function toggleSpoilerVisibility(element: HTMLElement): void {
   if (element.hasAttribute('data-review-revealed')) {
     element.removeAttribute('data-review-revealed')
@@ -333,6 +369,17 @@ export function ReviewEditor({
 
   const handleKeyDownCapture = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
     if (!editor) return
+
+    if (event.key === 'ArrowRight') {
+      const collapsedOutsideReviewMark = collapseSelectionOutsideReviewMark(editor)
+      const exitedReviewMark = clearInheritedReviewMarksAtParagraphEnd(editor)
+      if (collapsedOutsideReviewMark || exitedReviewMark) {
+        event.preventDefault()
+        return
+      }
+    } else if (event.key === 'Enter') {
+      clearInheritedReviewMarksAtParagraphEnd(editor)
+    }
 
     if (event.key === 'Backspace' || event.key === 'Delete') {
       const selectedFormats = getSelectedReviewFormats(editor)
