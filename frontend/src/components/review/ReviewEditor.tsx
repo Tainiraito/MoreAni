@@ -208,20 +208,91 @@ export function ReviewEditor({
 
   // ── 事件处理 ──
 
+  // 暂存 beforeinput 时的选区和源字符串
+  const beforeInputSelRef = useRef<{ sel: ReviewEditorSelection; source: string } | null>(null)
+
   const handleInput = useCallback(() => {
     if (disabled || composingRef.current) return
-    syncAfterInput()
-  }, [disabled, syncAfterInput])
+    const editor = editorRef.current
+    if (!editor) return
+
+    const saved = beforeInputSelRef.current
+    beforeInputSelRef.current = null
+
+    // 暂存的 InputEvent
+    const inputEvent = (window as any).__lastInputEvent as InputEvent | undefined
+    ;(window as any).__lastInputEvent = null
+
+    // 根据 inputType 直接操作源字符串
+    let newSource: string | null = null
+    let newCursor = 0
+
+    if (saved && inputEvent) {
+      const { sel: prevSel, source: prevSource } = saved
+      newCursor = prevSel.start
+
+      const it = inputEvent.inputType
+      if (it === 'insertText' && inputEvent.data) {
+        if (prevSel.start !== prevSel.end) {
+          newSource = prevSource.slice(0, prevSel.start) + inputEvent.data + prevSource.slice(prevSel.end)
+        } else {
+          newSource = insertIntoSource(prevSource, prevSel.start, inputEvent.data)
+        }
+        newCursor = prevSel.start + inputEvent.data.length
+      } else if (it === 'deleteContentBackward') {
+        if (prevSel.start !== prevSel.end) {
+          newSource = prevSource.slice(0, prevSel.start) + prevSource.slice(prevSel.end)
+          newCursor = prevSel.start
+        } else if (prevSel.start > 0) {
+          newSource = prevSource.slice(0, prevSel.start - 1) + prevSource.slice(prevSel.start)
+          newCursor = prevSel.start - 1
+        }
+      } else if (it === 'deleteContentForward') {
+        if (prevSel.start !== prevSel.end) {
+          newSource = prevSource.slice(0, prevSel.start) + prevSource.slice(prevSel.end)
+          newCursor = prevSel.start
+        } else if (prevSel.start < prevSource.length) {
+          newSource = prevSource.slice(0, prevSel.start) + prevSource.slice(prevSel.start + 1)
+          newCursor = prevSel.start
+        }
+      }
+    }
+
+    if (!newSource) {
+      // fallback：用 serializeReviewEditor（普通编辑器外的修改）
+      newSource = serializeReviewEditor(editor)
+    }
+
+    if (newSource && newSource !== sourceRef.current) {
+      sourceRef.current = newSource
+      const history = historyRef.current
+      const idx = historyIndexRef.current
+      history.length = idx + 1
+      history.push(newSource)
+      historyIndexRef.current = history.length - 1
+      onChange(newSource)
+      renderFromSource(newSource, { start: newCursor, end: newCursor })
+    }
+  }, [disabled, onChange, renderFromSource])
 
   const handleBeforeInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
     if (disabled || composingRef.current) return
+    const editor = editorRef.current
+    if (!editor) return
+
+    // 保存 beforeinput 时的选区和源字符串
+    const sel = getReviewEditorSelection(editor)
+    if (sel) {
+      beforeInputSelRef.current = { sel, source: sourceRef.current }
+    }
+
+    // 暂存 InputEvent 给 handleInput 使用
     const inputEvent = e.nativeEvent as InputEvent
+    ;(window as any).__lastInputEvent = inputEvent
+
     // Enter 键：插入换行而非段落
     if (inputEvent.inputType === 'insertParagraph' || inputEvent.inputType === 'insertLineBreak') {
       e.preventDefault()
-      const editor = editorRef.current
-      if (!editor) return
-      const sel = getReviewEditorSelection(editor)
       if (!sel) return
       const newSource = insertIntoSource(sourceRef.current, sel.start, '\n')
       sourceRef.current = newSource
