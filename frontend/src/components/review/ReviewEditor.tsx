@@ -67,6 +67,13 @@ function isSelectionWrappedByFormat(source: string, start: number, end: number, 
     }
   }
 
+  // Case 3: 选区从位置 0 开始且 source 以 token 开头 + 选区后有匹配的结尾 token
+  if (start === 0 && source.slice(0, tLen) === token && end + tLen <= source.length) {
+    if (source.slice(end, end + tLen) === token && hasContentBetween(tLen, end)) {
+      return true
+    }
+  }
+
   return false
 }
 
@@ -312,6 +319,13 @@ export function ReviewEditor({
         }
       }
 
+      // Case 3: 选区从位置 0 开始
+      if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token
+        && sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
+        openPos = 0
+        closePos = sel.end
+      }
+
       if (openPos >= 0 && closePos >= 0) {
         const newSource = source.slice(0, openPos) + source.slice(openPos + tLen, closePos) + source.slice(closePos + tLen)
         sourceRef.current = newSource
@@ -396,25 +410,25 @@ export function ReviewEditor({
       if (!sel || sel.start === sel.end) return
 
       const source = sourceRef.current
-      // 检查每个格式的 token 是否包围了选区
-      for (const tool of MARKUP_TOOLS) {
+      // 按 token 长度降序检查，避免 ** 被 * 先匹配
+      const sortedTools = [...MARKUP_TOOLS].sort((a, b) =>
+        REVIEW_MARKUP_TOKENS[b.format].length - REVIEW_MARKUP_TOKENS[a.format].length
+      )
+      for (const tool of sortedTools) {
         const token = REVIEW_MARKUP_TOKENS[tool.format]
-        if (isSelectionWrappedByFormat(source, sel.start, sel.end, token)) {
+        const wrapped = isSelectionWrappedByFormat(source, sel.start, sel.end, token)
+        if (wrapped) {
           e.preventDefault()
           const tLen = token.length
+          // 向前搜索匹配的开头 token
           let openPos = -1
-          let closePos = -1
-
-          // Case 1: 选区在 token 对内部
           for (let i = sel.start - 1; i >= 0; i--) {
             if (source.slice(i, i + tLen) === token) { openPos = i; break }
-            if (source[i] !== ' ' && source[i] !== '\n' && source[i] !== '\t') break
           }
-          if (openPos >= 0) {
-            for (let j = sel.end; j <= source.length - tLen; j++) {
-              if (source.slice(j, j + tLen) === token) { closePos = j; break }
-              if (source[j] !== ' ' && source[j] !== '\n' && source[j] !== '\t') break
-            }
+          // 向后搜索匹配的结尾 token
+          let closePos = -1
+          for (let j = sel.end; j <= source.length - tLen; j++) {
+            if (source.slice(j, j + tLen) === token) { closePos = j; break }
           }
 
           // Case 2: 选区恰好包含 token 对
@@ -424,6 +438,13 @@ export function ReviewEditor({
               openPos = sel.start - tLen
               closePos = sel.end
             }
+          }
+
+          // Case 3: 选区从位置 0 开始
+          if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token
+            && sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
+            openPos = 0
+            closePos = sel.end
           }
 
           if (openPos >= 0 && closePos >= 0) {
@@ -443,6 +464,25 @@ export function ReviewEditor({
         }
       }
       return // 让浏览器处理普通删除
+    }
+
+    // Enter → 插入换行
+    if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey || e.altKey)) {
+      e.preventDefault()
+      const editor = editorRef.current
+      if (!editor) return
+      const sel = getReviewEditorSelection(editor)
+      if (!sel) return
+      const newSource = insertIntoSource(sourceRef.current, sel.start, '\n')
+      sourceRef.current = newSource
+      const history = historyRef.current
+      const idx = historyIndexRef.current
+      history.length = idx + 1
+      history.push(newSource)
+      historyIndexRef.current = history.length - 1
+      onChange(newSource)
+      renderFromSource(newSource, { start: sel.start + 1, end: sel.start + 1 })
+      return
     }
   }, [disabled, applyFormat, onChange, renderFromSource])
 
