@@ -213,6 +213,7 @@ function serializeEditorNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return stripEditorCaretCharacters(node.nodeValue ?? '')
   if (!(node instanceof HTMLElement)) return ''
   if (node.tagName === 'BR') return '\n'
+  if (node.classList.contains('review-token')) return ''
 
   const content = serializeEditorChildren(node)
   const format = getElementFormat(node)

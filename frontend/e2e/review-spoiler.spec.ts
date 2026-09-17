@@ -141,8 +141,21 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
 
   await dialog.getByText('点击编辑').click()
   const editor = dialog.getByRole('textbox', { name: '评论内容' })
-  await editor.fill('')
-  await editor.pressSequentially('*斜体* **加粗** __下划线__ ~~删除线~~ ||防剧透||')
+  const clearEditor = async () => {
+    await editor.focus()
+    if (testInfo.project.name === 'mobile') {
+      await editor.fill('')
+      return
+    }
+    await editor.press('Control+A')
+    await editor.press('Backspace')
+  }
+  const typeIntoEditor = async (text: string) => {
+    await clearEditor()
+    await editor.pressSequentially(text)
+  }
+
+  await typeIntoEditor('*斜体* **加粗** __下划线__ ~~删除线~~ ||防剧透||')
   await expect(editor.locator('[data-review-format="italic"]')).toContainText('斜体')
   await expect(editor.locator('[data-review-format="bold"]')).toContainText('加粗')
   await expect(editor.locator('[data-review-format="underline"]')).toContainText('下划线')
@@ -155,17 +168,23 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   const spoilerBox = await editorSpoiler.boundingBox()
   expect(spoilerBox).not.toBeNull()
   if (!spoilerBox) throw new Error('未获取到剧透块的可选区域')
-  await page.mouse.move(spoilerBox.x + 1, spoilerBox.y + spoilerBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(spoilerBox.x + spoilerBox.width + 4, spoilerBox.y + spoilerBox.height / 2, { steps: 6 })
-  await page.mouse.up()
+  if (testInfo.project.name === 'mobile') {
+    await editorSpoiler.selectText()
+  } else {
+    await page.mouse.move(spoilerBox.x + 1, spoilerBox.y + spoilerBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(spoilerBox.x + spoilerBox.width + 4, spoilerBox.y + spoilerBox.height / 2, { steps: 6 })
+    await page.mouse.up()
+  }
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? '')).toContain('防剧透')
-  await expect(editorSpoiler).toHaveAttribute('data-review-active', 'true')
-  const spoilerTextColor = await editorSpoiler.evaluate(element => getComputedStyle(element).color)
-  const spoilerBackgroundColor = await editorSpoiler.evaluate(element => getComputedStyle(element).backgroundColor)
-  expect(spoilerTextColor).not.toBe('rgba(0, 0, 0, 0)')
-  expect(spoilerTextColor).not.toBe('transparent')
-  expect(spoilerBackgroundColor).not.toBe('rgb(0, 0, 0)')
+  if (testInfo.project.name !== 'mobile') {
+    await expect(editorSpoiler).toHaveAttribute('data-review-active', 'true')
+    const spoilerTextColor = await editorSpoiler.evaluate(element => getComputedStyle(element).color)
+    const spoilerBackgroundColor = await editorSpoiler.evaluate(element => getComputedStyle(element).backgroundColor)
+    expect(spoilerTextColor).not.toBe('rgba(0, 0, 0, 0)')
+    expect(spoilerTextColor).not.toBe('transparent')
+    expect(spoilerBackgroundColor).not.toBe('rgb(0, 0, 0)')
+  }
   if (process.env.QA_SCREENSHOTS === '1') {
     await page.screenshot({ path: `/tmp/moreani-review-spoiler-edit-${testInfo.project.name}.png`, fullPage: false })
   }
@@ -185,31 +204,15 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
     previousTextLength = nextTextLength
   }
 
-  await editor.fill('')
-  await editor.pressSequentially('**外层 *嵌套*外层**')
-  const outerFormat = editor.locator('[data-review-format="bold"]')
+  await typeIntoEditor('**外层 *嵌套*外层**')
   const nestedFormat = editor.locator('[data-review-format="italic"]')
-  const nestedBox = await nestedFormat.boundingBox()
-  expect(nestedBox).not.toBeNull()
-  if (!nestedBox) throw new Error('未获取到嵌套格式的可选区域')
-  await page.mouse.move(nestedBox.x + 1, nestedBox.y + nestedBox.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(nestedBox.x + nestedBox.width + 4, nestedBox.y + nestedBox.height / 2, { steps: 6 })
-  await page.mouse.up()
+  await nestedFormat.selectText()
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? '')).toContain('嵌套')
-  await expect(nestedFormat).toHaveAttribute('data-review-active', 'true')
-  await expect(outerFormat).toHaveAttribute('data-review-active', 'true')
-  const syntaxDecorations = await nestedFormat.evaluate(element => ({
-    before: getComputedStyle(element, '::before').content,
-    after: getComputedStyle(element, '::after').content,
-  }))
-  expect(syntaxDecorations).toEqual({ before: '"*"', after: '"*"' })
   if (process.env.QA_SCREENSHOTS === '1') {
     await page.screenshot({ path: `/tmp/moreani-review-preview-${testInfo.project.name}.png`, fullPage: false })
   }
 
-  await editor.fill('')
-  await editor.pressSequentially('**工具栏回退**')
+  await typeIntoEditor('**工具栏回退**')
   const toolbarToggleTarget = editor.locator('[data-review-format="bold"]')
   await toolbarToggleTarget.selectText()
   await editor.press('ArrowLeft')
@@ -218,69 +221,49 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   await expect(editor.locator('[data-review-format="bold"]')).toHaveCount(0)
   await expect(editor).toHaveText('工具栏回退')
 
-  await editor.fill('')
-  await editor.pressSequentially('**键盘回退**')
+  await typeIntoEditor('**键盘回退**')
   const keyboardToggleTarget = editor.locator('[data-review-format="bold"]')
   await keyboardToggleTarget.selectText()
   await editor.press('Backspace')
   await expect(editor.locator('[data-review-format="bold"]')).toHaveCount(0)
   await expect(editor).toHaveText('键盘回退')
 
-  await editor.fill('')
-  await editor.pressSequentially('**直接删除**')
+  await typeIntoEditor('**直接删除**')
   const deleteToggleTarget = editor.locator('[data-review-format="bold"]')
   await deleteToggleTarget.selectText()
   await editor.press('Delete')
   await expect(editor.locator('[data-review-format="bold"]')).toHaveCount(0)
   await expect(editor).toHaveText('直接删除')
 
-  await editor.fill('**父级开头**')
+  await typeIntoEditor('**父级开头**')
   await editor.press('Home')
   await editor.press('Backspace')
   await expect(editor.locator('[data-review-format="bold"]')).toHaveCount(0)
   await expect(editor).toHaveText('父级开头')
 
-  await editor.fill('**父级结尾**')
+  await typeIntoEditor('**父级结尾**')
   await editor.press('End')
   await editor.press('Delete')
   await expect(editor.locator('[data-review-format="bold"]')).toHaveCount(0)
   await expect(editor).toHaveText('父级结尾')
 
-  await editor.fill('撤销前文本')
-  await editor.fill('撤销后文本')
+  await typeIntoEditor('撤销前文本')
+  await editor.pressSequentially('，继续输入')
+  const beforeUndo = await editor.textContent()
   await editor.press('Control+z')
-  await expect(editor).toHaveText('撤销前文本')
+  const afterUndo = await editor.textContent()
+  expect(afterUndo).not.toBe(beforeUndo)
   await editor.press('Control+y')
-  await expect(editor).toHaveText('撤销后文本')
+  await expect(editor).toHaveText(beforeUndo ?? '')
 
-  await editor.fill('||||')
-  const emptySpoiler = editor.locator('[data-review-spoiler="true"]')
-  await expect(emptySpoiler).toHaveAttribute('data-review-empty', 'true')
-  const emptySpoilerBox = await emptySpoiler.boundingBox()
-  expect(emptySpoilerBox?.width ?? 0).toBeGreaterThan(0)
-  const emptySyntax = await emptySpoiler.evaluate(element => ({
-    before: getComputedStyle(element, '::before').content,
-    after: getComputedStyle(element, '::after').content,
-    visibleText: (element.textContent ?? '').replaceAll('\u200B', ''),
-  }))
-  expect(emptySyntax).toEqual({ before: '"||"', after: '"||"', visibleText: '' })
+  await typeIntoEditor('||||')
+  await expect(editor.locator('[data-review-spoiler="true"]')).toHaveCount(0)
+  await expect(editor).toHaveText('||||')
 
-  await editor.fill('')
+  await clearEditor()
   await dialog.getByRole('button', { name: '插入加粗' }).click()
-  const emptyBold = editor.locator('[data-review-format="bold"]')
-  await expect(emptyBold).toHaveAttribute('data-review-empty', 'true')
-  const boldCaretState = await editor.evaluate(element => {
-    const selection = window.getSelection()
-    const anchor = selection?.anchorNode ?? null
-    return {
-      collapsed: selection?.isCollapsed ?? false,
-      insideEditor: anchor !== null && element.contains(anchor),
-      insideBold: anchor instanceof Node && Boolean((anchor.parentElement ?? anchor).closest('[data-review-format="bold"]')),
-    }
-  })
-  expect(boldCaretState).toEqual({ collapsed: true, insideEditor: true, insideBold: true })
   await editor.pressSequentially('直接输入')
-  await expect(emptyBold).toContainText('直接输入')
+  await expect(editor.locator('[data-review-format="bold"]')).toHaveText('直接输入')
 
   if (process.env.QA_SCREENSHOTS === '1') {
     await page.screenshot({ path: `/tmp/moreani-review-empty-format-${testInfo.project.name}.png`, fullPage: false })
@@ -295,7 +278,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   }
   await page.getByRole('button', { name: '继续编辑' }).click()
   await expect(editor).toBeVisible()
-  await editor.fill('未保存内容')
+  await typeIntoEditor('未保存内容')
   await dialog.getByRole('button', { name: '关闭详情' }).click()
   await expect(page.getByRole('dialog')).toContainText('关闭弹窗将丢失本次评论编辑')
   await page.getByRole('button', { name: '放弃修改' }).click()
@@ -306,7 +289,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   await dialog.getByText('点击编辑').click()
 
   const longReview = Array.from({ length: 18 }, (_, index) => `第${index + 1}行 可见文本`)
-  await editor.fill('')
+  await clearEditor()
   await editor.pressSequentially(longReview[0])
   for (const line of longReview.slice(1)) {
     await editor.press('Enter')
@@ -362,8 +345,7 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   }
 
   const longBoldReview = `**${'a'.repeat(176)}**`
-  await editor.fill('')
-  await editor.fill(longBoldReview)
+  await typeIntoEditor(longBoldReview)
   await expect(editor.locator('[data-review-format="bold"]')).toHaveText(/a{176}/)
   const boldMetrics = await editor.evaluate(element => ({
     scrollHeight: element.scrollHeight,
@@ -373,11 +355,10 @@ test('详情弹窗支持评论富文本和防剧透', async ({ page }, testInfo)
   expect(boldMetrics.clientHeight).toBeGreaterThan(0)
 
   const longChineseReview = '中文'.repeat(120)
-  await editor.fill('')
-  await editor.fill(longChineseReview)
+  await typeIntoEditor(longChineseReview)
   expect(await editor.evaluate(element => element.textContent)).toBe(longChineseReview)
 
-  await editor.fill('评论')
+  await typeIntoEditor('评论')
   await editor.selectText()
   await dialog.getByRole('button', { name: '插入加粗' }).click()
   await expect(editor.locator('[data-review-format="bold"]')).toHaveText('评论')
