@@ -134,6 +134,7 @@
 
   [data-slot="review-editor"] [data-review-format="inline-spoiler"] {
     padding-inline: 0.125rem;
+    margin-inline: 0.125rem;
     border-radius: 0.125rem;
     background: #000;
     color: transparent;
@@ -178,6 +179,37 @@
   [data-slot="review-editor"] [data-review-format][data-review-empty="true"]::after {
     content: attr(data-review-token);
     margin-inline-start: 0.08em;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-caret-boundary] {
+    outline: 1px solid rgba(251, 113, 167, 0.85);
+    outline-offset: 1px;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-caret-boundary="start"]::before,
+  [data-slot="review-editor"] [data-review-format][data-review-caret-boundary="end"]::after {
+    content: attr(data-review-token);
+    color: var(--accent-pink);
+    font-style: normal;
+    font-weight: 500;
+    line-height: inherit;
+    text-decoration: none;
+    pointer-events: none;
+    user-select: none;
+    white-space: pre;
+    opacity: 1;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-caret-boundary="start"]::before {
+    margin-inline-end: 0.12em;
+  }
+
+  [data-slot="review-editor"] [data-review-format][data-review-caret-boundary="end"]::after {
+    margin-inline-start: 0.12em;
+  }
+
+  .review-inline-spoiler {
+    margin-inline: 0.125rem;
   }
 
   [data-slot="review-editor"] [data-review-format="inline-spoiler"]:focus-visible {

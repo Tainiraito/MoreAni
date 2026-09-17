@@ -19,7 +19,7 @@ describe('ReviewText', () => {
     const spoiler = container.querySelector('[tabindex="0"]')
 
     expect(spoiler).toHaveTextContent('防剧透')
-    expect(spoiler).toHaveClass('bg-black', 'text-black', 'hover:text-white', 'focus:text-white')
+    expect(spoiler).toHaveClass('review-inline-spoiler', 'bg-black', 'text-black', 'hover:text-white', 'focus:text-white')
     expect(spoiler).toHaveAttribute('aria-label', '防剧透内容')
     expect(spoiler).not.toHaveAttribute('title')
   })

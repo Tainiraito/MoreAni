@@ -1,4 +1,5 @@
 import { Mark, markInputRule, mergeAttributes, type Editor } from '@tiptap/core'
+import type { Mark as ProseMirrorMark } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -129,18 +130,63 @@ function selectionIntersectsElement(selection: Selection, element: HTMLElement):
   }
 }
 
+function getFormatAncestors(node: Node | null, editorRoot: HTMLElement): HTMLElement[] {
+  const elements: HTMLElement[] = []
+  let current = node instanceof HTMLElement ? node : node?.parentElement ?? null
+
+  while (current && current !== editorRoot) {
+    if (current.dataset.reviewFormat) elements.push(current)
+    current = current.parentElement
+  }
+
+  return elements
+}
+
+interface CaretBoundaryElements {
+  start: HTMLElement[]
+  end: HTMLElement[]
+}
+
+function getCaretBoundaryElements(editor: Editor): CaretBoundaryElements {
+  const boundary: CaretBoundaryElements = { start: [], end: [] }
+  const selection = window.getSelection()
+  if (!selection || !selection.isCollapsed || selection.rangeCount !== 1) return boundary
+
+  const range = selection.getRangeAt(0)
+  if (!editor.view.dom.contains(range.commonAncestorContainer) || !selection.anchorNode) return boundary
+
+  const anchorNode = selection.anchorNode
+  if (anchorNode.nodeType === Node.TEXT_NODE) {
+    const textLength = anchorNode.textContent?.length ?? 0
+    if (selection.anchorOffset === 0) boundary.start = getFormatAncestors(anchorNode, editor.view.dom)
+    if (selection.anchorOffset === textLength) boundary.end = getFormatAncestors(anchorNode, editor.view.dom)
+    return boundary
+  }
+
+  const before = anchorNode.childNodes[selection.anchorOffset - 1] ?? null
+  const after = anchorNode.childNodes[selection.anchorOffset] ?? null
+  if (after) boundary.start = getFormatAncestors(after, editor.view.dom)
+  if (before) boundary.end = getFormatAncestors(before, editor.view.dom)
+  return boundary
+}
+
 function setActiveFormatAttributes(editor: Editor): void {
   if (editor.isDestroyed) return
   const selection = window.getSelection()
   const insideEditor = selection?.rangeCount === 1
     && editor.view.dom.contains(selection.getRangeAt(0).commonAncestorContainer)
+  const caretBoundary = getCaretBoundaryElements(editor)
 
   getFormatElements(editor).forEach(element => {
+    element.removeAttribute('data-review-caret-boundary')
     if (insideEditor && selection && selectionIntersectsElement(selection, element)) {
       element.setAttribute('data-review-active', 'true')
     } else {
       element.removeAttribute('data-review-active')
     }
+
+    if (caretBoundary.start.includes(element)) element.setAttribute('data-review-caret-boundary', 'start')
+    if (caretBoundary.end.includes(element)) element.setAttribute('data-review-caret-boundary', 'end')
   })
 }
 
@@ -175,37 +221,40 @@ function syncProseMirrorSelection(editor: Editor): void {
   editor.commands.setTextSelection(nextSelection)
 }
 
-function clearInheritedReviewMarksAtParagraphEnd(editor: Editor): boolean {
-  const { selection, storedMarks } = editor.state
-  if (!(selection instanceof TextSelection) || !selection.empty || storedMarks !== null) return false
+function getReviewBoundaryMarks(
+  editor: Editor,
+  position: number,
+  direction: 'left' | 'right',
+): ProseMirrorMark[] {
+  const resolvedPosition = editor.state.doc.resolve(position)
+  const enteringMarks = direction === 'left'
+    ? resolvedPosition.nodeAfter?.marks ?? []
+    : resolvedPosition.nodeBefore?.marks ?? []
+  const leavingMarks = direction === 'left'
+    ? resolvedPosition.nodeBefore?.marks ?? []
+    : resolvedPosition.nodeAfter?.marks ?? []
 
-  const { $from } = selection
-  if ($from.pos !== $from.end()) return false
-
-  const hasReviewMark = $from.marks().some(mark => (
+  return enteringMarks.filter(mark => (
     Object.values(REVIEW_TIPTAP_MARK_NAMES).includes(mark.type.name)
+    && !leavingMarks.some(other => other.type === mark.type)
   ))
-  if (!hasReviewMark) return false
-
-  editor.view.dispatch(editor.state.tr.setStoredMarks([]))
-  return true
 }
 
-function collapseSelectionOutsideReviewMark(editor: Editor): boolean {
+function exitReviewMarksAtBoundary(editor: Editor, direction: 'left' | 'right'): boolean {
   const { selection } = editor.state
-  if (!(selection instanceof TextSelection) || selection.empty) return false
+  if (!(selection instanceof TextSelection)) return false
 
-  const target = selection.$to
-  if (target.pos !== target.end()) return false
+  const position = selection.empty
+    ? selection.from
+    : direction === 'right' ? selection.to : selection.from
+  const boundaryMarks = getReviewBoundaryMarks(editor, position, direction)
+  if (boundaryMarks.length === 0) return false
 
-  const hasReviewMark = target.marks().some(mark => (
-    Object.values(REVIEW_TIPTAP_MARK_NAMES).includes(mark.type.name)
-  ))
-  if (!hasReviewMark) return false
-
-  const transaction = editor.state.tr
-    .setSelection(TextSelection.create(editor.state.doc, target.pos))
-    .setStoredMarks([])
+  let transaction = editor.state.tr
+  if (!selection.empty) transaction = transaction.setSelection(TextSelection.create(editor.state.doc, position))
+  boundaryMarks.forEach(mark => {
+    transaction = transaction.removeStoredMark(mark)
+  })
   editor.view.dispatch(transaction)
   return true
 }
@@ -263,6 +312,7 @@ export function ReviewEditor({
 }: ReviewEditorProps) {
   const sourceRef = useRef(value)
   const onChangeRef = useRef(onChange)
+  const forcePlainTextInputRef = useRef(false)
   const editorHeight = Math.max(MIN_EDITOR_HEIGHT_PX, rows * 20 + 24)
 
   useEffect(() => {
@@ -289,9 +339,22 @@ export function ReviewEditor({
           if (!text) return false
 
           const { from, to } = view.state.selection
-          view.dispatch(view.state.tr.insertText(text, from, to))
+          const transaction = view.state.tr
+          if (forcePlainTextInputRef.current) {
+            transaction.setStoredMarks([])
+            forcePlainTextInputRef.current = false
+          }
+          transaction.insertText(text, from, to)
+          view.dispatch(transaction)
           view.focus()
           return true
+        },
+        handleTextInput(view) {
+          if (!forcePlainTextInputRef.current) return false
+
+          forcePlainTextInputRef.current = false
+          view.dispatch(view.state.tr.setStoredMarks([]))
+          return false
         },
       },
       onUpdate: ({ editor: currentEditor }) => {
@@ -371,14 +434,19 @@ export function ReviewEditor({
     if (!editor) return
 
     if (event.key === 'ArrowRight') {
-      const collapsedOutsideReviewMark = collapseSelectionOutsideReviewMark(editor)
-      const exitedReviewMark = clearInheritedReviewMarksAtParagraphEnd(editor)
-      if (collapsedOutsideReviewMark || exitedReviewMark) {
+      if (exitReviewMarksAtBoundary(editor, 'right')) {
+        forcePlainTextInputRef.current = true
+        event.preventDefault()
+        return
+      }
+    } else if (event.key === 'ArrowLeft') {
+      if (exitReviewMarksAtBoundary(editor, 'left')) {
+        forcePlainTextInputRef.current = true
         event.preventDefault()
         return
       }
     } else if (event.key === 'Enter') {
-      clearInheritedReviewMarksAtParagraphEnd(editor)
+      if (exitReviewMarksAtBoundary(editor, 'right')) forcePlainTextInputRef.current = true
     }
 
     if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -452,6 +520,7 @@ export function ReviewEditor({
             type="button"
             onMouseDown={(event: ReactMouseEvent<HTMLButtonElement>) => event.preventDefault()}
             onClick={() => {
+              forcePlainTextInputRef.current = false
               editor?.chain().focus().toggleMark(REVIEW_TIPTAP_MARK_NAMES[format]).run()
             }}
             disabled={disabled || !editor}

@@ -14,7 +14,7 @@ const FORMAT_CLASS_NAMES: Record<ReviewMarkupFormat, string> = {
   bold: 'font-semibold',
   underline: 'underline',
   strike: 'line-through',
-  'inline-spoiler': 'rounded-sm bg-black px-0.5 text-black transition-colors hover:text-white focus:text-white focus:outline-none focus:ring-1 focus:ring-white/60',
+  'inline-spoiler': 'review-inline-spoiler rounded-sm bg-black px-0.5 text-black transition-colors hover:text-white focus:text-white focus:outline-none focus:ring-1 focus:ring-white/60',
 }
 
 const MARKUP_TOKENS: Record<ReviewMarkupFormat, string> = {
