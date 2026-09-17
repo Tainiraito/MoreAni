@@ -134,13 +134,6 @@ function stripEditorCaretCharacters(value: string): string {
   return value.replaceAll('\u200B', '')
 }
 
-function hasMeaningfulFormatContent(nodes: ReviewMarkupNode[]): boolean {
-  return nodes.some(node => (
-    node.kind === 'text'
-      ? node.value.replaceAll('\u200B', '').trim().length > 0
-      : hasMeaningfulFormatContent(node.children)
-  ))
-}
 
 function renderEditableNodes(
   nodes: ReviewMarkupNode[],
@@ -151,13 +144,15 @@ function renderEditableNodes(
     const nodeId = `${path}.${index}`
     if (node.kind === 'text') return escapeHtml(node.value)
 
+    const token = REVIEW_MARKUP_TOKENS[node.format]
     const spoilerAttributes = node.format === 'inline-spoiler'
       ? ` data-review-spoiler="true" role="button" tabindex="0" aria-label="防剧透内容，点击显示或隐藏"${revealedSpoilerIds.has(nodeId) ? ' data-review-revealed="true"' : ''}`
       : ''
-    const emptyAttributes = hasMeaningfulFormatContent(node.children) ? '' : ' data-review-empty="true"'
+
     const renderedChildren = renderEditableNodes(node.children, nodeId, revealedSpoilerIds)
 
-    return `<span data-review-format="${node.format}" data-review-token="${REVIEW_MARKUP_TOKENS[node.format]}" data-review-node-id="${nodeId}"${emptyAttributes}${spoilerAttributes}>${renderedChildren || '\u200B'}</span>`
+    // token 作为可见文本渲染（带 data-review-token 标记），内容正常显示
+    return `<span class="review-format-block" data-review-format="${node.format}" data-review-node-id="${nodeId}"${spoilerAttributes}><span class="review-token" data-review-token="${token}">${escapeHtml(token)}</span>${renderedChildren}<span class="review-token" data-review-token="${token}">${escapeHtml(token)}</span></span>`
   }).join('')
 }
 

@@ -61,13 +61,13 @@ describe('ReviewEditor', () => {
     )
     const editor = view.getByRole('textbox')
 
-    expect(editor.textContent).toBe('斜体 加粗 下划线 删除线 防剧透')
-    expect(editor.querySelector('[data-review-format="italic"]')).toHaveTextContent('斜体')
-    expect(editor.querySelector('[data-review-format="bold"]')).toHaveTextContent('加粗')
-    expect(editor.querySelector('[data-review-format="underline"]')).toHaveTextContent('下划线')
-    expect(editor.querySelector('[data-review-format="strike"]')).toHaveTextContent('删除线')
-    expect(editor.querySelector('[data-review-spoiler="true"]')).toHaveTextContent('防剧透')
-    expect(editor.textContent).not.toContain('**')
+    expect(editor.textContent).toBe('*斜体* **加粗** __下划线__ ~~删除线~~ ||防剧透||')
+    expect(editor.querySelector('[data-review-format="italic"]')).toHaveTextContent('*斜体*')
+    expect(editor.querySelector('[data-review-format="bold"]')).toHaveTextContent('**加粗**')
+    expect(editor.querySelector('[data-review-format="underline"]')).toHaveTextContent('__下划线__')
+    expect(editor.querySelector('[data-review-format="strike"]')).toHaveTextContent('~~删除线~~')
+    expect(editor.querySelector('[data-review-spoiler="true"]')).toHaveTextContent('||防剧透||')
+    expect(editor.textContent).toContain('**')
   })
 
   it('keeps empty formats editable and visibly marks their syntax', () => {
@@ -75,9 +75,9 @@ describe('ReviewEditor', () => {
     const editor = view.getByRole('textbox')
     const spoiler = editor.querySelector('[data-review-spoiler="true"]') as HTMLElement
 
-    expect(spoiler).toHaveAttribute('data-review-empty', 'true')
-    expect(editor.textContent?.replaceAll('\u200B', '')).toBe('')
-    expect(spoiler.textContent).toContain('\u200B')
+    // token 现在作为可见文本渲染
+    expect(spoiler).toBeInTheDocument()
+    expect(editor.textContent).toBe('||||')
   })
 
   it('marks every nested format around the current selection for live syntax decorations', () => {
