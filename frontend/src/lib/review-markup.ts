@@ -233,13 +233,13 @@ function getEditorNodeSourceLength(node: Node): number {
   if (!(node instanceof HTMLElement)) return node instanceof HTMLBRElement ? 1 : 0
   if (node.tagName === 'BR') return 1
 
-  const contentLength = Array.from(node.childNodes)
-    .reduce((length, child) => length + getEditorNodeSourceLength(child), 0)
-  const format = getElementFormat(node)
-  if (!format) return contentLength
+  // token 可见时，格式元素的 source 长度就是 textContent 长度
+  if (node.dataset.reviewFormat) {
+    return stripEditorCaretCharacters(node.textContent ?? '').length
+  }
 
-  const tokenLength = REVIEW_MARKUP_TOKENS[format].length
-  return tokenLength + contentLength + tokenLength
+  return Array.from(node.childNodes)
+    .reduce((length, child) => length + getEditorNodeSourceLength(child), 0)
 }
 
 function getSourceOffsetInChildren(parent: Node, targetNode: Node, targetOffset: number, sourceStart: number): number | null {
@@ -259,21 +259,15 @@ function getSourceOffsetInChildren(parent: Node, targetNode: Node, targetOffset:
         return sourceOffset + stripEditorCaretCharacters(visibleText).length
       }
 
-      const format = child instanceof HTMLElement ? getElementFormat(child) : null
-      const contentStart = format
-        ? sourceOffset + REVIEW_MARKUP_TOKENS[format].length
-        : sourceOffset
-      return contentStart + Array.from(child.childNodes)
+      // token 可见时，格式元素内不需要额外加 token 长度
+      return sourceOffset + Array.from(child.childNodes)
         .slice(0, Math.max(0, Math.min(targetOffset, child.childNodes.length)))
         .reduce((length, nestedChild) => length + getEditorNodeSourceLength(nestedChild), 0)
     }
 
     if (child.contains(targetNode)) {
-      const format = child instanceof HTMLElement ? getElementFormat(child) : null
-      const contentStart = format
-        ? sourceOffset + REVIEW_MARKUP_TOKENS[format].length
-        : sourceOffset
-      return getSourceOffsetInChildren(child, targetNode, targetOffset, contentStart)
+      // token 可见时，格式元素内不需要额外加 token 长度
+      return getSourceOffsetInChildren(child, targetNode, targetOffset, sourceOffset)
     }
 
     sourceOffset += getEditorNodeSourceLength(child)
@@ -283,32 +277,11 @@ function getSourceOffsetInChildren(parent: Node, targetNode: Node, targetOffset:
 }
 
 function addClosingTokensAtCollapsedCaret(
-  root: HTMLElement,
-  range: Range,
+  _root: HTMLElement,
+  _range: Range,
   sourceOffset: number,
 ): number {
-  let current: Node | null = range.startContainer
-  let offset = range.startOffset
-
-  while (current && current !== root) {
-    const isAtNodeEnd = current.nodeType === Node.TEXT_NODE
-      ? offset === (current.nodeValue?.length ?? 0)
-      : current instanceof HTMLElement && offset === current.childNodes.length
-    if (!isAtNodeEnd) break
-
-    const parent: Node | null = current.parentNode
-    if (!parent) break
-    if (current !== parent.lastChild) break
-
-    if (parent instanceof HTMLElement) {
-      const format = getElementFormat(parent)
-      if (format) sourceOffset += REVIEW_MARKUP_TOKENS[format].length
-    }
-
-    current = parent
-    offset = parent.childNodes.length
-  }
-
+  // token 可见时，源偏移已经包含 token 字符，不需要额外调整
   return sourceOffset
 }
 

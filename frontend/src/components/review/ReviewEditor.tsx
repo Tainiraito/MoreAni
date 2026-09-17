@@ -68,8 +68,13 @@ function isSelectionWrappedByFormat(source: string, start: number, end: number, 
   }
 
   // Case 3: 选区从位置 0 开始且 source 以 token 开头 + 选区后有匹配的结尾 token
-  if (start === 0 && source.slice(0, tLen) === token && end + tLen <= source.length) {
-    if (source.slice(end, end + tLen) === token && hasContentBetween(tLen, end)) {
+  if (start === 0 && source.slice(0, tLen) === token) {
+    // 结尾 token 可能在选区末尾（选区覆盖整个源）或选区之后
+    if (end + tLen <= source.length && source.slice(end, end + tLen) === token && hasContentBetween(tLen, end)) {
+      return true
+    }
+    // 选区覆盖到源末尾，检查源是否以 token 结尾
+    if (end === source.length && source.slice(end - tLen, end) === token && hasContentBetween(tLen, end - tLen)) {
       return true
     }
   }
@@ -390,10 +395,14 @@ export function ReviewEditor({
       }
 
       // Case 3: 选区从位置 0 开始
-      if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token
-        && sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
-        openPos = 0
-        closePos = sel.end
+      if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token) {
+        if (sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
+          openPos = 0
+          closePos = sel.end
+        } else if (sel.end === source.length && source.slice(sel.end - tLen, sel.end) === token) {
+          openPos = 0
+          closePos = sel.end - tLen
+        }
       }
 
       if (openPos >= 0 && closePos >= 0) {
@@ -603,10 +612,14 @@ export function ReviewEditor({
           }
 
           // Case 3: 选区从位置 0 开始
-          if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token
-            && sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
-            openPos = 0
-            closePos = sel.end
+          if (openPos < 0 && sel.start === 0 && source.slice(0, tLen) === token) {
+            if (sel.end + tLen <= source.length && source.slice(sel.end, sel.end + tLen) === token) {
+              openPos = 0
+              closePos = sel.end
+            } else if (sel.end === source.length && source.slice(sel.end - tLen, sel.end) === token) {
+              openPos = 0
+              closePos = sel.end - tLen
+            }
           }
 
           if (openPos >= 0 && closePos >= 0) {
