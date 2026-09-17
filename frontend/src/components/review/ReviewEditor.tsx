@@ -231,6 +231,7 @@ export function ReviewEditor({
     // 根据 inputType 直接操作源字符串
     let newSource: string | null = null
     let newCursor = 0
+    let needsRerender = false
 
     if (saved && inputEvent) {
       const { sel: prevSel, source: prevSource } = saved
@@ -261,11 +262,17 @@ export function ReviewEditor({
           newCursor = prevSel.start
         }
       }
+
+      // 删除操作可能破坏格式结构，需要 re-render
+      if (it === 'deleteContentBackward' || it === 'deleteContentForward') {
+        needsRerender = true
+      }
     }
 
     if (!newSource) {
-      // fallback：用 serializeReviewEditor（普通编辑器外的修改）
+      // fallback：用 serializeReviewEditor
       newSource = serializeReviewEditor(editor)
+      needsRerender = true
     }
 
     if (newSource && newSource !== sourceRef.current) {
@@ -276,7 +283,12 @@ export function ReviewEditor({
       history.push(newSource)
       historyIndexRef.current = history.length - 1
       onChange(newSource)
-      renderFromSource(newSource, { start: newCursor, end: newCursor })
+
+      // 简单文本编辑：不 re-render DOM（保持光标稳定）
+      // 格式结构变化时才 re-render
+      if (needsRerender) {
+        renderFromSource(newSource, { start: newCursor, end: newCursor })
+      }
     }
   }, [disabled, onChange, renderFromSource])
 
