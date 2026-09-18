@@ -1,6 +1,6 @@
 import { Mark, markInputRule, mergeAttributes, type Editor } from '@tiptap/core'
 import type { Mark as ProseMirrorMark } from '@tiptap/pm/model'
-import { TextSelection } from '@tiptap/pm/state'
+import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useCallback, useEffect, useRef, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
@@ -51,6 +51,8 @@ const INPUT_RULES: Readonly<Record<ReviewMarkupFormat, RegExp>> = {
 }
 
 const MIN_EDITOR_HEIGHT_PX = 64
+const REVIEW_CARET_MARK_NAME = 'reviewCaretAnchor'
+const REVIEW_CARET_CHARACTER = '\u200B'
 
 function createReviewMark(format: ReviewMarkupFormat) {
   const token = REVIEW_MARKUP_TOKENS[format]
@@ -98,6 +100,25 @@ function createReviewMark(format: ReviewMarkupFormat) {
   })
 }
 
+function createReviewCaretMark() {
+  return Mark.create({
+    name: REVIEW_CARET_MARK_NAME,
+    inclusive: false,
+    excludes: '_',
+
+    parseHTML() {
+      return [{ tag: 'span[data-review-caret-anchor]' }]
+    },
+
+    renderHTML({ HTMLAttributes }) {
+      return ['span', mergeAttributes(HTMLAttributes, {
+        'data-review-caret-anchor': 'true',
+        'aria-hidden': 'true',
+      }), 0]
+    },
+  })
+}
+
 const REVIEW_EXTENSIONS = [
   StarterKit.configure({
     bold: false,
@@ -109,6 +130,7 @@ const REVIEW_EXTENSIONS = [
   createReviewMark('underline'),
   createReviewMark('strike'),
   createReviewMark('inline-spoiler'),
+  createReviewCaretMark(),
 ]
 
 function getFormatElements(editor: Editor): HTMLElement[] {
@@ -240,6 +262,30 @@ function getReviewBoundaryMarks(
   ))
 }
 
+function placeCaretOutsideReviewFormat(
+  editor: Editor,
+  position: number,
+  direction: 'left' | 'right',
+  boundaryMarks: ProseMirrorMark[],
+): boolean {
+  const caretMarkType = editor.state.schema.marks[REVIEW_CARET_MARK_NAME]
+  if (!caretMarkType) return false
+
+  let transaction = editor.state.tr.setSelection(TextSelection.create(editor.state.doc, position))
+  boundaryMarks.forEach(mark => {
+    transaction = transaction.removeStoredMark(mark)
+  })
+  transaction = transaction.setStoredMarks([])
+  transaction = transaction.insert(
+    position,
+    editor.state.schema.text(REVIEW_CARET_CHARACTER, [caretMarkType.create()]),
+  )
+  const selectionPosition = direction === 'left' ? position : position + 1
+  transaction = transaction.setSelection(TextSelection.create(transaction.doc, selectionPosition))
+  editor.view.dispatch(transaction)
+  return true
+}
+
 function moveToReviewBoundary(editor: Editor, direction: 'left' | 'right'): boolean {
   const { selection, doc } = editor.state
   if (!(selection instanceof TextSelection) || !selection.empty) return false
@@ -250,12 +296,7 @@ function moveToReviewBoundary(editor: Editor, direction: 'left' | 'right'): bool
   const boundaryMarks = getReviewBoundaryMarks(editor, nextPosition, direction)
   if (boundaryMarks.length === 0) return false
 
-  let transaction = editor.state.tr.setSelection(TextSelection.create(doc, nextPosition))
-  boundaryMarks.forEach(mark => {
-    transaction = transaction.removeStoredMark(mark)
-  })
-  editor.view.dispatch(transaction)
-  return true
+  return placeCaretOutsideReviewFormat(editor, nextPosition, direction, boundaryMarks)
 }
 
 function exitReviewMarksAtBoundary(editor: Editor, direction: 'left' | 'right'): boolean {
@@ -268,13 +309,51 @@ function exitReviewMarksAtBoundary(editor: Editor, direction: 'left' | 'right'):
   const boundaryMarks = getReviewBoundaryMarks(editor, position, direction)
   if (boundaryMarks.length === 0) return false
 
-  let transaction = editor.state.tr
-  if (!selection.empty) transaction = transaction.setSelection(TextSelection.create(editor.state.doc, position))
-  boundaryMarks.forEach(mark => {
-    transaction = transaction.removeStoredMark(mark)
+  return placeCaretOutsideReviewFormat(editor, position, direction, boundaryMarks)
+}
+
+function getReviewCaretAnchorRange(
+  doc: Editor['state']['doc'],
+  position: number,
+): { from: number; to: number } | null {
+  if (position < 1) return null
+
+  const resolvedPosition = doc.resolve(position)
+  const candidates = [
+    {
+      node: resolvedPosition.nodeBefore,
+      from: position - (resolvedPosition.nodeBefore?.nodeSize ?? 0),
+      to: position,
+    },
+    {
+      node: resolvedPosition.nodeAfter,
+      from: position,
+      to: position + (resolvedPosition.nodeAfter?.nodeSize ?? 0),
+    },
+  ]
+  const anchor = candidates.find(candidate => {
+    const caretMark = candidate.node?.marks.find(mark => mark.type.name === REVIEW_CARET_MARK_NAME)
+    return candidate.node?.isText
+      && candidate.node.text === REVIEW_CARET_CHARACTER
+      && caretMark !== undefined
   })
-  editor.view.dispatch(transaction)
-  return true
+  if (!anchor) return null
+
+  return { from: anchor.from, to: anchor.to }
+}
+
+function removeReviewCaretAnchorAtSelection(
+  transaction: Transaction,
+  from: number,
+  to: number,
+): { from: number; to: number } {
+  if (from !== to) return { from, to }
+
+  const range = getReviewCaretAnchorRange(transaction.doc, from)
+  if (!range) return { from, to }
+
+  transaction.delete(range.from, range.to)
+  return { from: range.from, to: range.from }
 }
 
 function toggleSpoilerVisibility(element: HTMLElement): void {
@@ -358,21 +437,30 @@ export function ReviewEditor({
 
           const { from, to } = view.state.selection
           const transaction = view.state.tr
+          let insertFrom = from
+          let insertTo = to
           if (forcePlainTextInputRef.current) {
+            const range = removeReviewCaretAnchorAtSelection(transaction, from, to)
+            insertFrom = range.from
+            insertTo = range.to
             transaction.setStoredMarks([])
             forcePlainTextInputRef.current = false
           }
-          transaction.insertText(text, from, to)
+          transaction.insertText(text, insertFrom, insertTo)
           view.dispatch(transaction)
           view.focus()
           return true
         },
-        handleTextInput(view) {
+        handleTextInput(view, from, to, text) {
           if (!forcePlainTextInputRef.current) return false
 
+          const transaction = view.state.tr
+          const range = removeReviewCaretAnchorAtSelection(transaction, from, to)
+          transaction.setStoredMarks([])
           forcePlainTextInputRef.current = false
-          view.dispatch(view.state.tr.setStoredMarks([]))
-          return false
+          transaction.insertText(text, range.from, range.to)
+          view.dispatch(transaction)
+          return true
         },
       },
       onUpdate: ({ editor: currentEditor }) => {

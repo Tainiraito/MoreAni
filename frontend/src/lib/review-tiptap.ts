@@ -131,7 +131,7 @@ function serializeInlineContent(nodes: JSONContent[] | undefined): string {
       result += REVIEW_MARKUP_TOKENS[nextMarks[index]]
     }
 
-    result += node.text ?? ''
+    result += (node.text ?? '').replaceAll('\u200B', '')
     activeMarks = nextMarks
   })
 

@@ -19,4 +19,18 @@ describe('review-tiptap adapter', () => {
     expect(nestedText?.marks?.map(mark => mark.type)).toEqual(['reviewBold', 'reviewItalic'])
     expect(serializeTiptapDocument(document)).toBe('**外层 *嵌套*外层**')
   })
+
+  it('序列化时忽略编辑器用于离开格式块的不可见光标锚点', () => {
+    expect(serializeTiptapDocument({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: '||剧透||' },
+          { type: 'text', text: '\u200B', marks: [{ type: 'reviewCaretAnchor' }] },
+          { type: 'text', text: '普通文本' },
+        ],
+      }],
+    })).toBe('||剧透||普通文本')
+  })
 })

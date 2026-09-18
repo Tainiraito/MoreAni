@@ -216,6 +216,16 @@
     outline: 1px solid var(--text-primary);
     outline-offset: 1px;
   }
+
+  [data-slot="review-editor"] [data-review-caret-anchor] {
+    display: inline-block;
+    width: 0.25em;
+    height: 1em;
+    margin-inline: 0.125rem;
+    vertical-align: -0.15em;
+    pointer-events: none;
+    user-select: none;
+  }
 }
 
 html {
