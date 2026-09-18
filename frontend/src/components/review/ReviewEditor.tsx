@@ -316,30 +316,56 @@ function getReviewCaretAnchorRange(
   doc: Editor['state']['doc'],
   position: number,
 ): { from: number; to: number } | null {
-  if (position < 1) return null
-
   const resolvedPosition = doc.resolve(position)
-  const candidates = [
-    {
-      node: resolvedPosition.nodeBefore,
-      from: position - (resolvedPosition.nodeBefore?.nodeSize ?? 0),
-      to: position,
-    },
-    {
-      node: resolvedPosition.nodeAfter,
-      from: position,
-      to: position + (resolvedPosition.nodeAfter?.nodeSize ?? 0),
-    },
-  ]
-  const anchor = candidates.find(candidate => {
-    const caretMark = candidate.node?.marks.find(mark => mark.type.name === REVIEW_CARET_MARK_NAME)
-    return candidate.node?.isText
-      && candidate.node.text === REVIEW_CARET_CHARACTER
-      && caretMark !== undefined
-  })
-  if (!anchor) return null
+  const parentStart = resolvedPosition.start(resolvedPosition.depth)
+  let anchorRange: { from: number; to: number } | null = null
 
-  return { from: anchor.from, to: anchor.to }
+  resolvedPosition.parent.forEach((node, offset) => {
+    const from = parentStart + offset
+    const to = from + node.nodeSize
+    const caretMark = node.marks.find(mark => mark.type.name === REVIEW_CARET_MARK_NAME)
+    if (
+      anchorRange === null
+      && position >= from
+      && position <= to
+      && node.isText
+      && node.text !== undefined
+      && node.text === REVIEW_CARET_CHARACTER.repeat(node.text.length)
+      && caretMark !== undefined
+    ) {
+      anchorRange = { from, to }
+    }
+  })
+
+  return anchorRange
+}
+
+function hasReviewFormatMarks(marks: readonly ProseMirrorMark[] | undefined): boolean {
+  return marks?.some(mark => Object.values(REVIEW_TIPTAP_MARK_NAMES).includes(mark.type.name)) ?? false
+}
+
+function moveAcrossReviewCaretAnchor(editor: Editor, direction: 'left' | 'right'): boolean {
+  const { selection, doc } = editor.state
+  if (!(selection instanceof TextSelection) || !selection.empty) return false
+
+  const anchorRange = getReviewCaretAnchorRange(doc, selection.from)
+  if (!anchorRange) return false
+
+  const isRightOfFormat = hasReviewFormatMarks(doc.resolve(anchorRange.from).nodeBefore?.marks)
+  const isLeftOfFormat = hasReviewFormatMarks(doc.resolve(anchorRange.to).nodeAfter?.marks)
+  const movesIntoFormat = direction === 'left' ? isRightOfFormat : isLeftOfFormat
+  let transaction = editor.state.tr.delete(anchorRange.from, anchorRange.to)
+  const nextPosition = movesIntoFormat
+    ? direction === 'left' ? anchorRange.from - 1 : anchorRange.from + 1
+    : direction === 'right' ? anchorRange.from + 1 : anchorRange.from - 1
+  const boundedPosition = nextPosition >= 1 && nextPosition <= transaction.doc.content.size
+    ? nextPosition
+    : anchorRange.from
+
+  transaction = transaction.setStoredMarks(movesIntoFormat ? null : [])
+  transaction = transaction.setSelection(TextSelection.create(transaction.doc, boundedPosition))
+  editor.view.dispatch(transaction)
+  return true
 }
 
 function removeReviewCaretAnchorAtSelection(
@@ -543,6 +569,10 @@ export function ReviewEditor({
     if (event.key === 'ArrowRight') {
       forcePlainTextInputRef.current = false
       syncProseMirrorSelection(editor)
+      if (moveAcrossReviewCaretAnchor(editor, 'right')) {
+        event.preventDefault()
+        return
+      }
       if (exitReviewMarksAtBoundary(editor, 'right')) {
         forcePlainTextInputRef.current = true
         event.preventDefault()
@@ -556,6 +586,10 @@ export function ReviewEditor({
     } else if (event.key === 'ArrowLeft') {
       forcePlainTextInputRef.current = false
       syncProseMirrorSelection(editor)
+      if (moveAcrossReviewCaretAnchor(editor, 'left')) {
+        event.preventDefault()
+        return
+      }
       if (exitReviewMarksAtBoundary(editor, 'left')) {
         forcePlainTextInputRef.current = true
         event.preventDefault()
