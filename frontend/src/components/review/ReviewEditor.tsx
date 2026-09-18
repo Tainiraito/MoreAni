@@ -240,6 +240,24 @@ function getReviewBoundaryMarks(
   ))
 }
 
+function moveToReviewBoundary(editor: Editor, direction: 'left' | 'right'): boolean {
+  const { selection, doc } = editor.state
+  if (!(selection instanceof TextSelection) || !selection.empty) return false
+
+  const nextPosition = direction === 'right' ? selection.from + 1 : selection.from - 1
+  if (nextPosition < 1 || nextPosition > doc.content.size) return false
+
+  const boundaryMarks = getReviewBoundaryMarks(editor, nextPosition, direction)
+  if (boundaryMarks.length === 0) return false
+
+  let transaction = editor.state.tr.setSelection(TextSelection.create(doc, nextPosition))
+  boundaryMarks.forEach(mark => {
+    transaction = transaction.removeStoredMark(mark)
+  })
+  editor.view.dispatch(transaction)
+  return true
+}
+
 function exitReviewMarksAtBoundary(editor: Editor, direction: 'left' | 'right'): boolean {
   const { selection } = editor.state
   if (!(selection instanceof TextSelection)) return false
@@ -419,6 +437,7 @@ export function ReviewEditor({
   const handleClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (!editor) return
 
+    forcePlainTextInputRef.current = false
     const target = event.target instanceof HTMLElement
       ? event.target.closest<HTMLElement>('[data-review-spoiler="true"]')
       : null
@@ -434,13 +453,27 @@ export function ReviewEditor({
     if (!editor) return
 
     if (event.key === 'ArrowRight') {
+      forcePlainTextInputRef.current = false
+      syncProseMirrorSelection(editor)
       if (exitReviewMarksAtBoundary(editor, 'right')) {
         forcePlainTextInputRef.current = true
         event.preventDefault()
         return
       }
+      if (moveToReviewBoundary(editor, 'right')) {
+        forcePlainTextInputRef.current = true
+        event.preventDefault()
+        return
+      }
     } else if (event.key === 'ArrowLeft') {
+      forcePlainTextInputRef.current = false
+      syncProseMirrorSelection(editor)
       if (exitReviewMarksAtBoundary(editor, 'left')) {
+        forcePlainTextInputRef.current = true
+        event.preventDefault()
+        return
+      }
+      if (moveToReviewBoundary(editor, 'left')) {
         forcePlainTextInputRef.current = true
         event.preventDefault()
         return
