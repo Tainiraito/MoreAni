@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { HeroSection } from '@/components/content/HeroSection'
-import { ArrowDownUp, ChartNoAxesCombined, ChevronRight, LayoutGrid, List, Swords } from 'lucide-react'
+import { ArrowDownUp, ChartNoAxesCombined, ChevronRight, LayoutGrid, List, Swords, type LucideIcon } from 'lucide-react'
 import type { AiringCalendarWeek, ContentItem } from '@/types'
 import {
   buildContentListParams,
@@ -86,79 +86,51 @@ function currentWeekStart(): string {
   return `${current.getFullYear()}-${month}-${date}`
 }
 
+const MORE_FEATURES: Array<{ path: string; title: string; description: string; icon: LucideIcon }> = [
+  {
+    path: '/ratings/battle',
+    title: '红蓝合战',
+    description: '通过相对选择整理个人番剧排名，随时比较、随时离开。',
+    icon: Swords,
+  },
+  {
+    path: '/ratings/calibration',
+    title: '随机比较',
+    description: '随机抽取已评分作品，重新比较并整理你的评分。',
+    icon: ArrowDownUp,
+  },
+  {
+    path: '/analytics',
+    title: '偏好分析',
+    description: '查看你的评分分布、偏好趋势和内容统计。',
+    icon: ChartNoAxesCombined,
+  },
+]
+
 function MoreFeaturesPanel() {
   return (
     <section className="mt-8" aria-label="更多功能">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          to="/ratings/battle"
-          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
-              >
-                <Swords size={18} />
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>红蓝合战</h3>
-                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
-                  通过相对选择整理个人番剧排名，随时比较、随时离开。
-                </p>
-              </div>
+      <div className="flex flex-col gap-2">
+        {MORE_FEATURES.map(({ path, title, description, icon: Icon }) => (
+          <Link
+            key={path}
+            to={path}
+            className="group flex w-full items-center gap-3 rounded-xl px-4 py-3 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
+          >
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
+            >
+              <Icon size={18} />
+            </span>
+            <div className="flex min-w-0 flex-1 items-baseline gap-3">
+              <h3 className="shrink-0 font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+              <p className="hidden min-w-0 truncate text-sm sm:block" style={{ color: 'var(--text-muted)' }}>{description}</p>
             </div>
-            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
-          </div>
-        </Link>
-        <Link
-          to="/ratings/calibration"
-          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
-              >
-                <ArrowDownUp size={18} />
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>随机比较</h3>
-                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
-                  随机抽取已评分作品，重新比较并整理你的评分。
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
-          </div>
-        </Link>
-        <Link
-          to="/analytics"
-          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
-              >
-                <ChartNoAxesCombined size={18} />
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>偏好分析</h3>
-                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
-                  查看你的评分分布、偏好趋势和内容统计。
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
-          </div>
-        </Link>
+            <ChevronRight className="shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
+          </Link>
+        ))}
       </div>
     </section>
   )

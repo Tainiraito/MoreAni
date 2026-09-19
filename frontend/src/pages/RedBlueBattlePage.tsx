@@ -91,7 +91,7 @@ function isShortcutBlocked(event: KeyboardEvent): boolean {
 
 function BattlePageSkeleton() {
   return (
-    <PageMain width="wide" className="pt-16 pb-12 sm:pt-20 sm:pb-16">
+    <PageMain className="pt-16 pb-12 sm:pt-20 sm:pb-16">
       <div className="animate-pulse space-y-5">
         <div className="h-8 w-36 rounded-lg" style={{ background: 'var(--skeleton-bg)' }} />
         <div className="h-4 w-80 max-w-full rounded" style={{ background: 'var(--skeleton-bg)' }} />
@@ -322,7 +322,7 @@ export function RedBlueBattlePage() {
 
   if (stateQuery.isError || stateQuery.data === undefined) {
     return (
-      <PageMain width="wide" className="pt-20 pb-16 sm:pt-24">
+      <PageMain className="pt-20 pb-16 sm:pt-24">
         <section className="rounded-2xl p-8 text-center" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} data-testid="red-blue-error">
           <CircleAlert size={24} className="mx-auto" style={{ color: 'var(--accent-coral)' }} />
           <h1 className="mt-3 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>红蓝合战暂时无法加载</h1>
@@ -349,7 +349,7 @@ export function RedBlueBattlePage() {
   const statusText = modelStatusText(state)
 
   return (
-    <PageMain width="wide" className="pt-16 pb-12 sm:pt-20 sm:pb-16" data-testid="red-blue-page">
+    <PageMain className="pt-16 pb-12 sm:pt-20 sm:pb-16" data-testid="red-blue-page">
       <div className="space-y-5 sm:space-y-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

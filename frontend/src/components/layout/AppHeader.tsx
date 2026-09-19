@@ -10,7 +10,8 @@ import { Avatar } from '@/components/ui/Avatar'
 import { NotificationCenter } from '@/components/notification/NotificationFab'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { preloadAdminDialog } from '@/components/admin/admin-dialog-loader'
-import { ChartNoAxesCombined, User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
+import { ChartNoAxesCombined, Swords, User, Sun, Moon, Settings, LogOut, Shield } from 'lucide-react'
+import { Tooltip } from '@/components/ui/tooltip'
 
 export function AppHeader() {
   const { user, logout } = useAuthStore()
@@ -95,17 +96,34 @@ export function AppHeader() {
           <div className="flex items-center gap-2" data-testid="header-actions">
             <div className="flex items-center gap-0" data-testid="header-icon-actions">
               {user ? (
-                <Link
-                  to="/analytics"
-                  aria-label="打开统计分析"
-                  aria-current={location.pathname === '/analytics' ? 'page' : undefined}
-                  className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
-                  style={{ color: location.pathname === '/analytics' ? 'var(--brand)' : 'var(--text-secondary)' }}
-                >
-                  <ChartNoAxesCombined size={16} />
-                </Link>
+                <>
+                  <Tooltip content="红蓝合战" side="bottom">
+                    <Link
+                      to="/ratings/battle"
+                      aria-label="打开红蓝合战"
+                      aria-current={location.pathname === '/ratings/battle' ? 'page' : undefined}
+                      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+                      style={{ color: location.pathname === '/ratings/battle' ? 'var(--brand)' : 'var(--text-secondary)' }}
+                    >
+                      <Swords size={16} />
+                    </Link>
+                  </Tooltip>
+                  <Tooltip content="偏好分析" side="bottom">
+                    <Link
+                      to="/analytics"
+                      aria-label="打开统计分析"
+                      aria-current={location.pathname === '/analytics' ? 'page' : undefined}
+                      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[rgba(251,113,167,0.1)]"
+                      style={{ color: location.pathname === '/analytics' ? 'var(--brand)' : 'var(--text-secondary)' }}
+                    >
+                      <ChartNoAxesCombined size={16} />
+                    </Link>
+                  </Tooltip>
+                </>
               ) : null}
-              <NotificationCenter />
+              <Tooltip content="通知中心" side="bottom">
+                <NotificationCenter />
+              </Tooltip>
             </div>
             <div className="relative" ref={menuRef}>
             <button
