@@ -537,6 +537,7 @@ class RedBlueService:
             .filter(
                 RedBlueComparison.user_id == user_id,
                 RedBlueComparison.revoked_at.is_(None),
+                RedBlueComparison.outcome != RedBlueOutcome.SKIP,
             )
         )
         total = query.order_by(None).count()

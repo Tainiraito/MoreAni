@@ -82,7 +82,7 @@ export function RankingRow({
         >
           <CoverImage src={item.content.cover_url ?? ''} alt={item.content.title} />
         </button>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col justify-center">
           <h3 className="truncate text-sm font-semibold" title={item.content.title}>
             <button
               type="button"

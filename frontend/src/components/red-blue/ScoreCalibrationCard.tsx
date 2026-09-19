@@ -29,7 +29,7 @@ export function ScoreCalibrationCard({ suggestion, disabled, onAction }: ScoreCa
   const DirectionIcon = suggestion.direction === 'UP' ? ArrowUp : ArrowDown
 
   return (
-    <aside className="rounded-xl p-3" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }} data-testid={`score-suggestion-${suggestion.id}`}>
+    <aside className="w-full self-center rounded-xl p-3" style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }} data-testid={`score-suggestion-${suggestion.id}`}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>评分校准</span>
         <button

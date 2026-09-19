@@ -175,6 +175,40 @@ describe('RedBlueBattlePage', () => {
     await waitFor(() => expect(view.getByTestId('comparison-history-result-11')).toHaveTextContent('《左作品》VS《右作品》'))
   })
 
+  it('patches a score suggestion from the comparison delta without waiting for refresh', async () => {
+    const response = {
+      ...comparisonResponse(),
+      score_suggestion_delta: {
+        added: [{
+          id: 31,
+          content_id: 1,
+          suggestion_key: '1:20:85:UP',
+          current_score: 20,
+          suggested_score_low: 80,
+          suggested_score_high: 90,
+          recommended_score: 85,
+          direction: 'UP' as const,
+          confidence: 0.92,
+          severity: 0.95,
+          reason_code: 'PREFERENCE_HIGHER_THAN_SCORE',
+        }],
+        updated: [],
+        removed: [],
+      },
+    }
+    vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce(response)
+    const view = renderPage()
+    await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
+
+    fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
+
+    await waitFor(() => expect(view.getByTestId('score-suggestion-31')).toBeInTheDocument())
+    expect(view.getByTestId('score-suggestion-31')).toHaveTextContent('推荐调整为 8.5')
+    const filters = within(view.getByRole('group', { name: '排名筛选' }))
+    fireEvent.click(filters.getByRole('button'))
+    expect(view.getByRole('option', { name: '有评分建议 (1)' })).toBeInTheDocument()
+  })
+
   it('keeps ranking changes through search, focus and skip, then replaces them on the next valid PK', async () => {
     const first = {
       ...comparisonResponse(),

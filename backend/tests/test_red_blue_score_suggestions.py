@@ -35,6 +35,7 @@ from services.red_blue_score_calibration import (
 )
 from services.red_blue_score_suggestions import (
     ScoreSuggestionConflictError,
+    ScoreSuggestionDelta,
     ScoreSuggestionService,
 )
 
@@ -268,6 +269,22 @@ def test_refresh_reconciles_top_suggestion_from_anchor_without_self_feedback(db,
     assert persisted.recommended_score >= 50
     assert persisted.suggestion_key.startswith(f'sc-v1:{contents[0].id}:20:')
     assert any(item.id == persisted.id for item in visible)
+
+    stale_delta, stale_visible = service.refresh_score_suggestions(
+        db,
+        user_id=user.id,
+        model_run_id=run.id,
+        model_freshness=CalibrationFreshness.STALE_REQUIRES_FULL,
+        comparison_state_version=5,
+        effective_comparison_max_id=13,
+        candidates=candidates,
+        preference_results=preferences,
+        ratings=ratings,
+    )
+    assert stale_delta == ScoreSuggestionDelta()
+    assert any(item.id == persisted.id for item in stale_visible)
+    db.refresh(persisted)
+    assert persisted.status == ScoreSuggestionStatus.PENDING
 
     persisted.status = ScoreSuggestionStatus.EXPIRED
     persisted.handled_at = datetime.now(UTC)

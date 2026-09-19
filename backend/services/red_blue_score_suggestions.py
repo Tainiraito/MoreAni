@@ -123,19 +123,19 @@ class ScoreSuggestionService:
             CalibrationFreshness.STALE_REQUIRES_FULL,
             CalibrationFreshness.BOOTSTRAP,
         }:
-            # 候选池/anchor 变化后可能暂时没有兼容的 Full Snapshot。此时
-            # 不能让旧建议继续保持 PENDING；它们会在下一次 Full 运行后以
-            # 新 model_run 和新 key 重新生成。首次 Bootstrap 通常没有旧行，
-            # 因而仍是无副作用的。
-            old_rows = self._all_pending_rows(db, user_id=user_id)
-            for row in old_rows:
-                row.status = ScoreSuggestionStatus.EXPIRED
-                row.handled_at = current_time
-            if old_rows:
-                db.commit()
+            # Full Ranker 正在等待或运行时，旧 Full Snapshot 仍然是最后一份
+            # 可展示结果。不能在每次 GET / comparison 后先把 PENDING 清掉，
+            # 否则前端会出现“刷新消失，下一次刷新又回来”的闪烁。下一次
+            # 兼容的 Full Snapshot 完成后，正常 reconciliation 会用新结果
+            # 更新或过期这些派生行；用户 action 事实始终不受影响。
+            old_rows = self._pending_rows(
+                db,
+                user_id=user_id,
+                content_ids=candidate_ids,
+            )
             return (
-                ScoreSuggestionDelta(removed=tuple(row.id for row in old_rows)),
-                (),
+                ScoreSuggestionDelta(),
+                tuple(_suggestion_view(row) for row in old_rows),
             )
 
         if model_run_id is None:
@@ -370,19 +370,6 @@ class ScoreSuggestionService:
                 ScoreSuggestion.status == ScoreSuggestionStatus.PENDING,
             )
             .order_by(ScoreSuggestion.severity.desc(), ScoreSuggestion.confidence.desc(), ScoreSuggestion.id.asc())
-            .all()
-        )
-
-    @staticmethod
-    def _all_pending_rows(db: Session, *, user_id: int) -> list[ScoreSuggestion]:
-        """读取用户全部 PENDING 建议，用于 stale/bootstrap 的整体过期。"""
-        return (
-            db.query(ScoreSuggestion)
-            .filter(
-                ScoreSuggestion.user_id == user_id,
-                ScoreSuggestion.status == ScoreSuggestionStatus.PENDING,
-            )
-            .order_by(ScoreSuggestion.id.asc())
             .all()
         )
 

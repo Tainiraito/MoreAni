@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { BattleActions } from '@/components/red-blue/BattleActions'
 
 describe('BattleActions', () => {
-  it('将左右选择放在第一行，并让两侧按钮与卡片列对齐', () => {
+  it('让红蓝按钮跨两行，并把跳过放在差不多上方的中间列', () => {
     const view = render(
       <BattleActions
         disabled={false}
@@ -13,17 +13,13 @@ describe('BattleActions', () => {
       />,
     )
 
-    const primary = within(view.getByTestId('battle-primary-actions'))
-    const secondary = within(view.getByTestId('battle-secondary-actions'))
+    const actions = within(view.getByTestId('battle-primary-actions'))
 
-    expect(primary.getByRole('button', { name: '更喜欢红方' })).toBeInTheDocument()
-    expect(primary.getByRole('button', { name: '更喜欢蓝方' })).toBeInTheDocument()
-    expect(secondary.getByRole('button', { name: '差不多' })).toBeInTheDocument()
-    expect(secondary.getByRole('button', { name: '跳过' })).toBeInTheDocument()
-    expect(primary.getByRole('button', { name: '更喜欢红方' })).toHaveClass('w-full')
-    expect(primary.getByRole('button', { name: '更喜欢蓝方' })).toHaveClass('w-full')
-    expect(primary.getByRole('button', { name: '更喜欢蓝方' })).toHaveClass('col-start-3')
-    expect(secondary.getByRole('button', { name: '跳过' })).toHaveClass('col-start-3')
+    expect(actions.getByRole('button', { name: '更喜欢红方' })).toHaveClass('w-full', 'row-span-2')
+    expect(actions.getByRole('button', { name: '更喜欢蓝方' })).toHaveClass('w-full', 'col-start-3', 'row-span-2')
+    expect(actions.getByRole('button', { name: '跳过' })).toHaveClass('col-start-2', 'row-start-1')
+    expect(actions.getByRole('button', { name: '差不多' })).toHaveClass('col-start-2', 'row-start-2')
+    expect(view.queryByTestId('battle-secondary-actions')).not.toBeInTheDocument()
   })
 
   it('紧凑模式仍保持四个快捷操作在同一行', () => {

@@ -399,14 +399,14 @@ class RedBlueComparisonHistoryContentResponse(BaseModel):
 
 
 class RedBlueComparisonHistoryItemResponse(BaseModel):
-    """当前用户仍可撤销的一条 PK 历史记录。"""
+    """当前用户仍可撤销的一条有效 PK 历史记录；SKIP 不进入历史列表。"""
 
     id: int
     left_content: RedBlueComparisonHistoryContentResponse
     right_content: RedBlueComparisonHistoryContentResponse
     left_content_id: int
     right_content_id: int
-    outcome: Literal['LEFT_WIN', 'RIGHT_WIN', 'TIE', 'SKIP']
+    outcome: Literal['LEFT_WIN', 'RIGHT_WIN', 'TIE']
     client_event_id: str
     selector_version: str
     created_at: datetime | None = None
@@ -414,7 +414,7 @@ class RedBlueComparisonHistoryItemResponse(BaseModel):
 
 
 class RedBlueComparisonHistoryPageResponse(BaseModel):
-    """PK 历史分页响应；已撤销事实不出现在 items 中。"""
+    """PK 历史分页响应；SKIP 和已撤销事实不出现在 items 中。"""
 
     items: list[RedBlueComparisonHistoryItemResponse]
     total: int

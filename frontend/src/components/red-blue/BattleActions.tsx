@@ -68,7 +68,7 @@ export function BattleActions({
         type="button"
         disabled={disabled}
         onClick={() => onChoose(outcome)}
-        className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 transition-all duration-150 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-55 ${compact ? 'text-xs font-semibold' : 'w-full'} ${compact ? '' : primary ? 'gap-2 px-3 text-sm font-bold' : skip ? 'px-3 text-xs font-medium' : 'px-3 text-sm font-semibold'} ${placementClassName}`}
+        className={`inline-flex min-h-11 items-center justify-center rounded-xl transition-all duration-150 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-55 ${compact ? 'gap-1.5 px-2 text-xs font-semibold' : primary ? 'w-full gap-2 px-3 text-sm font-bold' : skip ? 'w-full gap-1 px-1 text-xs font-medium' : 'w-full gap-1 px-1 text-xs font-semibold'} ${placementClassName}`}
         style={{
           ...actionStyle(tone, selected),
           boxShadow: primary && !selected
@@ -90,15 +90,14 @@ export function BattleActions({
   }
 
   return (
-    <div className="space-y-2">
-      <div className={BATTLE_PAIR_GRID_CLASS_NAME} data-testid={`${testIdPrefix}-primary-actions`}>
-        {renderAction(ACTIONS[0])}
-        {renderAction(ACTIONS[2], 'col-start-3')}
-      </div>
-      <div className={BATTLE_PAIR_GRID_CLASS_NAME} data-testid={`${testIdPrefix}-secondary-actions`}>
-        {renderAction(ACTIONS[1])}
-        {renderAction(ACTIONS[3], 'col-start-3')}
-      </div>
+    <div
+      className={BATTLE_PAIR_GRID_CLASS_NAME}
+      data-testid={`${testIdPrefix}-primary-actions`}
+    >
+      {renderAction(ACTIONS[0], 'row-span-2')}
+      {renderAction(ACTIONS[3], 'col-start-2 row-start-1')}
+      {renderAction(ACTIONS[1], 'col-start-2 row-start-2')}
+      {renderAction(ACTIONS[2], 'col-start-3 row-span-2')}
     </div>
   )
 }

@@ -40,7 +40,6 @@ describe('ComparisonHistoryList', () => {
     ['LEFT_WIN', 'font-bold', 'font-normal'],
     ['RIGHT_WIN', 'font-normal', 'font-bold'],
     ['TIE', 'font-normal', 'font-normal'],
-    ['SKIP', 'font-normal', 'font-normal'],
   ] as const)('renders %s as one result line with the right emphasis', (outcome, leftWeight, rightWeight) => {
     const view = renderHistory(outcome)
     const result = view.getByTestId('comparison-history-result-1')

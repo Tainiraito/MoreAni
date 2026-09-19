@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from middleware import RateLimitMiddleware, RateLimitRule
-from models import ContentItem, Rating, RedBlueComparison
+from models import ContentItem, Rating, RedBlueComparison, RedBlueOutcome
 from routers.v1.red_blue import get_red_blue_service
 from services.red_blue import (
     FullRecalibrationReason,
@@ -290,6 +290,17 @@ def test_comparison_history_lists_active_facts_and_removes_revoked_rows(client, 
     user = make_user('red-blue-history')
     first, second = _seed_contents(db, user.id, 2)
     cookies = auth_cookie(user)
+    skipped = client.post(
+        '/api/v1/red-blue/comparisons',
+        cookies=cookies,
+        json={
+            'left_content_id': first.id,
+            'right_content_id': second.id,
+            'outcome': 'SKIP',
+            'client_event_id': str(uuid4()),
+        },
+    )
+    assert skipped.status_code == 200
     created = client.post(
         '/api/v1/red-blue/comparisons',
         cookies=cookies,
@@ -313,6 +324,7 @@ def test_comparison_history_lists_active_facts_and_removes_revoked_rows(client, 
     assert history_payload['items'][0]['left_content']['title'] == first.title
     assert history_payload['items'][0]['right_content']['title'] == second.title
     assert history_payload['items'][0]['outcome'] == 'LEFT_WIN'
+    assert db.query(RedBlueComparison).filter_by(user_id=user.id, outcome=RedBlueOutcome.SKIP).count() == 1
 
     empty_page = client.get('/api/v1/red-blue/comparisons?page=2&size=1', cookies=cookies)
     assert empty_page.status_code == 200
