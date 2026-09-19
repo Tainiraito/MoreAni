@@ -109,7 +109,7 @@ const MORE_FEATURES: Array<{ path: string; title: string; description: string; i
 
 function MoreFeaturesPanel() {
   return (
-    <section className="mt-8" aria-label="更多功能">
+    <section aria-label="更多功能">
       <div className="flex flex-col gap-2">
         {MORE_FEATURES.map(({ path, title, description, icon: Icon }) => (
           <Link
@@ -606,7 +606,7 @@ export function HomePage() {
         >
           {/* Tab 分类 */}
           <div
-            className="flex gap-6 overflow-x-auto mb-4"
+            className="flex gap-6 overflow-x-auto"
             style={{ borderBottom: '1px solid var(--border-line)' }}
           >
             {(['anime', 'calendar', 'other', 'more'] as const).map(val => {
@@ -630,7 +630,7 @@ export function HomePage() {
           </div>
 
           {/* 搜索、筛选、排序 */}
-          {activeTab !== 'calendar' && activeTab !== 'more' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4 pb-3">
+          {activeTab !== 'calendar' && activeTab !== 'more' && <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 pb-4">
             {/* 左侧：搜索 + 筛选 */}
             <div className="flex flex-1 flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[160px] max-w-xs">
@@ -758,11 +758,11 @@ export function HomePage() {
         </div>
 
         {activeTab === 'more' ? (
-          <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <div className="mt-4 flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
             <MoreFeaturesPanel />
           </div>
         ) : activeTab === 'calendar' ? (
-          <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <div className="mt-4 flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
             <WeeklyAiringPanel
               week={airingQuery.data ?? null}
               loading={airingQuery.isPending}
@@ -819,14 +819,14 @@ export function HomePage() {
                   </div>
                 )}
                 {activeTab === 'other' ? (
-                  <section className="mt-8">
+                  <section>
                     <OtherContentList items={items} onSelect={openDetail} isFavorited={isFavorited} isFavoritePending={isFavoritePending} onToggleFavorite={toggleFavorite} />
                     {loadingMore && <div className="flex items-center justify-center py-8" role="status" aria-label="加载更多"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>加载中...</p></div>}
                     {!hasMore && items.length > 0 && <div className="flex items-center justify-center py-8"><p className="text-sm" style={{ color: 'var(--text-muted)' }}>已显示全部 {totalCount} 条内容</p></div>}
                   </section>
                 ) : (
                 animeItems.length > 0 && (
-                  <section className="mt-8">
+                  <section>
                     {viewMode === 'list' ? (
                       <CommentListView
                         items={animeItems}
