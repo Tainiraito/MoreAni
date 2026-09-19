@@ -49,6 +49,11 @@ def _load_rules() -> dict[str, RateLimitRule]:
             max_requests=env_int('MOREANI_RATE_LIMIT_WRITE', 30),
             window_seconds=env_int('MOREANI_RATE_LIMIT_WRITE_WINDOW_SECONDS', 60),
         ),
+        # PK 是连续交互写入，单独使用用户级上限，避免被通用写请求 30/min 截断。
+        'red_blue_comparison': RateLimitRule(
+            max_requests=env_int('MOREANI_RATE_LIMIT_RED_BLUE_COMPARISON', 120),
+            window_seconds=env_int('MOREANI_RATE_LIMIT_RED_BLUE_COMPARISON_WINDOW_SECONDS', 60),
+        ),
         'read': RateLimitRule(
             max_requests=env_int('MOREANI_RATE_LIMIT_READ', 300),
             window_seconds=env_int('MOREANI_RATE_LIMIT_READ_WINDOW_SECONDS', 60),
@@ -122,6 +127,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return 'login', self.rules['login']
         if path.endswith('/auth/register') and method == 'POST':
             return 'register', self.rules['register']
+        if path == '/api/v1/red-blue/comparisons' and method == 'POST':
+            return 'red_blue_comparison', self.rules['red_blue_comparison']
         if method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
             return 'write', self.rules['write']
         return 'read', self.rules['read']
@@ -134,7 +141,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         ip = get_client_ip(request)
         entries = [(f'{rule_name}:ip:{ip}', rule)]
-        if rule_name == 'write':
+        if rule_name in {'write', 'red_blue_comparison'}:
             user_id = self._authenticated_user_id(request)
             if user_id is not None:
                 entries.append((f'write:user:{user_id}', rule))

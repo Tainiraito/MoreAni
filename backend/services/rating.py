@@ -8,7 +8,15 @@ from uuid import uuid4
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from models import ContentItem, Notification, Rating, RatingRevision, User, UserContentStatus
+from models import (
+    ContentItem,
+    Notification,
+    Rating,
+    RatingRevision,
+    RatingRevisionSource,
+    User,
+    UserContentStatus,
+)
 from services import covers
 from services.avatar import avatar_fields
 from services.content import ANIME_CONTENT_TYPES
@@ -37,6 +45,8 @@ def _record_score_revision(
     source: str,
     changed_at: datetime,
     comparison_id: str | None = None,
+    score_suggestion_id: int | None = None,
+    score_suggestion_action_id: int | None = None,
 ) -> None:
     """Record one primary-score change without recording comment-only edits."""
     if previous_score == new_score:
@@ -51,6 +61,8 @@ def _record_score_revision(
             changed_at=changed_at,
             source=source,
             comparison_id=comparison_id,
+            score_suggestion_id=score_suggestion_id,
+            score_suggestion_action_id=score_suggestion_action_id,
         )
     )
 
@@ -136,6 +148,12 @@ def upsert_rating(
     score: int,
     recommend: int = 0,
     review: str = '',
+    revision_source: RatingRevisionSource | str = RatingRevisionSource.MANUAL,
+    update_score_anchor: bool | None = None,
+    commit: bool = True,
+    preserve_metadata: bool = False,
+    score_suggestion_id: int | None = None,
+    score_suggestion_action_id: int | None = None,
 ) -> Rating:
     """Create or update a rating (upsert on unique constraint).
 
@@ -143,31 +161,52 @@ def upsert_rating(
     Also bumps the parent content's updated_at so it sorts to top.
     """
     now = datetime.now(UTC)
+    normalized_source = (
+        revision_source.value
+        if isinstance(revision_source, RatingRevisionSource)
+        else revision_source
+    )
+    should_update_anchor = (
+        normalized_source != RatingRevisionSource.PK_SUGGESTION.value
+        if update_score_anchor is None
+        else update_score_anchor
+    )
     existing = get_user_rating(db, user_id, content_id)
     was_active = existing is not None and _has_activity(existing.score, existing.review)
     if existing:
         previous_score = existing.score
         existing.score = score
-        existing.recommend = recommend
-        existing.review = review
+        # 普通手动/import/comparison 表达会建立新的 anchor；pk_suggestion
+        # 只改变当前显示评分，避免 PK -> score -> anchor 的自反馈。
+        if should_update_anchor:
+            existing.score_anchor = score
+        if not preserve_metadata:
+            existing.recommend = recommend
+            existing.review = review
         existing.updated_at = now
         _record_score_revision(
             db,
             rating=existing,
             previous_score=previous_score,
             new_score=score,
-            source='manual',
+            source=normalized_source,
             changed_at=now,
+            score_suggestion_id=score_suggestion_id,
+            score_suggestion_action_id=score_suggestion_action_id,
         )
         _bump_content_updated_at(db, content_id, now)
-        db.commit()
-        db.refresh(existing)
+        if commit:
+            db.commit()
+            db.refresh(existing)
         rating = existing
     else:
+        if not should_update_anchor:
+            raise ValueError('pk_suggestion 只能修改已有 Rating')
         rating = Rating(
             user_id=user_id,
             content_id=content_id,
             score=score,
+            score_anchor=score,
             recommend=recommend,
             review=review,
             created_at=now,
@@ -180,14 +219,21 @@ def upsert_rating(
             rating=rating,
             previous_score=0,
             new_score=score,
-            source='initial',
+            source=(
+                RatingRevisionSource.INITIAL.value
+                if normalized_source == RatingRevisionSource.MANUAL.value
+                else normalized_source
+            ),
             changed_at=now,
+            score_suggestion_id=score_suggestion_id,
+            score_suggestion_action_id=score_suggestion_action_id,
         )
         _bump_content_updated_at(db, content_id, now)
-        db.commit()
-        db.refresh(rating)
+        if commit:
+            db.commit()
+            db.refresh(rating)
 
-    if not was_active and _has_activity(rating.score, rating.review):
+    if commit and not was_active and _has_activity(rating.score, rating.review):
         _notify_favorite_activity(db, rating=rating, actor_user_id=user_id)
     return rating
 
@@ -195,13 +241,15 @@ def upsert_rating(
 def delete_rating(db: Session, rating: Rating) -> None:
     """Delete a rating and preserve a positive-score deletion event."""
     if rating.score > 0:
+        # 删除正分 Rating 会移除有效 score_anchor 输入；delete Revision
+        # 因此属于 anchor watermark 来源。
         now = datetime.now(UTC)
         _record_score_revision(
             db,
             rating=rating,
             previous_score=rating.score,
             new_score=0,
-            source='delete',
+            source=RatingRevisionSource.DELETE.value,
             changed_at=now,
         )
     db.delete(rating)
@@ -298,13 +346,17 @@ def save_calibration_scores(
             continue
         previous_score = rating.score
         rating.score = new_score
+        # 旧版“评分校准”是用户主动确认的评分修改，不属于红蓝合战
+        # 建议，因此它会建立新的独立评分锚点；source='comparison' 保持
+        # 兼容现有历史语义。
+        rating.score_anchor = new_score
         rating.updated_at = now
         _record_score_revision(
             db,
             rating=rating,
             previous_score=previous_score,
             new_score=new_score,
-            source='comparison',
+            source=RatingRevisionSource.COMPARISON.value,
             changed_at=now,
             comparison_id=comparison_id,
         )

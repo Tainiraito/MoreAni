@@ -18,7 +18,19 @@ from starlette.types import Scope
 from database import Base, SessionLocal, engine
 from middleware import OriginGuardMiddleware, RateLimitMiddleware, SecurityHeadersMiddleware
 from migrations import Migration, run_pending_migrations
-from models import ContentItem, Rating, RatingRevision, ResourceSubscription
+from models import (
+    ContentItem,
+    PreferenceModelRun,
+    PreferenceResult,
+    Rating,
+    RatingRevision,
+    RatingRevisionSource,
+    RedBlueComparison,
+    RedBlueUserState,
+    ResourceSubscription,
+    ScoreSuggestion,
+    ScoreSuggestionAction,
+)
 from routers.v1.admin import router as admin_router
 from routers.v1.airing import router as airing_router
 from routers.v1.analytics import router as analytics_router
@@ -30,6 +42,7 @@ from routers.v1.notifications import subscription_router
 from routers.v1.proxy import close_proxy_clients
 from routers.v1.proxy import router as proxy_router
 from routers.v1.rating import router as rating_router
+from routers.v1.red_blue import router as red_blue_router
 from routers.v1.status import router as status_router
 from routers.v1.tag import router as tag_router
 from routers.v1.user import router as user_router
@@ -241,7 +254,7 @@ def _migrate_rating_revisions() -> None:
                     previous_score=0,
                     new_score=rating.score,
                     changed_at=now,
-                    source='migration_snapshot',
+                    source=RatingRevisionSource.MIGRATION_SNAPSHOT.value,
                 )
                 for rating in ratings
                 if rating.id not in rating_ids
@@ -252,6 +265,341 @@ def _migrate_rating_revisions() -> None:
                 print(f'[migrate] rating revisions baseline snapshots: {len(snapshots)}')
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f'[migrate] rating revisions 迁移失败: {exc}') from exc
+
+
+def _migrate_red_blue_preference_foundation() -> None:
+    """建立红蓝合战事实、模型运行、排名快照和评分建议基础结构。"""
+    from sqlalchemy import text
+
+    try:
+        # 显式按外键依赖顺序创建，兼容直接运行迁移函数的场景；正常启动前
+        # Base.metadata.create_all 已经执行过，这些操作仍然是幂等的。
+        with engine.begin() as conn:
+            for table in (
+                RedBlueComparison.__table__,
+                PreferenceModelRun.__table__,
+                PreferenceResult.__table__,
+                ScoreSuggestion.__table__,
+                ScoreSuggestionAction.__table__,
+            ):
+                table.create(bind=conn, checkfirst=True)
+
+            rating_columns = {
+                row[1]
+                for row in conn.execute(text('PRAGMA table_info(ratings)'))
+            }
+            score_anchor_added = 'score_anchor' not in rating_columns
+            if score_anchor_added:
+                conn.execute(
+                    text(
+                        'ALTER TABLE ratings '
+                        'ADD COLUMN score_anchor INTEGER NOT NULL DEFAULT 0',
+                    ),
+                )
+                # 只在首次补列时初始化；若未来迁移已存在该列，绝不覆盖用户
+                # 已经形成的独立评分锚点。
+                conn.execute(text('UPDATE ratings SET score_anchor = score'))
+
+            conn.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_ratings_user_score_anchor '
+                    'ON ratings (user_id, score_anchor)',
+                ),
+            )
+
+            revision_columns = {
+                row[1]
+                for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))
+            }
+            if 'score_suggestion_id' not in revision_columns:
+                conn.execute(
+                    text(
+                        'ALTER TABLE rating_revisions '
+                        'ADD COLUMN score_suggestion_id INTEGER '
+                        'REFERENCES score_suggestions(id) ON DELETE SET NULL',
+                    ),
+                )
+            if 'score_suggestion_action_id' not in revision_columns:
+                conn.execute(
+                    text(
+                        'ALTER TABLE rating_revisions '
+                        'ADD COLUMN score_suggestion_action_id INTEGER '
+                        'REFERENCES score_suggestion_actions(id) ON DELETE SET NULL',
+                    ),
+                )
+            conn.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_rating_revisions_score_suggestion_id '
+                    'ON rating_revisions (score_suggestion_id)',
+                ),
+            )
+            conn.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_rating_revisions_score_suggestion_action_id '
+                    'ON rating_revisions (score_suggestion_action_id)',
+                ),
+            )
+
+        if score_anchor_added:
+            print('[migrate] ratings.score_anchor 已按当前评分初始化')
+        print('[migrate] 红蓝合战偏好模型基础表已就绪')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 红蓝合战偏好模型基础结构迁移失败: {exc}') from exc
+
+
+def _migrate_preference_model_run_input_metadata() -> None:
+    """为模型运行补充 score_anchor watermark 和算法配置快照。"""
+    from sqlalchemy import text
+
+    try:
+        with engine.begin() as conn:
+            columns = {
+                row[1]
+                for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))
+            }
+            if not columns:
+                return
+            if 'input_rating_revision_max_id' not in columns:
+                conn.execute(
+                    text(
+                        'ALTER TABLE preference_model_runs '
+                        'ADD COLUMN input_rating_revision_max_id INTEGER',
+                    ),
+                )
+            if 'algorithm_config_json' not in columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE preference_model_runs "
+                        "ADD COLUMN algorithm_config_json TEXT NOT NULL DEFAULT '{}'",
+                    ),
+                )
+            conn.execute(
+                text(
+                    'CREATE INDEX IF NOT EXISTS ix_preference_model_runs_user_input_watermarks '
+                    'ON preference_model_runs '
+                    '(user_id, input_comparison_max_id, input_rating_revision_max_id)',
+                ),
+            )
+        print('[migrate] preference_model_runs 输入 watermark 和算法配置已就绪')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 模型运行输入元数据迁移失败: {exc}') from exc
+
+
+def _migrate_red_blue_realtime_state() -> None:
+    """补充实时 Fast State 所需的 comparison watermark 和用户状态表。"""
+    from sqlalchemy import text
+
+    try:
+        with engine.begin() as conn:
+            RedBlueUserState.__table__.create(bind=conn, checkfirst=True)
+            columns = {
+                row[1]
+                for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))
+            }
+            if columns:
+                if 'input_comparison_state_version' not in columns:
+                    conn.execute(
+                        text(
+                            'ALTER TABLE preference_model_runs '
+                            'ADD COLUMN input_comparison_state_version INTEGER NOT NULL DEFAULT 0',
+                        ),
+                    )
+                if 'input_revoke_version' not in columns:
+                    conn.execute(
+                        text(
+                            'ALTER TABLE preference_model_runs '
+                            'ADD COLUMN input_revoke_version INTEGER NOT NULL DEFAULT 0',
+                        ),
+                    )
+                conn.execute(
+                    text(
+                        'CREATE INDEX IF NOT EXISTS ix_preference_model_runs_user_realtime_watermarks '
+                        'ON preference_model_runs '
+                        '(user_id, input_comparison_state_version, input_revoke_version)',
+                    ),
+                )
+
+            # 对 4B 之前已经存在的事实建立保守 watermark；旧 Model Run 的新字段
+            # 默认 0，若无法证明兼容，Service 会要求重新 Full Ranker。
+            conn.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO red_blue_user_states (
+                        user_id, comparison_state_version, revoke_version, updated_at
+                    )
+                    SELECT user_id,
+                           COUNT(*) AS comparison_state_version,
+                           SUM(CASE WHEN revoked_at IS NOT NULL THEN 1 ELSE 0 END) AS revoke_version,
+                           CURRENT_TIMESTAMP
+                    FROM red_blue_comparisons
+                    GROUP BY user_id
+                    """,
+                ),
+            )
+        print('[migrate] 红蓝合战实时 watermark 和用户状态表已就绪')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 红蓝合战实时状态迁移失败: {exc}') from exc
+
+
+def _migrate_red_blue_score_suggestion_actions() -> None:
+    """为建议缓存和 Action 事实补充展示字段、evidence watermark 与幂等键。"""
+    from sqlalchemy import text
+
+    try:
+        with engine.begin() as conn:
+            suggestion_columns = {
+                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))
+            }
+            if suggestion_columns:
+                additions = {
+                    'direction': 'VARCHAR(16)',
+                    'severity': 'FLOAT',
+                    'reason_code': 'VARCHAR(64)',
+                }
+                for column, definition in additions.items():
+                    if column not in suggestion_columns:
+                        conn.execute(
+                            text(
+                                f'ALTER TABLE score_suggestions ADD COLUMN {column} {definition}',
+                            ),
+                        )
+
+            action_columns = {
+                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestion_actions)'))
+            }
+            if action_columns:
+                additions = {
+                    'comparison_state_version_at_action': 'INTEGER NOT NULL DEFAULT 0',
+                    'effective_comparison_max_id_at_action': 'INTEGER',
+                    'client_event_id': 'VARCHAR(64)',
+                }
+                for column, definition in additions.items():
+                    if column not in action_columns:
+                        conn.execute(
+                            text(
+                                f'ALTER TABLE score_suggestion_actions ADD COLUMN {column} {definition}',
+                            ),
+                        )
+                conn.execute(
+                    text(
+                        'CREATE UNIQUE INDEX IF NOT EXISTS '
+                        'uq_score_suggestion_action_user_client_event '
+                        'ON score_suggestion_actions (user_id, client_event_id)',
+                    ),
+                )
+                conn.execute(
+                    text(
+                        'CREATE INDEX IF NOT EXISTS '
+                        'ix_score_suggestion_actions_user_effective_comparison '
+                        'ON score_suggestion_actions (user_id, effective_comparison_max_id_at_action)',
+                    ),
+                )
+        print('[migrate] 红蓝合战评分建议 Action watermark 和幂等字段已就绪')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 评分建议 Action 迁移失败: {exc}') from exc
+
+
+def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
+    """允许同一 Full run 下因证据变化产生多个 suggestion key。"""
+    from sqlalchemy import text
+
+    try:
+        with engine.begin() as conn:
+            table_columns = {
+                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))
+            }
+            if not table_columns:
+                return
+
+            current_columns = [
+                'id',
+                'user_id',
+                'content_id',
+                'model_run_id',
+                'suggestion_key',
+                'current_score',
+                'suggested_score_low',
+                'suggested_score_high',
+                'recommended_score',
+                'direction',
+                'confidence',
+                'severity',
+                'reason_code',
+                'status',
+                'created_at',
+                'handled_at',
+            ]
+
+            def copy_legacy_rows(source_table: str) -> None:
+                """把中断迁移留下的旧表数据补回当前表。"""
+                source_columns = {
+                    row[1] for row in conn.execute(text(f'PRAGMA table_info("{source_table}")'))
+                }
+                copied_columns = [column for column in current_columns if column in source_columns]
+                missing_optional = set(current_columns) - set(copied_columns)
+                if missing_optional - {'direction', 'severity', 'reason_code'}:
+                    raise RuntimeError(f'评分建议旧表缺少不可选字段: {sorted(missing_optional)}')
+                select_columns = [
+                    column if column in copied_columns else 'NULL'
+                    for column in current_columns
+                ]
+                conn.execute(
+                    text(
+                        'INSERT OR IGNORE INTO score_suggestions ('
+                        + ', '.join(current_columns)
+                        + ') SELECT '
+                        + ', '.join(select_columns)
+                        + f' FROM "{source_table}"',
+                    ),
+                )
+
+            legacy_table_columns = {
+                row[1]
+                for row in conn.execute(text('PRAGMA table_info(score_suggestions_legacy)'))
+            }
+            if legacy_table_columns:
+                # 上一次启动在创建新表索引时失败后，SQLite 会保留新表和旧表。
+                # 先补数据、再删除旧表释放同名索引，最后只补当前模型声明的索引。
+                copy_legacy_rows('score_suggestions_legacy')
+                conn.execute(text('DROP TABLE score_suggestions_legacy'))
+                for index in ScoreSuggestion.__table__.indexes:
+                    index.create(bind=conn, checkfirst=True)
+                print('[migrate] score_suggestions suggestion_key 唯一语义中断状态已修复')
+                return
+
+            unique_indexes = []
+            for row in conn.execute(text('PRAGMA index_list(score_suggestions)')):
+                index_name = row[1]
+                is_unique = bool(row[2])
+                if not is_unique:
+                    continue
+                columns = [
+                    index_row[2]
+                    for index_row in conn.execute(text(f'PRAGMA index_info("{index_name}")'))
+                ]
+                unique_indexes.append((index_name, columns))
+
+            has_legacy_unique = any(
+                columns == ['model_run_id', 'user_id', 'content_id']
+                for _index_name, columns in unique_indexes
+            )
+            if not has_legacy_unique:
+                return
+
+            for row in conn.execute(text('PRAGMA index_list(score_suggestions)')):
+                index_name = row[1]
+                if not index_name.startswith('sqlite_autoindex'):
+                    conn.execute(text(f'DROP INDEX IF EXISTS "{index_name}"'))
+            conn.execute(text('PRAGMA foreign_keys=OFF'))
+            conn.execute(text('ALTER TABLE score_suggestions RENAME TO score_suggestions_legacy'))
+            ScoreSuggestion.__table__.create(bind=conn, checkfirst=True)
+
+            copy_legacy_rows('score_suggestions_legacy')
+            conn.execute(text('DROP TABLE score_suggestions_legacy'))
+            conn.execute(text('PRAGMA foreign_keys=ON'))
+        print('[migrate] score_suggestions suggestion_key 唯一语义已升级')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 评分建议 suggestion_key 唯一语义迁移失败: {exc}') from exc
 
 
 MIGRATIONS = (
@@ -270,6 +618,31 @@ MIGRATIONS = (
         _migrate_airing_calendar_failure_tracking,
     ),
     Migration('0007-rating-revision-baseline', '为历史评分建立修订基线', _migrate_rating_revisions),
+    Migration(
+        '0008-red-blue-preference-foundation',
+        '建立红蓝合战事实、偏好模型快照和评分建议基础结构',
+        _migrate_red_blue_preference_foundation,
+    ),
+    Migration(
+        '0009-preference-model-run-input-metadata',
+        '补充模型运行的评分锚点 watermark 和算法配置快照',
+        _migrate_preference_model_run_input_metadata,
+    ),
+    Migration(
+        '0010-red-blue-realtime-state',
+        '补充红蓝合战 comparison 状态 watermark 和实时状态表',
+        _migrate_red_blue_realtime_state,
+    ),
+    Migration(
+        '0011-red-blue-score-suggestion-actions',
+        '补充评分建议展示字段、evidence watermark 和 Action 幂等键',
+        _migrate_red_blue_score_suggestion_actions,
+    ),
+    Migration(
+        '0012-red-blue-score-suggestion-key-uniqueness',
+        '允许同一模型运行下按 suggestion_key 保存建议语义变化',
+        _migrate_red_blue_score_suggestion_key_uniqueness,
+    ),
 )
 
 
@@ -315,6 +688,7 @@ app.include_router(analytics_router, prefix='/api/v1')
 app.include_router(notifications_router, prefix='/api/v1')
 app.include_router(subscription_router, prefix='/api/v1')
 app.include_router(rating_router, prefix='/api/v1')
+app.include_router(red_blue_router, prefix='/api/v1')
 app.include_router(status_router, prefix='/api/v1')
 app.include_router(tag_router, prefix='/api/v1')
 app.include_router(user_router, prefix='/api/v1')

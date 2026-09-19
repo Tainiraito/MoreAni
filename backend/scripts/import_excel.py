@@ -264,7 +264,7 @@ def main():
     # ── 正式导入 ──
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from database import SessionLocal
-    from models import ContentItem, User
+    from models import ContentItem, RatingRevisionSource, User
     from services import content as content_svc
     from services import rating as rating_svc
 
@@ -366,6 +366,7 @@ def main():
                 content_id=content.id,
                 score=f.get('score') or 0,
                 review=f.get('comment', ''),
+                revision_source=RatingRevisionSource.IMPORT,
             )
             rating_count += 1
     print(f'  写入评分/评论 {rating_count} 条')

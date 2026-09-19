@@ -88,7 +88,7 @@ docker compose -f deploy/docker-compose.yml exec moreani-app \
 |------|:----:|------|
 | `SECRET_KEY` | ✅ | JWT 签名密钥，重启后不变否则所有登录失效 |
 | `CF_TUNNEL_TOKEN` | — | Cloudflare Tunnel token，用于公网访问 |
-| `ALLOWED_ORIGINS` | — | CORS 白名单，默认 `https://moreani.lovelysia.top` |
+| `ALLOWED_ORIGINS` | — | CORS 白名单；开发环境默认包含 `http://localhost:5173` 与 `http://127.0.0.1:5173`，生产环境只接受 HTTPS 来源 |
 | `MOREANI_BANGUMI_PROXY` | — | Bangumi API 代理，格式 `http://host:port` |
 | `DATABASE_URL` | — | 数据库路径，默认 `sqlite:////app/data/moreani.db` |
 

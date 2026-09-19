@@ -18,6 +18,15 @@ import type {
   ResourceSubscription,
   User,
 } from '@/types'
+import type {
+  CreateRedBlueComparisonRequest,
+  CreateRedBlueComparisonResponse,
+  RedBlueState,
+  RevokeRedBlueComparisonResponse,
+  ScoreSuggestionActionRequest,
+  ScoreSuggestionActionResponse,
+} from '@/types/red-blue'
+import { normalizeRedBlueState } from '@/lib/red-blue'
 
 const API_BASE = '/api/v1'
 const CONTENT_LIST_TIMEOUT_MS = 15_000
@@ -320,6 +329,23 @@ export const api = {
     request<RatingCalibrationSaveResponse>('/rating/calibration', {
       method: 'POST',
       body: JSON.stringify({ items }),
+    }),
+  // Red-blue battle
+  getRedBlueState: async (options?: RequestInit) =>
+    normalizeRedBlueState(await request<RedBlueState>('/red-blue/state', options)),
+  createRedBlueComparison: (data: CreateRedBlueComparisonRequest) =>
+    request<CreateRedBlueComparisonResponse>('/red-blue/comparisons', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  revokeRedBlueComparison: (comparisonId: number) =>
+    request<RevokeRedBlueComparisonResponse>(`/red-blue/comparisons/${comparisonId}/revoke`, {
+      method: 'POST',
+    }),
+  handleRedBlueSuggestionAction: (suggestionId: number, data: ScoreSuggestionActionRequest) =>
+    request<ScoreSuggestionActionResponse>(`/red-blue/score-suggestions/${suggestionId}/actions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
   // Resource subscriptions
   listResourceSubscriptions: (contentId?: number) => {

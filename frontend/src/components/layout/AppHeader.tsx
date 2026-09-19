@@ -131,6 +131,7 @@ export function AppHeader() {
             {menuOpen && (
               <div
                 className="absolute top-full mt-2 w-48 rounded-xl overflow-hidden"
+                data-red-blue-shortcut-block="true"
                 style={{
                   left: '50%',
                   transform: 'translateX(-50%)',

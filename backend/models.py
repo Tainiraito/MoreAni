@@ -1,17 +1,22 @@
 """SQLAlchemy ORM models for MoreAni v2."""
 
 from datetime import UTC, datetime
+from enum import Enum
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -19,6 +24,91 @@ from database import Base
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+class RatingRevisionSource(str, Enum):
+    """来源于哪一种用户评分表达。"""
+
+    INITIAL = 'initial'
+    MANUAL = 'manual'
+    IMPORT = 'import'
+    PK_SUGGESTION = 'pk_suggestion'
+    # 兼容 MoreAni 现有的评分校准功能；不是红蓝合战 PK 事实。
+    COMPARISON = 'comparison'
+    DELETE = 'delete'
+    MIGRATION_SNAPSHOT = 'migration_snapshot'
+
+
+# 只有这些来源会改变模型看到的 score_anchor 输入。pk_suggestion 虽然会
+# 改变 Rating.score，但不能推进 anchor watermark；migration_snapshot 只是
+# 历史基线，不代表迁移之后发生了新的独立评分表达。delete 会移除一个
+# 现有 Rating，因此会改变有效 anchor 输入集合。
+SCORE_ANCHOR_REVISION_SOURCES: frozenset[str] = frozenset(
+    {
+        RatingRevisionSource.INITIAL.value,
+        RatingRevisionSource.MANUAL.value,
+        RatingRevisionSource.IMPORT.value,
+        RatingRevisionSource.COMPARISON.value,
+        RatingRevisionSource.DELETE.value,
+    },
+)
+
+
+class RedBlueOutcome(str, Enum):
+    """一次红蓝合战比较的用户选择。"""
+
+    LEFT_WIN = 'LEFT_WIN'
+    RIGHT_WIN = 'RIGHT_WIN'
+    TIE = 'TIE'
+    SKIP = 'SKIP'
+
+
+class PreferenceModelRunStatus(str, Enum):
+    """偏好模型计算任务状态。"""
+
+    PENDING = 'PENDING'
+    RUNNING = 'RUNNING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+
+
+class PreferenceStability(str, Enum):
+    """排名结果的稳定性标签；本阶段只定义语义，不判断标签。"""
+
+    UNCALIBRATED = 'UNCALIBRATED'
+    CALIBRATING = 'CALIBRATING'
+    RELATIVELY_STABLE = 'RELATIVELY_STABLE'
+    STABLE = 'STABLE'
+    ORDER_UNCERTAIN = 'ORDER_UNCERTAIN'
+
+
+class ScoreSuggestionStatus(str, Enum):
+    """评分建议当前状态。"""
+
+    PENDING = 'PENDING'
+    ACCEPTED = 'ACCEPTED'
+    DISMISSED = 'DISMISSED'
+    REJECTED = 'REJECTED'
+    EXPIRED = 'EXPIRED'
+
+
+class ScoreSuggestionActionType(str, Enum):
+    """用户对评分建议执行的不可丢失操作。"""
+
+    ACCEPTED = 'ACCEPTED'
+    DISMISSED = 'DISMISSED'
+    REJECTED = 'REJECTED'
+
+
+def _enum_column(enum_class: type[Enum], name: str) -> SqlEnum:
+    """创建在 SQLite 中保存枚举值并带 CHECK 约束的字符串枚举列。"""
+    return SqlEnum(
+        enum_class,
+        name=name,
+        native_enum=False,
+        create_constraint=True,
+        values_callable=lambda values: [member.value for member in values],
+    )
 
 
 class User(Base):
@@ -39,6 +129,37 @@ class User(Base):
 
     ratings = relationship('Rating', back_populates='user', cascade='all, delete-orphan')
     rating_revisions = relationship('RatingRevision', back_populates='user', cascade='all, delete-orphan')
+    red_blue_comparisons = relationship(
+        'RedBlueComparison',
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    preference_model_runs = relationship(
+        'PreferenceModelRun',
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    preference_results = relationship(
+        'PreferenceResult',
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    score_suggestions = relationship(
+        'ScoreSuggestion',
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    score_suggestion_actions = relationship(
+        'ScoreSuggestionAction',
+        back_populates='user',
+        cascade='all, delete-orphan',
+    )
+    red_blue_state = relationship(
+        'RedBlueUserState',
+        back_populates='user',
+        uselist=False,
+        cascade='all, delete-orphan',
+    )
     # 删除账号时内容会先转交给执行操作的超级管理员，不能随父用户级联删除。
     content_items = relationship('ContentItem', back_populates='creator')
     statuses = relationship('UserContentStatus', back_populates='user', cascade='all, delete-orphan')
@@ -141,6 +262,8 @@ class Rating(Base):
         index=True,
     )
     score = Column(Integer, nullable=False, default=0)  # 0-100
+    # 最近一次独立于红蓝合战建议、由用户明确表达的评分。
+    score_anchor = Column(Integer, nullable=False, default=0)  # 0-100
     recommend = Column(Integer, nullable=False, default=0)  # 0-100
     review = Column(Text, default='')
     created_at = Column(DateTime, default=_utcnow)
@@ -151,6 +274,7 @@ class Rating(Base):
 
     __table_args__ = (
         UniqueConstraint('content_id', 'user_id', name='uq_content_user'),
+        Index('ix_ratings_user_score_anchor', 'user_id', 'score_anchor'),
         {'comment': 'Per-user rating for a content item'},
     )
 
@@ -184,9 +308,354 @@ class RatingRevision(Base):
     changed_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
     source = Column(String(30), nullable=False, default='manual')
     comparison_id = Column(String(64), nullable=True, index=True)
+    score_suggestion_id = Column(
+        Integer,
+        ForeignKey('score_suggestions.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    score_suggestion_action_id = Column(
+        Integer,
+        ForeignKey('score_suggestion_actions.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
 
     user = relationship('User', back_populates='rating_revisions')
     content = relationship('ContentItem', back_populates='rating_revisions')
+    score_suggestion = relationship('ScoreSuggestion', back_populates='rating_revisions')
+    score_suggestion_action = relationship('ScoreSuggestionAction')
+
+
+class RedBlueComparison(Base):
+    """红蓝合战的不可变 PK 事实；撤销只写 revoked_at，不物理删除。"""
+
+    __tablename__ = 'red_blue_comparisons'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    left_content_id = Column(Integer, ForeignKey('content_items.id'), nullable=False, index=True)
+    right_content_id = Column(Integer, ForeignKey('content_items.id'), nullable=False, index=True)
+    outcome = Column(_enum_column(RedBlueOutcome, 'red_blue_outcome'), nullable=False)
+    client_event_id = Column(String(64), nullable=False)
+    selector_version = Column(String(32), nullable=False, default='v1')
+    created_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+    revoked_at = Column(DateTime, nullable=True, index=True)
+
+    user = relationship('User', back_populates='red_blue_comparisons')
+
+    __table_args__ = (
+        CheckConstraint(
+            'left_content_id != right_content_id',
+            name='ck_red_blue_comparison_distinct_contents',
+        ),
+        UniqueConstraint('user_id', 'client_event_id', name='uq_red_blue_comparison_client_event'),
+        Index(
+            'ix_red_blue_comparisons_user_created',
+            'user_id',
+            'created_at',
+        ),
+        Index(
+            'ix_red_blue_comparisons_user_active_created',
+            'user_id',
+            'revoked_at',
+            'created_at',
+        ),
+        Index(
+            'ix_red_blue_comparisons_user_pair_created',
+            'user_id',
+            'left_content_id',
+            'right_content_id',
+            'created_at',
+        ),
+    )
+
+
+class PreferenceModelRun(Base):
+    """一次可追踪、可失败、可全量重算的偏好模型计算。"""
+
+    __tablename__ = 'preference_model_runs'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    algorithm_version = Column(String(64), nullable=False)
+    status = Column(
+        _enum_column(PreferenceModelRunStatus, 'preference_model_run_status'),
+        nullable=False,
+        default=PreferenceModelRunStatus.PENDING,
+    )
+    input_comparison_max_id = Column(Integer, nullable=True)
+    # 记录本次完整计算读取到的用户 comparison 事实状态版本。
+    input_comparison_state_version = Column(Integer, nullable=False, default=0, server_default='0')
+    # 记录本次完整计算读取到的 revoke 状态版本；它单独表达旧 evidence 是否可能被移除。
+    input_revoke_version = Column(Integer, nullable=False, default=0, server_default='0')
+    # 最新一条会改变有效 score_anchor 输入的 RatingRevision.id。
+    input_rating_revision_max_id = Column(Integer, nullable=True)
+    # JSON object；保存本次运行实际参数，而不是只依赖 algorithm_version。
+    algorithm_config_json = Column(
+        Text,
+        nullable=False,
+        default='{}',
+        server_default='{}',
+    )
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    user = relationship('User', back_populates='preference_model_runs')
+    results = relationship(
+        'PreferenceResult',
+        back_populates='model_run',
+        cascade='all, delete-orphan',
+    )
+    score_suggestions = relationship(
+        'ScoreSuggestion',
+        back_populates='model_run',
+        cascade='all, delete-orphan',
+    )
+
+    __table_args__ = (
+        Index(
+            'ix_preference_model_runs_user_status_started',
+            'user_id',
+            'status',
+            'started_at',
+        ),
+        Index(
+            'ix_preference_model_runs_algorithm_status',
+            'algorithm_version',
+            'status',
+        ),
+        Index(
+            'ix_preference_model_runs_user_input_watermarks',
+            'user_id',
+            'input_comparison_max_id',
+            'input_comparison_state_version',
+            'input_revoke_version',
+            'input_rating_revision_max_id',
+        ),
+    )
+
+
+class RedBlueUserState(Base):
+    """每个用户的 comparison 状态 watermark；不是排名缓存或事实明细。"""
+
+    __tablename__ = 'red_blue_user_states'
+
+    user_id = Column(
+        Integer,
+        ForeignKey('users.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    # 新增 Comparison（包括 SKIP）都会递增。
+    comparison_state_version = Column(Integer, nullable=False, default=0, server_default='0')
+    # revoke 已有 Comparison 时与 comparison_state_version 一起递增。
+    revoke_version = Column(Integer, nullable=False, default=0, server_default='0')
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    user = relationship('User', back_populates='red_blue_state')
+
+
+class PreferenceResult(Base):
+    """某次模型运行生成的排名快照，可从事实重新建立。"""
+
+    __tablename__ = 'preference_results'
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_run_id = Column(
+        Integer,
+        ForeignKey('preference_model_runs.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey('content_items.id', ondelete='CASCADE'), nullable=False, index=True)
+    preference_mean = Column(Float, nullable=False)
+    preference_std = Column(Float, nullable=False)
+    expected_rank = Column(Float, nullable=False)
+    rank_low = Column(Integer, nullable=False)
+    rank_high = Column(Integer, nullable=False)
+    stability = Column(
+        _enum_column(PreferenceStability, 'preference_result_stability'),
+        nullable=False,
+        default=PreferenceStability.UNCALIBRATED,
+    )
+    comparison_count = Column(Integer, nullable=False, default=0)
+    computed_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+
+    model_run = relationship('PreferenceModelRun', back_populates='results')
+    user = relationship('User', back_populates='preference_results')
+    content = relationship('ContentItem')
+
+    __table_args__ = (
+        CheckConstraint('rank_low <= rank_high', name='ck_preference_result_rank_interval'),
+        CheckConstraint('comparison_count >= 0', name='ck_preference_result_comparison_count'),
+        UniqueConstraint('model_run_id', 'content_id', name='uq_preference_result_run_content'),
+        Index(
+            'ix_preference_results_user_rank_interval',
+            'user_id',
+            'rank_low',
+            'rank_high',
+        ),
+        Index(
+            'ix_preference_results_user_content',
+            'user_id',
+            'content_id',
+        ),
+    )
+
+
+class ScoreSuggestion(Base):
+    """某次模型运行推导出的评分建议；状态只是派生展示缓存。"""
+
+    __tablename__ = 'score_suggestions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey('content_items.id', ondelete='CASCADE'), nullable=False, index=True)
+    model_run_id = Column(
+        Integer,
+        ForeignKey('preference_model_runs.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    # 由未来算法根据建议依据生成；不包含 model_run_id，便于跨重算识别同一建议。
+    suggestion_key = Column(String(128), nullable=False)
+    current_score = Column(Integer, nullable=False)
+    suggested_score_low = Column(Integer, nullable=False)
+    suggested_score_high = Column(Integer, nullable=False)
+    recommended_score = Column(Integer, nullable=False)
+    direction = Column(String(16), nullable=True)
+    confidence = Column(Float, nullable=True)
+    severity = Column(Float, nullable=True)
+    reason_code = Column(String(64), nullable=True)
+    status = Column(
+        _enum_column(ScoreSuggestionStatus, 'score_suggestion_status'),
+        nullable=False,
+        default=ScoreSuggestionStatus.PENDING,
+    )
+    created_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+    handled_at = Column(DateTime, nullable=True)
+
+    user = relationship('User', back_populates='score_suggestions')
+    content = relationship('ContentItem')
+    model_run = relationship('PreferenceModelRun', back_populates='score_suggestions')
+    rating_revisions = relationship('RatingRevision', back_populates='score_suggestion')
+
+    __table_args__ = (
+        CheckConstraint('current_score BETWEEN 0 AND 100', name='ck_score_suggestion_current_score'),
+        CheckConstraint('suggested_score_low BETWEEN 0 AND 100', name='ck_score_suggestion_low'),
+        CheckConstraint('suggested_score_high BETWEEN 0 AND 100', name='ck_score_suggestion_high'),
+        CheckConstraint('recommended_score BETWEEN 0 AND 100', name='ck_score_suggestion_recommended'),
+        CheckConstraint(
+            'suggested_score_low <= suggested_score_high',
+            name='ck_score_suggestion_score_interval',
+        ),
+        CheckConstraint(
+            'confidence IS NULL OR confidence BETWEEN 0 AND 1',
+            name='ck_score_suggestion_confidence',
+        ),
+        CheckConstraint(
+            'severity IS NULL OR severity BETWEEN 0 AND 1',
+            name='ck_score_suggestion_severity',
+        ),
+        UniqueConstraint(
+            'model_run_id',
+            'user_id',
+            'content_id',
+            'suggestion_key',
+            name='uq_score_suggestion_run_user_content_key',
+        ),
+        Index(
+            'ix_score_suggestions_user_status_created',
+            'user_id',
+            'status',
+            'created_at',
+        ),
+        Index(
+            'ix_score_suggestions_user_content_status',
+            'user_id',
+            'content_id',
+            'status',
+        ),
+        Index(
+            'ix_score_suggestions_user_content_key',
+            'user_id',
+            'content_id',
+            'suggestion_key',
+        ),
+    )
+
+
+class ScoreSuggestionAction(Base):
+    """用户处理评分建议的权威事实，重算或删除派生 suggestion 后仍保留。"""
+
+    __tablename__ = 'score_suggestion_actions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey('content_items.id'), nullable=False, index=True)
+    score_suggestion_id = Column(
+        Integer,
+        ForeignKey('score_suggestions.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    model_run_id = Column(
+        Integer,
+        ForeignKey('preference_model_runs.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    suggestion_key = Column(String(128), nullable=False)
+    action = Column(
+        _enum_column(ScoreSuggestionActionType, 'score_suggestion_action_type'),
+        nullable=False,
+    )
+    current_score = Column(Integer, nullable=False)
+    recommended_score = Column(Integer, nullable=False)
+    # 用户执行动作时的事实状态版本；不能依赖可删除的 Model Run 推导。
+    comparison_state_version_at_action = Column(Integer, nullable=False, default=0, server_default='0')
+    # 排除 SKIP 后最后一条有效 comparison 的 id，用于精确判断新 evidence。
+    effective_comparison_max_id_at_action = Column(Integer, nullable=True)
+    # 客户端写操作幂等键；NULL 兼容历史 action，非 NULL 时按用户唯一。
+    client_event_id = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+
+    user = relationship('User', back_populates='score_suggestion_actions')
+    content = relationship('ContentItem')
+    score_suggestion = relationship('ScoreSuggestion')
+
+    __table_args__ = (
+        CheckConstraint('current_score BETWEEN 0 AND 100', name='ck_score_suggestion_action_current_score'),
+        CheckConstraint('recommended_score BETWEEN 0 AND 100', name='ck_score_suggestion_action_recommended_score'),
+        CheckConstraint(
+            'comparison_state_version_at_action >= 0',
+            name='ck_score_suggestion_action_comparison_state_version',
+        ),
+        UniqueConstraint(
+            'user_id',
+            'client_event_id',
+            name='uq_score_suggestion_action_user_client_event',
+        ),
+        Index(
+            'ix_score_suggestion_actions_user_content_created',
+            'user_id',
+            'content_id',
+            'created_at',
+        ),
+        Index(
+            'ix_score_suggestion_actions_user_content_key',
+            'user_id',
+            'content_id',
+            'suggestion_key',
+        ),
+        Index(
+            'ix_score_suggestion_actions_user_effective_comparison',
+            'user_id',
+            'effective_comparison_max_id_at_action',
+        ),
+    )
 
 
 class UserContentStatus(Base):

@@ -18,6 +18,7 @@ const queryClient = new QueryClient()
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then(module => ({ default: module.ProfilePage })))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })))
 const RatingCalibrationPage = lazy(() => import('@/pages/RatingCalibrationPage').then(module => ({ default: module.RatingCalibrationPage })))
+const RedBlueBattlePage = lazy(() => import('@/pages/RedBlueBattlePage').then(module => ({ default: module.RedBlueBattlePage })))
 const ContentFormDialog = lazy(() => import('@/components/content/ContentFormDialog').then(module => ({ default: module.ContentFormDialog })))
 const SettingsDialog = lazy(() => import('@/components/settings/SettingsDialog').then(module => ({ default: module.SettingsDialog })))
 const ContentDetailDialog = lazy(() => import('@/components/content/ContentDetailDialog').then(module => ({ default: module.ContentDetailDialog })))
@@ -209,6 +210,7 @@ export default function App() {
               <Route path="/profile/:id" element={<Suspense fallback={null}><ProfilePage /></Suspense>} />
               <Route path="/analytics" element={<RequireUser><Suspense fallback={null}><AnalyticsPage /></Suspense></RequireUser>} />
               <Route path="/ratings/calibration" element={<RequireUser><Suspense fallback={null}><RatingCalibrationPage /></Suspense></RequireUser>} />
+              <Route path="/ratings/battle" element={<RequireUser><Suspense fallback={null}><RedBlueBattlePage /></Suspense></RequireUser>} />
             </Routes>
           </div>
 

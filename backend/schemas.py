@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -295,6 +296,161 @@ class RatingResponse(BaseModel):
     content_type: str | None = None
 
     model_config = {'from_attributes': True}
+
+
+# =============================================================================
+# Red-blue battle schemas
+# =============================================================================
+
+
+class RedBlueContentSummaryResponse(BaseModel):
+    """PK 和排名使用的轻量作品摘要。"""
+
+    content_id: int
+    title: str
+    cover_url: str | None = None
+    content_type: str
+
+
+class RedBluePairResponse(BaseModel):
+    """当前待比较的有向 Pair。"""
+
+    left: RedBlueContentSummaryResponse
+    right: RedBlueContentSummaryResponse
+    selector_version: str
+    selection_reason: str
+
+
+class RedBlueScoreSuggestionResponse(BaseModel):
+    """排名行右侧可展示的评分校准建议。"""
+
+    id: int
+    content_id: int
+    suggestion_key: str
+    current_score: int
+    suggested_score_low: int
+    suggested_score_high: int
+    recommended_score: int
+    direction: Literal['UP', 'DOWN']
+    confidence: float
+    severity: float
+    reason_code: str
+
+
+class RedBlueRankingItemResponse(BaseModel):
+    """个人排名中的一行；rank 是严格的 UI 展示序号。"""
+
+    content: RedBlueContentSummaryResponse
+    rank: int
+    current_score: int
+    preference_mean: float
+    comparison_count: int
+    stability: str
+    rank_low: int | None = None
+    rank_high: int | None = None
+    score_suggestion: RedBlueScoreSuggestionResponse | None = None
+
+
+class RedBlueStateResponse(BaseModel):
+    """GET /red-blue/state 的完整可恢复页面状态。"""
+
+    state_version: int
+    model_freshness: str
+    candidate_count: int
+    pair_status: str
+    current_pair: RedBluePairResponse | None = None
+    ranking: list[RedBlueRankingItemResponse]
+    full_recalibration_required: bool
+    full_recalibration_running: bool
+
+
+class CreateComparisonRequest(BaseModel):
+    """提交一次红蓝合战事实。"""
+
+    left_content_id: int = Field(gt=0)
+    right_content_id: int = Field(gt=0)
+    outcome: Literal['LEFT_WIN', 'RIGHT_WIN', 'TIE', 'SKIP']
+    client_event_id: UUID
+    focus_content_id: int | None = Field(default=None, gt=0)
+
+
+class RedBlueComparisonResponse(BaseModel):
+    """一条已经写入事实表的 Comparison。"""
+
+    id: int
+    left_content_id: int
+    right_content_id: int
+    outcome: Literal['LEFT_WIN', 'RIGHT_WIN', 'TIE', 'SKIP']
+    client_event_id: str
+    selector_version: str
+    created_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class RedBlueRankingDeltaResponse(BaseModel):
+    """一次普通 PK 后需要 patch 的所有榜单行。"""
+
+    content_id: int
+    old_rank: int | None = None
+    new_rank: int
+    preference_mean: float
+    comparison_count: int
+
+
+class RedBlueScoreSuggestionDeltaResponse(BaseModel):
+    """一次比较后评分建议的增量变化。"""
+
+    added: list[RedBlueScoreSuggestionResponse] = Field(default_factory=list)
+    updated: list[RedBlueScoreSuggestionResponse] = Field(default_factory=list)
+    removed: list[int] = Field(default_factory=list)
+
+
+class CreateComparisonResponse(BaseModel):
+    """提交 Comparison 后供前端继续 PK 的增量响应。"""
+
+    comparison: RedBlueComparisonResponse
+    state_version: int
+    ranking_delta: list[RedBlueRankingDeltaResponse]
+    score_suggestion_delta: RedBlueScoreSuggestionDeltaResponse = Field(
+        default_factory=RedBlueScoreSuggestionDeltaResponse,
+    )
+    next_pair: RedBluePairResponse | None = None
+    pair_status: str
+    model_freshness: str
+    full_recalibration_required: bool
+    full_recalibration_running: bool
+    idempotent_replay: bool
+
+
+class RevokeComparisonResponse(BaseModel):
+    """撤销事实后的状态提示；不伪造尚未完成的全量排名。"""
+
+    comparison: RedBlueComparisonResponse
+    revoked: bool
+    state_version: int
+    model_freshness: str
+    full_recalibration_required: bool
+    full_recalibration_running: bool
+
+
+class ScoreSuggestionActionRequest(BaseModel):
+    """处理一条评分建议；client_event_id 用于重复点击幂等。"""
+
+    action: Literal['ACCEPTED', 'DISMISSED', 'REJECTED']
+    suggestion_key: str = Field(min_length=1, max_length=128)
+    client_event_id: UUID
+
+
+class ScoreSuggestionActionResponse(BaseModel):
+    """评分建议动作及其最新排名行。"""
+
+    suggestion_id: int
+    action: Literal['ACCEPTED', 'DISMISSED', 'REJECTED']
+    current_score: int
+    updated_score: int
+    state_version: int
+    updated_ranking_item: RedBlueRankingItemResponse | None = None
+    idempotent_replay: bool = False
 
 
 class RatingHistoryResponse(BaseModel):

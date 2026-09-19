@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { LoadingIcon } from '@/components/ui/loading-icon'
 import { HeroSection } from '@/components/content/HeroSection'
-import { ArrowDownUp, ChartNoAxesCombined, ChevronRight, LayoutGrid, List } from 'lucide-react'
+import { ArrowDownUp, ChartNoAxesCombined, ChevronRight, LayoutGrid, List, Swords } from 'lucide-react'
 import type { AiringCalendarWeek, ContentItem } from '@/types'
 import {
   buildContentListParams,
@@ -89,7 +89,30 @@ function currentWeekStart(): string {
 function MoreFeaturesPanel() {
   return (
     <section className="mt-8" aria-label="更多功能">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link
+          to="/ratings/battle"
+          className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: 'rgba(251,113,167,0.12)', color: 'var(--brand)' }}
+              >
+                <Swords size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>红蓝合战</h3>
+                <p className="mt-1 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                  通过相对选择整理个人番剧排名，随时比较、随时离开。
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="mt-1 shrink-0 transition-transform group-hover:translate-x-0.5" size={18} style={{ color: 'var(--text-muted)' }} />
+          </div>
+        </Link>
         <Link
           to="/ratings/calibration"
           className="group rounded-xl p-5 transition-colors hover:bg-[rgba(251,113,167,0.06)]"
