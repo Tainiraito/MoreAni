@@ -139,6 +139,8 @@ describe('AnalyticsPage', () => {
     const view = renderAnalytics()
 
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalled())
+    expect(view.getByText('Preference analytics')).toBeInTheDocument()
+    expect(view.getByRole('heading', { level: 1, name: '统计分析' })).toBeInTheDocument()
     expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
       { scope: 'global', userId: undefined, minScore: 0.5, maxScore: 10, tags: [] },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),

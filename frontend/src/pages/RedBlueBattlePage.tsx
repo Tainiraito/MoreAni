@@ -6,6 +6,7 @@ import { BattlePair } from '@/components/red-blue/BattlePair'
 import { RankingList } from '@/components/red-blue/RankingList'
 import { StickyMiniBattle } from '@/components/red-blue/StickyMiniBattle'
 import { PageMain } from '@/components/layout/PageContainer'
+import { FeaturePageHeader } from '@/components/layout/FeaturePageHeader'
 import { ApiError, api } from '@/lib/api'
 import { buildRedBlueRankingChanges, patchRedBlueComparisonState, patchRedBlueSuggestionAction, RED_BLUE_STATE_QUERY_KEY } from '@/lib/red-blue'
 import { useUIStore } from '@/stores/ui-store'
@@ -351,23 +352,16 @@ export function RedBlueBattlePage() {
   return (
     <PageMain className="pt-16 pb-12 sm:pt-20 sm:pb-16" data-testid="red-blue-page">
       <div className="space-y-5 sm:space-y-6">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2" style={{ color: 'var(--brand)' }}>
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'rgba(251,113,167,0.12)' }}>
-                <Sparkles size={17} />
-              </span>
-              <span className="text-xs font-semibold uppercase tracking-[0.18em]">MoreAni / Personal order</span>
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl" style={{ color: 'var(--text-primary)' }}>红蓝合战</h1>
-            <p className="mt-2 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>用相对选择，整理真正属于你的番剧排名。</p>
-          </div>
-          {statusText && (
+        <FeaturePageHeader
+          eyebrow="Personal ranking"
+          title="红蓝合战"
+          description="用相对选择，整理真正属于你的番剧排名。"
+          actions={statusText ? (
             <p className="self-start text-xs sm:self-auto sm:pb-1 sm:text-right" style={{ color: 'var(--text-muted)' }} aria-live="polite">
               {statusText}
             </p>
-          )}
-        </header>
+          ) : undefined}
+        />
 
         {focusedContent && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(251,113,167,0.08)', border: '1px solid rgba(251,113,167,0.25)', color: 'var(--text-secondary)' }} data-testid="red-blue-focus-status">

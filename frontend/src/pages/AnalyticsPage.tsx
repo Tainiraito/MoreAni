@@ -1,6 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { BarChart3, ChartNoAxesCombined, Cloud, Heart, RotateCcw, Sparkles, Star, Users } from 'lucide-react'
+import { BarChart3, Cloud, Heart, RotateCcw, Sparkles, Star, Users } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
 import {
@@ -11,6 +11,7 @@ import { ScoreDistributionChart } from '@/components/analytics/ScoreDistribution
 import { ScoreRangeSlider } from '@/components/analytics/ScoreRangeSlider'
 import { TagWordCloud } from '@/components/analytics/TagWordCloud'
 import { PageMain } from '@/components/layout/PageContainer'
+import { FeaturePageHeader } from '@/components/layout/FeaturePageHeader'
 import { Select } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import {
@@ -260,26 +261,21 @@ export function AnalyticsPage() {
 
   return (
     <PageMain className="py-20 sm:py-24">
-      <section className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ color: 'var(--brand)', background: 'rgba(251, 113, 167, 0.12)' }}>
-              <ChartNoAxesCombined size={22} />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold sm:text-3xl" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>统计分析</h1>
-              <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>从评分和标签中理解全站与成员的看番偏好</p>
-            </div>
-          </div>
-        </div>
-        <Select
-          value={selectedScopeValue}
-          onChange={handleScopeChange}
-          options={scopeOptions}
-          className="w-full sm:w-52"
-          placeholder="选择分析范围"
-        />
-      </section>
+      <FeaturePageHeader
+        className="mb-6"
+        eyebrow="Preference analytics"
+        title="统计分析"
+        description="从评分和标签中理解全站与成员的看番偏好"
+        actions={(
+          <Select
+            value={selectedScopeValue}
+            onChange={handleScopeChange}
+            options={scopeOptions}
+            className="w-full sm:w-52"
+            placeholder="选择分析范围"
+          />
+        )}
+      />
 
       {overviewQuery.isPending ? <AnalyticsLoading /> : overviewQuery.isError || !overview ? (
         <div className="rounded-xl p-8 text-center text-sm" style={ANALYTICS_CARD_STYLE}>

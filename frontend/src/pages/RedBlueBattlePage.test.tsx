@@ -117,6 +117,8 @@ describe('RedBlueBattlePage', () => {
   it('loads a pair, submits LEFT and replaces it with the next pair', async () => {
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
+    expect(view.getByText('Personal ranking')).toBeInTheDocument()
+    expect(view.getByRole('heading', { level: 1, name: '红蓝合战' })).toBeInTheDocument()
     expect(view.getAllByText('左作品').length).toBeGreaterThan(0)
     expect(view.getAllByText('右作品').length).toBeGreaterThan(0)
 

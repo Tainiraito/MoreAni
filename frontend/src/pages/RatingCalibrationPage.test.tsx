@@ -70,6 +70,8 @@ describe('RatingCalibrationPage', () => {
     const view = renderPage()
 
     await waitFor(() => expect(view.getByText('作品 1')).toBeInTheDocument())
+    expect(view.getByText('Random comparison')).toBeInTheDocument()
+    expect(view.getByRole('heading', { level: 1, name: '随机比较' })).toBeInTheDocument()
     expect(view.getAllByRole('button', { name: /显示《作品 [123]》的旧评分/ })).toHaveLength(2)
     expect(view.getAllByRole('button', { name: /隐藏《作品 [123]》的旧评分/ })).toHaveLength(1)
     const scoreGroups = view.getAllByRole('group', { name: /《作品 [123]》的新评分/ })
