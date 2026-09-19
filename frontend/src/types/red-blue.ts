@@ -16,6 +16,7 @@ export type RedBlueSuggestionAction = 'ACCEPTED' | 'DISMISSED' | 'REJECTED'
 export interface RedBlueContentSummary {
   content_id: number
   title: string
+  description: string
   cover_url: string | null
   content_type: ContentType | string
 }

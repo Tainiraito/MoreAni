@@ -2,6 +2,7 @@ import { Swords } from 'lucide-react'
 
 import { BattleAnimeCard } from '@/components/red-blue/BattleAnimeCard'
 import { BattleActions } from '@/components/red-blue/BattleActions'
+import { BATTLE_PAIR_GRID_CLASS_NAME } from '@/components/red-blue/battle-layout'
 import type { RedBlueOutcome, RedBluePair } from '@/types/red-blue'
 
 interface BattlePairProps {
@@ -27,7 +28,7 @@ export function BattlePair({ pair, disabled, selectedOutcome, onChoose, onOpenCo
 
   return (
     <section className="rounded-2xl p-3 sm:p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }} data-testid="battle-pair">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
+      <div className={`${BATTLE_PAIR_GRID_CLASS_NAME} items-center`}>
         <BattleAnimeCard content={pair.left} side="red" onOpen={() => onOpenContent(pair.left.content_id)} />
         <div className="flex flex-col items-center gap-1 px-0.5 sm:px-2" aria-hidden="true">
           <span className="flex h-9 w-9 items-center justify-center rounded-full" style={{ background: 'rgba(251,113,167,0.1)', border: '1px solid var(--border-line)' }}>
@@ -45,9 +46,6 @@ export function BattlePair({ pair, disabled, selectedOutcome, onChoose, onOpenCo
           onChoose={onChoose}
         />
       </div>
-      <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-        键盘快捷键：A / ← 红方　S / ↓ 差不多　D / → 蓝方　W / ↑ 跳过
-      </p>
     </section>
   )
 }

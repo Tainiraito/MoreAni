@@ -9,6 +9,7 @@ function rankingOf(size: number): RedBlueRankingItem[] {
     content: {
       content_id: index + 1,
       title: `测试作品 ${index + 1}`,
+      description: '',
       cover_url: null,
       content_type: 'anime',
     },

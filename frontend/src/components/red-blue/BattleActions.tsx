@@ -1,5 +1,6 @@
 import { Heart, Minus, SkipForward, type LucideIcon } from 'lucide-react'
 
+import { BATTLE_PAIR_GRID_CLASS_NAME } from '@/components/red-blue/battle-layout'
 import type { RedBlueOutcome } from '@/types/red-blue'
 
 export interface BattleActionsProps {
@@ -57,34 +58,47 @@ export function BattleActions({
   compact = false,
   testIdPrefix = 'battle',
 }: BattleActionsProps) {
+  const renderAction = ({ outcome, label, compactLabel, icon: Icon, tone }: BattleActionDefinition, placementClassName = '') => {
+    const selected = selectedOutcome === outcome
+    const primary = outcome === 'LEFT_WIN' || outcome === 'RIGHT_WIN'
+    const skip = outcome === 'SKIP'
+    return (
+      <button
+        key={outcome}
+        type="button"
+        disabled={disabled}
+        onClick={() => onChoose(outcome)}
+        className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 transition-all duration-150 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-55 ${compact ? 'text-xs font-semibold' : 'w-full'} ${compact ? '' : primary ? 'gap-2 px-3 text-sm font-bold' : skip ? 'px-3 text-xs font-medium' : 'px-3 text-sm font-semibold'} ${placementClassName}`}
+        style={{
+          ...actionStyle(tone, selected),
+          boxShadow: primary && !selected
+            ? `0 6px 18px color-mix(in srgb, ${tone === 'red' ? 'var(--battle-red)' : 'var(--battle-blue)'} 12%, transparent)`
+            : 'none',
+        }}
+        aria-label={label}
+        aria-pressed={selected}
+        data-testid={`${testIdPrefix}-action-${outcome.toLowerCase()}`}
+      >
+        <Icon size={compact ? 14 : 16} fill={primary ? 'currentColor' : 'none'} />
+        <span>{compact ? compactLabel : label}</span>
+      </button>
+    )
+  }
+
+  if (compact) {
+    return <div className="grid grid-cols-4 gap-1.5">{ACTIONS.map(action => renderAction(action))}</div>
+  }
+
   return (
-    <div className={compact ? 'grid grid-cols-4 gap-1.5' : 'grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.8fr)_minmax(0,1.25fr)_minmax(0,0.7fr)]'}>
-      {ACTIONS.map(({ outcome, label, compactLabel, icon: Icon, tone }) => {
-        const selected = selectedOutcome === outcome
-        const primary = outcome === 'LEFT_WIN' || outcome === 'RIGHT_WIN'
-        const skip = outcome === 'SKIP'
-        return (
-          <button
-            key={outcome}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChoose(outcome)}
-            className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-2 transition-all duration-150 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-55 ${compact ? 'text-xs font-semibold' : primary ? 'gap-2 px-3 text-sm font-bold' : skip ? 'px-3 text-xs font-medium' : 'px-3 text-sm font-semibold'}`}
-            style={{
-              ...actionStyle(tone, selected),
-              boxShadow: primary && !selected
-                ? `0 6px 18px color-mix(in srgb, ${tone === 'red' ? 'var(--battle-red)' : 'var(--battle-blue)'} 12%, transparent)`
-                : 'none',
-            }}
-            aria-label={label}
-            aria-pressed={selected}
-            data-testid={`${testIdPrefix}-action-${outcome.toLowerCase()}`}
-          >
-            <Icon size={compact ? 14 : 16} fill={primary ? 'currentColor' : 'none'} />
-            <span>{compact ? compactLabel : label}</span>
-          </button>
-        )
-      })}
+    <div className="space-y-2">
+      <div className={BATTLE_PAIR_GRID_CLASS_NAME} data-testid={`${testIdPrefix}-primary-actions`}>
+        {renderAction(ACTIONS[0])}
+        {renderAction(ACTIONS[2], 'col-start-3')}
+      </div>
+      <div className={BATTLE_PAIR_GRID_CLASS_NAME} data-testid={`${testIdPrefix}-secondary-actions`}>
+        {renderAction(ACTIONS[1])}
+        {renderAction(ACTIONS[3], 'col-start-3')}
+      </div>
     </div>
   )
 }

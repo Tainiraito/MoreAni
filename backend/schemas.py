@@ -308,6 +308,7 @@ class RedBlueContentSummaryResponse(BaseModel):
 
     content_id: int
     title: str
+    description: str = ''
     cover_url: str | None = None
     content_type: str
 

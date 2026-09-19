@@ -189,6 +189,7 @@ class ContentSnapshot:
 
     content_id: int
     title: str
+    description: str
     cover_url: str | None
     content_type: str
     current_score: int
@@ -479,6 +480,7 @@ class RedBlueService:
             content.id: ContentSnapshot(
                 content_id=content.id,
                 title=content.title,
+                description=content.description or '',
                 cover_url=content.cover_url or None,
                 content_type=content.content_type,
                 current_score=int(score),

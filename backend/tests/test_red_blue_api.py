@@ -144,6 +144,7 @@ def test_state_bootstrap_full_fast_and_pair_contract(client, db, make_user, api_
     assert set(bootstrap_payload['current_pair']['left']) == {
         'content_id',
         'title',
+        'description',
         'cover_url',
         'content_type',
     }

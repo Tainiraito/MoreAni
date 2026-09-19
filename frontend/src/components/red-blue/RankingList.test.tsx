@@ -6,7 +6,7 @@ import type { RedBlueRankingItem, RedBlueScoreSuggestion } from '@/types/red-blu
 
 function item(contentId: number, title: string, stability: string): RedBlueRankingItem {
   return {
-    content: { content_id: contentId, title, cover_url: null, content_type: 'anime' },
+    content: { content_id: contentId, title, description: '', cover_url: null, content_type: 'anime' },
     rank: contentId,
     current_score: 80,
     preference_mean: 1,

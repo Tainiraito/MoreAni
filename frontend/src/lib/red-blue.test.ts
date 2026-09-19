@@ -14,14 +14,14 @@ function state(): RedBlueState {
     candidate_count: 2,
     pair_status: 'AVAILABLE',
     current_pair: {
-      left: { content_id: 1, title: '作品 1', cover_url: null, content_type: 'anime' },
-      right: { content_id: 2, title: '作品 2', cover_url: null, content_type: 'anime' },
+      left: { content_id: 1, title: '作品 1', description: '', cover_url: null, content_type: 'anime' },
+      right: { content_id: 2, title: '作品 2', description: '', cover_url: null, content_type: 'anime' },
       selector_version: 'v1',
       selection_reason: 'uncertainty',
     },
     ranking: [
       {
-        content: { content_id: 1, title: '作品 1', cover_url: null, content_type: 'anime' },
+        content: { content_id: 1, title: '作品 1', description: '', cover_url: null, content_type: 'anime' },
         rank: 1,
         current_score: 80,
         preference_mean: 1,
@@ -32,7 +32,7 @@ function state(): RedBlueState {
         score_suggestion: null,
       },
       {
-        content: { content_id: 2, title: '作品 2', cover_url: null, content_type: 'anime' },
+        content: { content_id: 2, title: '作品 2', description: '', cover_url: null, content_type: 'anime' },
         rank: 2,
         current_score: 85,
         preference_mean: 0.8,
@@ -133,8 +133,8 @@ describe('red-blue query cache patching', () => {
       ...response,
       score_suggestion_delta: undefined,
       next_pair: {
-        left: { content_id: 3, title: '作品 3', cover_url: null, content_type: 'anime' },
-        right: { content_id: 4, title: '作品 4', cover_url: null, content_type: 'anime' },
+        left: { content_id: 3, title: '作品 3', description: '', cover_url: null, content_type: 'anime' },
+        right: { content_id: 4, title: '作品 4', description: '', cover_url: null, content_type: 'anime' },
         selector_version: 'v1',
         selection_reason: 'uncertainty',
       },
@@ -157,8 +157,8 @@ describe('red-blue query cache patching', () => {
       ...comparisonResponse(),
       state_version: current.state_version,
       next_pair: {
-        left: { content_id: 3, title: '作品 3', cover_url: null, content_type: 'anime' },
-        right: { content_id: 4, title: '作品 4', cover_url: null, content_type: 'anime' },
+        left: { content_id: 3, title: '作品 3', description: '', cover_url: null, content_type: 'anime' },
+        right: { content_id: 4, title: '作品 4', description: '', cover_url: null, content_type: 'anime' },
         selector_version: 'v1',
         selection_reason: 'uncertainty',
       },

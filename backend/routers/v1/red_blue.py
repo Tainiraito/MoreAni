@@ -53,6 +53,7 @@ def _content_summary(snapshot: ContentSnapshot) -> RedBlueContentSummaryResponse
     return RedBlueContentSummaryResponse(
         content_id=snapshot.content_id,
         title=snapshot.title,
+        description=snapshot.description,
         cover_url=snapshot.cover_url,
         content_type=snapshot.content_type,
     )

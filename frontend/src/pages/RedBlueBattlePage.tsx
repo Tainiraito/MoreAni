@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle, RefreshCw, Sparkles } from 'lucide-react'
 
 import { BattlePair } from '@/components/red-blue/BattlePair'
+import { BattleKeyboardShortcuts } from '@/components/red-blue/BattleKeyboardShortcuts'
 import { RankingList } from '@/components/red-blue/RankingList'
 import { StickyMiniBattle } from '@/components/red-blue/StickyMiniBattle'
 import { PageMain } from '@/components/layout/PageContainer'
@@ -391,12 +392,15 @@ export function RedBlueBattlePage() {
           <EmptyBattleState candidateCount={state.candidate_count} />
         ) : canShowPair ? (
           <section ref={battleSectionRef} aria-labelledby="red-blue-battle-title" data-testid="red-blue-main-battle">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 sm:flex-nowrap">
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--text-muted)' }}>Choose by feeling</p>
                 <h2 id="red-blue-battle-title" className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>这一组，你更喜欢哪一部？</h2>
               </div>
-              {comparisonMutation.isPending && <LoaderCircle size={17} className="animate-spin" style={{ color: 'var(--brand)' }} aria-label="正在记录选择" />}
+              <div className="flex shrink-0 items-center gap-2">
+                <BattleKeyboardShortcuts />
+                {comparisonMutation.isPending && <LoaderCircle size={17} className="animate-spin" style={{ color: 'var(--brand)' }} aria-label="正在记录选择" />}
+              </div>
             </div>
             <BattlePair
               pair={state.current_pair}

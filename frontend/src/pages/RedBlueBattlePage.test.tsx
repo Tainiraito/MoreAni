@@ -30,7 +30,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 function content(contentId: number, title: string) {
-  return { content_id: contentId, title, cover_url: null, content_type: 'anime' }
+  return { content_id: contentId, title, description: '', cover_url: null, content_type: 'anime' }
 }
 
 function baseState(overrides: Partial<RedBlueState> = {}): RedBlueState {
@@ -119,6 +119,9 @@ describe('RedBlueBattlePage', () => {
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
     expect(view.getByText('Personal ranking')).toBeInTheDocument()
     expect(view.getByRole('heading', { level: 1, name: '红蓝合战' })).toBeInTheDocument()
+    const shortcuts = view.getByTestId('battle-keyboard-shortcuts')
+    expect(shortcuts).toHaveTextContent('A红方')
+    expect(shortcuts.querySelectorAll('kbd')).toHaveLength(8)
     expect(view.getAllByText('左作品').length).toBeGreaterThan(0)
     expect(view.getAllByText('右作品').length).toBeGreaterThan(0)
 
