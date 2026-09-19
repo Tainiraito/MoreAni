@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import { ApiError, api } from '@/lib/api'
 import { RedBlueBattlePage } from '@/pages/RedBlueBattlePage'
 import type {
   CreateRedBlueComparisonResponse,
+  RedBlueComparisonHistoryItem,
   RevokeRedBlueComparisonResponse,
   RedBlueState,
   ScoreSuggestionActionResponse,
@@ -23,6 +24,7 @@ vi.mock('@/lib/api', () => ({
   },
   api: {
     getRedBlueState: vi.fn(),
+    getRedBlueComparisons: vi.fn(),
     createRedBlueComparison: vi.fn(),
     handleRedBlueSuggestionAction: vi.fn(),
     revokeRedBlueComparison: vi.fn(),
@@ -94,6 +96,22 @@ function comparisonResponse(): CreateRedBlueComparisonResponse {
   }
 }
 
+function historyItem(overrides: Partial<RedBlueComparisonHistoryItem> = {}): RedBlueComparisonHistoryItem {
+  return {
+    id: 11,
+    left_content: { content_id: 1, title: '左作品' },
+    right_content: { content_id: 2, title: '右作品' },
+    left_content_id: 1,
+    right_content_id: 2,
+    outcome: 'LEFT_WIN',
+    client_event_id: 'event-1',
+    selector_version: 'v1',
+    created_at: null,
+    revoked_at: null,
+    ...overrides,
+  }
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -111,14 +129,20 @@ describe('RedBlueBattlePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.getRedBlueState).mockResolvedValue(baseState())
+    vi.mocked(api.getRedBlueComparisons).mockResolvedValue([])
     vi.mocked(api.createRedBlueComparison).mockResolvedValue(comparisonResponse())
   })
 
   it('loads a pair, submits LEFT and replaces it with the next pair', async () => {
+    vi.mocked(api.getRedBlueComparisons)
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([historyItem()])
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
     expect(view.getByText('Personal ranking')).toBeInTheDocument()
     expect(view.getByRole('heading', { level: 1, name: '红蓝合战' })).toBeInTheDocument()
+    expect(view.getByTestId('red-blue-results-tabs')).toHaveAttribute('data-slot', 'tabs')
+    expect(view.getByTestId('red-blue-ranking-tab')).toHaveAttribute('data-slot', 'tabs-trigger')
     const shortcuts = view.getByTestId('battle-keyboard-shortcuts')
     expect(shortcuts).toHaveTextContent('A红方')
     expect(shortcuts.querySelectorAll('kbd')).toHaveLength(8)
@@ -133,7 +157,8 @@ describe('RedBlueBattlePage', () => {
       client_event_id: expect.any(String),
     })))
     await waitFor(() => expect(view.getByTestId('battle-card-blue')).toHaveTextContent('左作品'))
-    expect(view.getByTestId('comparison-undo')).toHaveTextContent('已记录：更喜欢《左作品》')
+    fireEvent.click(view.getByTestId('red-blue-history-tab'))
+    await waitFor(() => expect(view.getByTestId('comparison-history-item-11')).toHaveTextContent('已记录：更喜欢《左作品》'))
   })
 
   it('keeps ranking changes through search, focus and skip, then replaces them on the next valid PK', async () => {
@@ -169,7 +194,7 @@ describe('RedBlueBattlePage', () => {
     fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
     await waitFor(() => expect(view.getByTestId('ranking-change-1')).toHaveTextContent('3'))
 
-    fireEvent.change(view.getByPlaceholderText('搜索作品'), { target: { value: '左' } })
+    fireEvent.change(view.getByRole('textbox', { name: '搜索作品' }), { target: { value: '左' } })
     expect(view.getByTestId('ranking-change-1')).toBeInTheDocument()
     fireEvent.click(view.getByTestId('focus-content-1'))
     expect(view.getByTestId('ranking-change-1')).toBeInTheDocument()
@@ -178,7 +203,7 @@ describe('RedBlueBattlePage', () => {
     await waitFor(() => expect(api.createRedBlueComparison).toHaveBeenCalledTimes(2))
     expect(view.getByTestId('ranking-change-1')).toBeInTheDocument()
 
-    fireEvent.change(view.getByPlaceholderText('搜索作品'), { target: { value: '' } })
+    fireEvent.change(view.getByRole('textbox', { name: '搜索作品' }), { target: { value: '' } })
     fireEvent.click(view.getByRole('button', { name: '更喜欢蓝方' }))
     await waitFor(() => expect(api.createRedBlueComparison).toHaveBeenCalledTimes(3))
     await waitFor(() => expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument())
@@ -202,14 +227,46 @@ describe('RedBlueBattlePage', () => {
     }
     vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce(first)
     vi.mocked(api.revokeRedBlueComparison).mockResolvedValueOnce(revoked)
+    vi.mocked(api.getRedBlueComparisons)
+      .mockResolvedValueOnce([historyItem()])
+      .mockResolvedValueOnce([historyItem()])
+      .mockResolvedValue([])
 
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
     fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
     await waitFor(() => expect(view.getByTestId('ranking-change-1')).toBeInTheDocument())
-    fireEvent.click(view.getByRole('button', { name: '撤销' }))
+    fireEvent.click(view.getByTestId('red-blue-history-tab'))
+    await waitFor(() => expect(view.getByTestId('comparison-history-item-11')).toBeInTheDocument())
+    fireEvent.click(view.getByRole('button', { name: /撤销《左作品》与《右作品》这次 PK/ }))
     await waitFor(() => expect(api.revokeRedBlueComparison).toHaveBeenCalledWith(11))
     expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument()
+  })
+
+  it('keeps PK history visible in its tab and removes a row only after revoke succeeds', async () => {
+    const item = historyItem({ id: 21, outcome: 'RIGHT_WIN' })
+    vi.mocked(api.getRedBlueComparisons)
+      .mockResolvedValueOnce([item])
+      .mockResolvedValue([])
+    vi.mocked(api.revokeRedBlueComparison).mockResolvedValue({
+      comparison: { ...comparisonResponse().comparison, id: 21, outcome: 'RIGHT_WIN' },
+      revoked: true,
+      state_version: 2,
+      model_freshness: 'STALE_REQUIRES_FULL',
+      full_recalibration_required: true,
+      full_recalibration_running: false,
+    })
+
+    const view = renderPage()
+    await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
+    fireEvent.click(view.getByTestId('red-blue-history-tab'))
+    await waitFor(() => expect(view.getByTestId('comparison-history-item-21')).toHaveTextContent('已记录：更喜欢《右作品》'))
+    expect(view.getByTestId('comparison-history-item-21')).toHaveTextContent('《左作品》 VS 《右作品》')
+
+    fireEvent.click(view.getByRole('button', { name: /撤销《左作品》与《右作品》这次 PK/ }))
+    await waitFor(() => expect(api.revokeRedBlueComparison).toHaveBeenCalledWith(21))
+    await waitFor(() => expect(view.queryByTestId('comparison-history-item-21')).not.toBeInTheDocument())
+    expect(view.getByTestId('red-blue-history-empty')).toBeInTheDocument()
   })
 
   it.each([
@@ -231,7 +288,7 @@ describe('RedBlueBattlePage', () => {
   it('does not trigger shortcuts in editable content, while pending or on repeated key events', async () => {
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
-    const search = view.getByPlaceholderText('搜索作品')
+    const search = view.getByRole('textbox', { name: '搜索作品' })
     fireEvent.keyDown(search, { key: 'a' })
     expect(api.createRedBlueComparison).not.toHaveBeenCalled()
 
@@ -343,7 +400,9 @@ describe('RedBlueBattlePage', () => {
     fireEvent.click(view.getByRole('button', { name: '调整为 9.0' }))
     await waitFor(() => expect(api.handleRedBlueSuggestionAction).toHaveBeenCalledWith(20, expect.objectContaining({ action: 'ACCEPTED', suggestion_key: '2:85:90:UP' })))
     await waitFor(() => expect(view.queryByTestId('score-suggestion-20')).not.toBeInTheDocument())
-    expect(view.getByRole('button', { name: /有评分建议 0/ })).toBeInTheDocument()
+    const filters = within(view.getByRole('group', { name: '排名筛选' }))
+    fireEvent.click(filters.getByRole('button'))
+    expect(view.getByRole('option', { name: /有评分建议 \(0\)/ })).toBeInTheDocument()
   })
 
   it('reloads on a comparison conflict instead of guessing local state', async () => {

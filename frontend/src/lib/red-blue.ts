@@ -9,6 +9,7 @@ import type {
 } from '@/types/red-blue'
 
 export const RED_BLUE_STATE_QUERY_KEY = ['red-blue', 'state'] as const
+export const RED_BLUE_COMPARISONS_QUERY_KEY = ['red-blue', 'comparisons'] as const
 
 function byDisplayOrder(left: RedBlueRankingItem, right: RedBlueRankingItem): number {
   return right.preference_mean - left.preference_mean

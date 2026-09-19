@@ -5,6 +5,7 @@ interface BattleMockState {
   comparisons: number
   suggestionVisible: boolean
   currentScore: number
+  history: Array<Record<string, unknown>>
 }
 
 const user = {
@@ -81,6 +82,7 @@ async function mockBattleApi(page: Page): Promise<BattleMockState> {
     comparisons: 0,
     suggestionVisible: false,
     currentScore: 85,
+    history: [],
   }
 
   await page.addInitScript(({ auth }) => {
@@ -103,11 +105,27 @@ async function mockBattleApi(page: Page): Promise<BattleMockState> {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(getState(mock)) })
       return
     }
+    if (path === '/api/v1/red-blue/comparisons' && request.method() === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mock.history) })
+      return
+    }
     if (path === '/api/v1/red-blue/comparisons' && request.method() === 'POST') {
       const body = JSON.parse(request.postData() ?? '{}') as { outcome?: string; client_event_id?: string }
       mock.comparisons += 1
       mock.stateVersion += 1
       mock.suggestionVisible = mock.comparisons >= 3
+      mock.history.unshift({
+        id: mock.comparisons,
+        left_content: { content_id: 1, title: '左作品' },
+        right_content: { content_id: 2, title: '右作品' },
+        left_content_id: 1,
+        right_content_id: 2,
+        outcome: body.outcome ?? 'SKIP',
+        client_event_id: body.client_event_id ?? `event-${mock.comparisons}`,
+        selector_version: 'v1',
+        created_at: '2026-01-01T00:00:00Z',
+        revoked_at: null,
+      })
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -161,6 +179,7 @@ async function mockBattleApi(page: Page): Promise<BattleMockState> {
       return
     }
     if (path.includes('/red-blue/comparisons/') && path.endsWith('/revoke') && request.method() === 'POST') {
+      mock.history = []
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -207,9 +226,12 @@ test.describe('红蓝合战页面', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/ratings/battle')
     await page.getByRole('button', { name: '差不多' }).click()
-    await expect(page.getByTestId('comparison-undo')).toBeVisible()
-    await page.getByRole('button', { name: '撤销' }).click()
-    await expect(page.getByTestId('comparison-undo')).toHaveCount(0)
+    await expect(page.getByTestId('red-blue-history-tab')).toContainText('PK 历史 1')
+    await page.getByTestId('red-blue-history-tab').click()
+    await expect(page.getByTestId('comparison-history-item-1')).toBeVisible()
+    await page.getByRole('button', { name: /撤销/ }).click()
+    await expect(page.getByTestId('red-blue-history-empty')).toBeVisible()
+    await page.getByTestId('red-blue-ranking-tab').click()
     await expect(page.getByTestId('battle-card-red')).toBeVisible()
     await expect(page.getByTestId('battle-card-blue')).toBeVisible()
     await page.screenshot({ path: `/tmp/moreani-red-blue-${testInfo.project.name}-mobile.png`, fullPage: false })

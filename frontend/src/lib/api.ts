@@ -21,6 +21,7 @@ import type {
 import type {
   CreateRedBlueComparisonRequest,
   CreateRedBlueComparisonResponse,
+  RedBlueComparisonHistoryItem,
   RedBlueState,
   RevokeRedBlueComparisonResponse,
   ScoreSuggestionActionRequest,
@@ -333,6 +334,8 @@ export const api = {
   // Red-blue battle
   getRedBlueState: async (options?: RequestInit) =>
     normalizeRedBlueState(await request<RedBlueState>('/red-blue/state', options)),
+  getRedBlueComparisons: async (options?: RequestInit) =>
+    request<RedBlueComparisonHistoryItem[]>('/red-blue/comparisons', options),
   createRedBlueComparison: (data: CreateRedBlueComparisonRequest) =>
     request<CreateRedBlueComparisonResponse>('/red-blue/comparisons', {
       method: 'POST',

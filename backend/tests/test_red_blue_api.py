@@ -79,12 +79,14 @@ def test_openapi_exposes_explicit_red_blue_contract(client):
         '/api/v1/red-blue/comparisons',
         '/api/v1/red-blue/comparisons/{comparison_id}/revoke',
     }
+    assert 'get' in paths['/api/v1/red-blue/comparisons']
     schemas = response.json()['components']['schemas']
     assert {
         'CreateComparisonRequest',
         'CreateComparisonResponse',
         'RedBlueStateResponse',
         'RevokeComparisonResponse',
+        'RedBlueComparisonHistoryItemResponse',
     } <= set(schemas)
     assert 'score_suggestion_delta' in schemas['CreateComparisonResponse']['properties']
     assert schemas['RedBlueRankingItemResponse']['properties']['rank']['type'] == 'integer'
@@ -270,6 +272,39 @@ def test_real_continuous_comparison_smoke_uses_http_contract(client, db, make_us
     assert final_payload['current_pair'] is not None
     assert db.query(RedBlueComparison).filter_by(user_id=user.id).count() == 5
     assert len(seen_pairs) == 5
+
+
+def test_comparison_history_lists_active_facts_and_removes_revoked_rows(client, db, make_user, api_service):
+    user = make_user('red-blue-history')
+    first, second = _seed_contents(db, user.id, 2)
+    cookies = auth_cookie(user)
+    created = client.post(
+        '/api/v1/red-blue/comparisons',
+        cookies=cookies,
+        json={
+            'left_content_id': first.id,
+            'right_content_id': second.id,
+            'outcome': 'LEFT_WIN',
+            'client_event_id': str(uuid4()),
+        },
+    )
+    assert created.status_code == 200
+    comparison_id = created.json()['comparison']['id']
+
+    history = client.get('/api/v1/red-blue/comparisons', cookies=cookies)
+    assert history.status_code == 200
+    assert history.json()[0]['id'] == comparison_id
+    assert history.json()[0]['left_content']['title'] == first.title
+    assert history.json()[0]['right_content']['title'] == second.title
+    assert history.json()[0]['outcome'] == 'LEFT_WIN'
+
+    revoked = client.post(
+        f'/api/v1/red-blue/comparisons/{comparison_id}/revoke',
+        cookies=cookies,
+    )
+    assert revoked.status_code == 200
+    assert client.get('/api/v1/red-blue/comparisons', cookies=cookies).json() == []
+    assert db.query(RedBlueComparison).filter_by(id=comparison_id).one().revoked_at is not None
 
 
 def test_comparison_outcomes_idempotency_and_payload_conflict(client, db, make_user, api_service):

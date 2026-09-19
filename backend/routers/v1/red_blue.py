@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from deps import get_current_user, get_db
@@ -10,6 +10,8 @@ from models import User
 from schemas import (
     CreateComparisonRequest,
     CreateComparisonResponse,
+    RedBlueComparisonHistoryContentResponse,
+    RedBlueComparisonHistoryItemResponse,
     RedBlueComparisonResponse,
     RedBlueContentSummaryResponse,
     RedBluePairResponse,
@@ -25,6 +27,7 @@ from schemas import (
 from services.red_blue import (
     BattlePair,
     BattleState,
+    ComparisonHistoryItem,
     ComparisonResult,
     ContentSnapshot,
     ModelFreshness,
@@ -170,6 +173,28 @@ def _comparison_response(result: ComparisonResult) -> RedBlueComparisonResponse:
     )
 
 
+def _comparison_history_response(item: ComparisonHistoryItem) -> RedBlueComparisonHistoryItemResponse:
+    """将可撤销的领域历史记录转换为列表 API 响应。"""
+    return RedBlueComparisonHistoryItemResponse(
+        id=item.id,
+        left_content=RedBlueComparisonHistoryContentResponse(
+            content_id=item.left_content_id,
+            title=item.left_title,
+        ),
+        right_content=RedBlueComparisonHistoryContentResponse(
+            content_id=item.right_content_id,
+            title=item.right_title,
+        ),
+        left_content_id=item.left_content_id,
+        right_content_id=item.right_content_id,
+        outcome=item.outcome.value,
+        client_event_id=item.client_event_id,
+        selector_version=item.selector_version,
+        created_at=item.created_at,
+        revoked_at=item.revoked_at,
+    )
+
+
 def _map_service_error(error: ValueError) -> HTTPException:
     """把领域输入/资源错误映射到稳定的 HTTP 语义。"""
     if isinstance(error, RedBlueComparisonConflictError):
@@ -192,6 +217,20 @@ def get_state(
     """获取当前用户可恢复的 PK、排名和模型状态。"""
     state = service.get_battle_state(db, user_id=user.id)
     return _state_response(db, service=service, state=state)
+
+
+@router.get('/comparisons', response_model=list[RedBlueComparisonHistoryItemResponse])
+def list_comparisons(
+    limit: int = Query(default=100, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    service: RedBlueService = Depends(get_red_blue_service),
+) -> list[RedBlueComparisonHistoryItemResponse]:
+    """获取当前用户仍可撤销的 PK 历史；已撤销事实仍保留在数据库中。"""
+    return [
+        _comparison_history_response(item)
+        for item in service.list_active_comparisons(db, user_id=user.id, limit=limit)
+    ]
 
 
 @router.post('/comparisons', response_model=CreateComparisonResponse)

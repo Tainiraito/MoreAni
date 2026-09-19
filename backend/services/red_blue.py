@@ -27,7 +27,7 @@ from enum import StrEnum
 
 from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from database import SessionLocal
 from models import (
@@ -193,6 +193,22 @@ class ContentSnapshot:
     cover_url: str | None
     content_type: str
     current_score: int
+
+
+@dataclass(frozen=True, slots=True)
+class ComparisonHistoryItem:
+    """一条仍可撤销的 PK 历史及其左右作品标题。"""
+
+    id: int
+    left_content_id: int
+    right_content_id: int
+    left_title: str
+    right_title: str
+    outcome: RedBlueOutcome
+    client_event_id: str
+    selector_version: str
+    created_at: datetime | None
+    revoked_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,6 +503,44 @@ class RedBlueService:
             )
             for content, score in rows
         }
+
+    def list_active_comparisons(
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        limit: int = 100,
+    ) -> tuple[ComparisonHistoryItem, ...]:
+        """读取当前用户仍可撤销的 PK 历史，按最新记录优先返回。"""
+        left_content = aliased(ContentItem)
+        right_content = aliased(ContentItem)
+        rows = (
+            db.query(RedBlueComparison, left_content, right_content)
+            .join(left_content, left_content.id == RedBlueComparison.left_content_id)
+            .join(right_content, right_content.id == RedBlueComparison.right_content_id)
+            .filter(
+                RedBlueComparison.user_id == user_id,
+                RedBlueComparison.revoked_at.is_(None),
+            )
+            .order_by(RedBlueComparison.created_at.desc(), RedBlueComparison.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return tuple(
+            ComparisonHistoryItem(
+                id=comparison.id,
+                left_content_id=comparison.left_content_id,
+                right_content_id=comparison.right_content_id,
+                left_title=left.title,
+                right_title=right.title,
+                outcome=RedBlueOutcome(comparison.outcome.value),
+                client_event_id=comparison.client_event_id,
+                selector_version=comparison.selector_version,
+                created_at=_aware_datetime(comparison.created_at),
+                revoked_at=_aware_datetime(comparison.revoked_at),
+            )
+            for comparison, left, right in rows
+        )
 
     def record_comparison(
         self,

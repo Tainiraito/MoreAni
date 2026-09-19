@@ -1,7 +1,9 @@
-import { ListFilter, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { RankingRow } from '@/components/red-blue/RankingRow'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueSuggestionAction } from '@/types/red-blue'
 
 type RankingFilter = 'all' | 'uncertain' | 'suggestion' | 'stable'
@@ -57,48 +59,41 @@ export function RankingList({
   )
 
   return (
-    <section aria-labelledby="red-blue-ranking-title" data-testid="red-blue-ranking">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--brand)' }}>Personal order</p>
-          <h2 id="red-blue-ranking-title" className="mt-1 text-xl font-semibold sm:text-2xl" style={{ color: 'var(--text-primary)' }}>我的排名</h2>
-          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>排名会随着你的选择持续变化。</p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
-          <label className="relative block w-full sm:w-64">
-            <span className="sr-only">搜索作品</span>
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-            <input
+    <section aria-label="我的排名" data-testid="red-blue-ranking">
+      <div className="flex flex-col items-stretch gap-3 pt-4 pb-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          <div className="relative min-w-[160px] max-w-xs flex-1">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: 'var(--text-muted)' }}
+              aria-hidden="true"
+            />
+            <Input
+              aria-label="搜索作品"
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder="搜索作品"
-              className="h-9 w-full rounded-lg pl-9 pr-3 text-sm outline-none"
-              style={{ background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-line)' }}
+              placeholder="搜索作品..."
+              clearable
+              onClear={() => setQuery('')}
+              className="pl-9 text-sm"
             />
-          </label>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="排名筛选">
-            <ListFilter size={14} style={{ color: 'var(--text-muted)' }} />
-            {FILTERS.map(option => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setFilter(option.key)}
-                className="rounded-full px-2.5 py-1 text-xs transition-colors"
-                style={{
-                  color: filter === option.key ? 'var(--brand)' : 'var(--text-muted)',
-                  background: filter === option.key ? 'rgba(251,113,167,0.1)' : 'transparent',
-                  border: `1px solid ${filter === option.key ? 'rgba(251,113,167,0.3)' : 'transparent'}`,
-                }}
-                aria-pressed={filter === option.key}
-              >
-                {option.label} <span className="ml-0.5 opacity-70">{filterCounts[option.key]}</span>
-              </button>
-            ))}
+          </div>
+          <div role="group" aria-label="排名筛选">
+            <Select
+              value={filter}
+              onChange={value => setFilter(value as RankingFilter)}
+              className="w-[144px]"
+              options={FILTERS.map(option => ({
+                value: option.key,
+                label: `${option.label} (${filterCounts[option.key]})`,
+              }))}
+            />
           </div>
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
+      <div className="mt-0 overflow-hidden rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
         {visibleRanking.length === 0 ? (
           <div className="flex min-h-36 items-center justify-center px-5 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
             没有符合当前搜索或筛选条件的作品。

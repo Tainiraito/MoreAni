@@ -4,16 +4,19 @@ import { CircleAlert, LoaderCircle, RefreshCw, Sparkles } from 'lucide-react'
 
 import { BattlePair } from '@/components/red-blue/BattlePair'
 import { BattleKeyboardShortcuts } from '@/components/red-blue/BattleKeyboardShortcuts'
+import { ComparisonHistoryList } from '@/components/red-blue/ComparisonHistoryList'
 import { RankingList } from '@/components/red-blue/RankingList'
 import { StickyMiniBattle } from '@/components/red-blue/StickyMiniBattle'
 import { PageMain } from '@/components/layout/PageContainer'
 import { FeaturePageHeader } from '@/components/layout/FeaturePageHeader'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiError, api } from '@/lib/api'
-import { buildRedBlueRankingChanges, patchRedBlueComparisonState, patchRedBlueSuggestionAction, RED_BLUE_STATE_QUERY_KEY } from '@/lib/red-blue'
+import { buildRedBlueRankingChanges, patchRedBlueComparisonState, patchRedBlueSuggestionAction, RED_BLUE_COMPARISONS_QUERY_KEY, RED_BLUE_STATE_QUERY_KEY } from '@/lib/red-blue'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
 import type {
   CreateRedBlueComparisonRequest,
+  RedBlueComparisonHistoryItem,
   RedBlueOutcome,
   RedBlueRankingChange,
   RedBlueScoreSuggestion,
@@ -26,11 +29,6 @@ interface RetryComparison extends CreateRedBlueComparisonRequest {
   rightTitle: string
 }
 
-interface UndoComparison {
-  id: number
-  message: string
-}
-
 function createClientEventId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `red-blue-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -38,13 +36,6 @@ function createClientEventId(): string {
 
 function formatScore(score: number): string {
   return (score / 10).toFixed(1)
-}
-
-function outcomeMessage(outcome: RedBlueOutcome, leftTitle: string, rightTitle: string): string {
-  if (outcome === 'LEFT_WIN') return `已记录：更喜欢《${leftTitle}》`
-  if (outcome === 'RIGHT_WIN') return `已记录：更喜欢《${rightTitle}》`
-  if (outcome === 'TIE') return '已记录：两部作品差不多'
-  return '已跳过这组作品'
 }
 
 function errorMessage(error: unknown): string {
@@ -135,11 +126,10 @@ export function RedBlueBattlePage() {
   const [retryComparison, setRetryComparison] = useState<RetryComparison | null>(null)
   const [lastRankingDelta, setLastRankingDelta] = useState<Record<number, RedBlueRankingChange>>({})
   const [actionPendingId, setActionPendingId] = useState<number | null>(null)
-  const [undoComparison, setUndoComparison] = useState<UndoComparison | null>(null)
+  const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking')
   const [focusContentId, setFocusContentId] = useState<number | null>(null)
   const [battleVisible, setBattleVisible] = useState(true)
   const battleSectionRef = useRef<HTMLElement | null>(null)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const toggleFocus = useCallback((contentId: number) => {
     setFocusContentId(current => current === contentId ? null : contentId)
   }, [])
@@ -147,6 +137,13 @@ export function RedBlueBattlePage() {
   const stateQuery = useQuery({
     queryKey: RED_BLUE_STATE_QUERY_KEY,
     queryFn: () => api.getRedBlueState(),
+    staleTime: 15_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+  const historyQuery = useQuery({
+    queryKey: RED_BLUE_COMPARISONS_QUERY_KEY,
+    queryFn: () => api.getRedBlueComparisons(),
     staleTime: 15_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -166,10 +163,6 @@ export function RedBlueBattlePage() {
   const revokeMutation = useMutation({
     mutationFn: (comparisonId: number) => api.revokeRedBlueComparison(comparisonId),
   })
-
-  useEffect(() => () => {
-    if (undoTimerRef.current !== null) clearTimeout(undoTimerRef.current)
-  }, [])
 
   useEffect(() => {
     const section = battleSectionRef.current
@@ -234,16 +227,7 @@ export function RedBlueBattlePage() {
         }
         setRetryComparison(null)
         setSelectedOutcome(null)
-        if (response.comparison.outcome !== 'SKIP') {
-          if (undoTimerRef.current !== null) clearTimeout(undoTimerRef.current)
-          setUndoComparison({
-            id: response.comparison.id,
-            message: outcomeMessage(response.comparison.outcome, pair.left.title, pair.right.title),
-          })
-          undoTimerRef.current = window.setTimeout(() => setUndoComparison(null), 7000)
-        } else {
-          setUndoComparison(null)
-        }
+        void queryClient.invalidateQueries({ queryKey: RED_BLUE_COMPARISONS_QUERY_KEY })
       },
       onError: error => {
         setSelectedOutcome(null)
@@ -284,19 +268,21 @@ export function RedBlueBattlePage() {
     })
   }, [actionMutation, actionPendingId, addToast, queryClient, reloadState])
 
-  const revokeComparison = useCallback(() => {
-    if (undoComparison === null || revokeMutation.isPending) return
-    const comparisonId = undoComparison.id
-    setUndoComparison(null)
+  const revokeComparison = useCallback((item: RedBlueComparisonHistoryItem) => {
+    if (revokeMutation.isPending) return
     setLastRankingDelta({})
-    revokeMutation.mutate(comparisonId, {
+    revokeMutation.mutate(item.id, {
       onSuccess: () => {
+        queryClient.setQueryData<RedBlueComparisonHistoryItem[]>(RED_BLUE_COMPARISONS_QUERY_KEY, current =>
+          current?.filter(historyItem => historyItem.id !== item.id),
+        )
         addToast('success', '这次 PK 已撤销')
         void reloadState()
+        void queryClient.invalidateQueries({ queryKey: RED_BLUE_COMPARISONS_QUERY_KEY })
       },
       onError: error => addToast('error', errorMessage(error)),
     })
-  }, [addToast, reloadState, revokeMutation, undoComparison])
+  }, [addToast, queryClient, reloadState, revokeMutation])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -343,6 +329,7 @@ export function RedBlueBattlePage() {
   }
 
   const state = stateQuery.data
+  const comparisonHistory = historyQuery.data ?? []
   const pairMessage = pairStatusText(state)
   const canShowPair = state.current_pair !== null && state.pair_status !== 'INSUFFICIENT_CANDIDATES'
   const focusedContent = focusContentId === null
@@ -436,28 +423,62 @@ export function RedBlueBattlePage() {
           </div>
         )}
 
-        {undoComparison && (
-          <div className="flex flex-col gap-2 rounded-xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'rgba(71,184,138,0.08)', border: '1px solid rgba(71,184,138,0.25)' }} data-testid="comparison-undo">
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{undoComparison.message}</span>
-            <button type="button" onClick={revokeComparison} disabled={revokeMutation.isPending} className="inline-flex items-center justify-center gap-1 text-xs font-semibold disabled:opacity-50" style={{ color: '#47b88a' }}>
-              {revokeMutation.isPending && <LoaderCircle size={13} className="animate-spin" />} 撤销
-            </button>
-          </div>
-        )}
+        <Tabs
+          value={activeTab}
+          onValueChange={value => {
+            if (value === 'ranking' || value === 'history') setActiveTab(value)
+          }}
+          className="gap-0"
+          data-testid="red-blue-results-tabs"
+        >
+          <TabsList
+            variant="line"
+            aria-label="红蓝合战结果"
+            className="w-full justify-start rounded-none border-b p-0"
+            style={{ borderColor: 'var(--border-line)' }}
+          >
+            <TabsTrigger
+              value="ranking"
+              className="flex-none rounded-t-lg px-3 py-2 text-sm font-semibold text-[var(--text-muted)] after:bg-[var(--brand)] data-[active]:text-[var(--brand)]"
+              data-testid="red-blue-ranking-tab"
+            >
+              我的排名
+            </TabsTrigger>
+            <TabsTrigger
+              value="history"
+              className="flex-none rounded-t-lg px-3 py-2 text-sm font-semibold text-[var(--text-muted)] after:bg-[var(--brand)] data-[active]:text-[var(--brand)]"
+              data-testid="red-blue-history-tab"
+            >
+              PK 历史 <span className="ml-1 opacity-70">{comparisonHistory.length}</span>
+            </TabsTrigger>
+          </TabsList>
 
-        {state.ranking.length > 0 && (
-            <RankingList
-              ranking={state.ranking}
-              rankChanges={lastRankingDelta}
-              actionPendingId={actionPendingId}
-              onOpenContent={openDetail}
-              onSuggestionAction={handleSuggestionAction}
-              candidateCount={state.candidate_count}
-              focusedContentId={focusContentId}
-              onFocusContent={toggleFocus}
-          />
-        )}
-        {state.ranking.length === 0 && state.candidate_count > 0 && <EmptyBattleState candidateCount={state.candidate_count} />}
+          <TabsContent value="ranking" className="mt-0">
+            {state.ranking.length > 0 && (
+              <RankingList
+                ranking={state.ranking}
+                rankChanges={lastRankingDelta}
+                actionPendingId={actionPendingId}
+                onOpenContent={openDetail}
+                onSuggestionAction={handleSuggestionAction}
+                candidateCount={state.candidate_count}
+                focusedContentId={focusContentId}
+                onFocusContent={toggleFocus}
+              />
+            )}
+            {state.ranking.length === 0 && state.candidate_count > 0 && <EmptyBattleState candidateCount={state.candidate_count} />}
+          </TabsContent>
+          <TabsContent value="history" className="mt-0">
+            <ComparisonHistoryList
+              history={comparisonHistory}
+              loading={historyQuery.isLoading}
+              error={historyQuery.isError}
+              onRetry={() => void historyQuery.refetch()}
+              pendingId={revokeMutation.isPending ? revokeMutation.variables ?? null : null}
+              onRevoke={revokeComparison}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </PageMain>
   )

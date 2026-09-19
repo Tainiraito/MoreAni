@@ -109,6 +109,25 @@ export interface RedBlueComparison {
   revoked_at: string | null
 }
 
+export interface RedBlueComparisonHistoryItem {
+  id: number
+  left_content: {
+    content_id: number
+    title: string
+  }
+  right_content: {
+    content_id: number
+    title: string
+  }
+  left_content_id: number
+  right_content_id: number
+  outcome: RedBlueOutcome
+  client_event_id: string
+  selector_version: string
+  created_at: string | null
+  revoked_at: string | null
+}
+
 export interface CreateRedBlueComparisonResponse {
   comparison: RedBlueComparison
   state_version: number

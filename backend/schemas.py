@@ -388,6 +388,28 @@ class RedBlueComparisonResponse(BaseModel):
     revoked_at: datetime | None = None
 
 
+class RedBlueComparisonHistoryContentResponse(BaseModel):
+    """PK 历史中用于展示的作品摘要。"""
+
+    content_id: int
+    title: str
+
+
+class RedBlueComparisonHistoryItemResponse(BaseModel):
+    """当前用户仍可撤销的一条 PK 历史记录。"""
+
+    id: int
+    left_content: RedBlueComparisonHistoryContentResponse
+    right_content: RedBlueComparisonHistoryContentResponse
+    left_content_id: int
+    right_content_id: int
+    outcome: Literal['LEFT_WIN', 'RIGHT_WIN', 'TIE', 'SKIP']
+    client_event_id: str
+    selector_version: str
+    created_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
 class RedBlueRankingDeltaResponse(BaseModel):
     """一次普通 PK 后需要 patch 的所有榜单行。"""
 

@@ -39,6 +39,12 @@ describe('RankingList filters and intervals', () => {
     document.body.innerHTML = ''
   })
 
+  function chooseFilter(view: ReturnType<typeof render>, label: RegExp): void {
+    const filters = within(view.getByRole('group', { name: '排名筛选' }))
+    fireEvent.click(filters.getByRole('button'))
+    fireEvent.click(view.getByRole('option', { name: label }))
+  }
+
   it('groups all uncertain stability states under 待确认', () => {
     const view = render(
       <RankingList
@@ -55,14 +61,15 @@ describe('RankingList filters and intervals', () => {
       />,
     )
 
-    const filters = within(view.getByRole('group', { name: '排名筛选' }))
-    fireEvent.click(filters.getByRole('button', { name: /待确认/ }))
+    chooseFilter(view, /待确认 \(3\)/)
     expect(view.getByTestId('ranking-row-1')).toBeInTheDocument()
     expect(view.getByTestId('ranking-row-2')).toBeInTheDocument()
     expect(view.getByTestId('ranking-row-3')).toBeInTheDocument()
     expect(view.queryByTestId('ranking-row-4')).not.toBeInTheDocument()
     expect(view.getByText('排名仍在确认中')).toBeInTheDocument()
-    expect(filters.getByRole('button', { name: /稳定 1/ })).toBeInTheDocument()
+    const filters = within(view.getByRole('group', { name: '排名筛选' }))
+    fireEvent.click(filters.getByRole('button'))
+    expect(view.getByRole('option', { name: /稳定 \(1\)/ })).toBeInTheDocument()
   })
 
   it('counts no suggestions when all 100 rows have null suggestions', () => {
@@ -76,9 +83,7 @@ describe('RankingList filters and intervals', () => {
       />,
     )
 
-    const filters = within(view.getByRole('group', { name: '排名筛选' }))
-    expect(filters.getByRole('button', { name: /有评分建议 0/ })).toBeInTheDocument()
-    fireEvent.click(filters.getByRole('button', { name: /有评分建议 0/ }))
+    chooseFilter(view, /有评分建议 \(0\)/)
     expect(view.getByText('没有符合当前搜索或筛选条件的作品。')).toBeInTheDocument()
   })
 
@@ -97,10 +102,7 @@ describe('RankingList filters and intervals', () => {
       />,
     )
 
-    const filters = within(view.getByRole('group', { name: '排名筛选' }))
-    const suggestionFilter = filters.getByRole('button', { name: /有评分建议 3/ })
-    expect(suggestionFilter).toBeInTheDocument()
-    fireEvent.click(suggestionFilter)
+    chooseFilter(view, /有评分建议 \(3\)/)
     expect(view.getAllByTestId(/^ranking-row-/)).toHaveLength(3)
     expect(view.getByText('显示 3 / 100 部作品')).toBeInTheDocument()
   })
