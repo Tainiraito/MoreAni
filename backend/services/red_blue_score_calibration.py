@@ -143,6 +143,9 @@ class ScoreCalibrationConfig:
     hysteresis_confidence_threshold: float = 0.70
     dismissed_suppression_days: float = 14.0
     dismissed_new_evidence_comparisons: int = 2
+    order_uncertain_min_comparisons: int = 20
+    extreme_outlier_min_score_delta: float = 20.0
+    extreme_outlier_confidence_threshold: float = 0.60
     max_suggestions: int | None = 10
 
     def __post_init__(self) -> None:
@@ -189,6 +192,12 @@ class ScoreCalibrationConfig:
             raise ValueError('dismissed_suppression_days 不能为负数')
         if self.dismissed_new_evidence_comparisons < 1:
             raise ValueError('dismissed_new_evidence_comparisons 必须至少为 1')
+        if self.order_uncertain_min_comparisons < self.min_comparisons_for_suggestion:
+            raise ValueError('order_uncertain_min_comparisons 不能低于 min_comparisons_for_suggestion')
+        if self.extreme_outlier_min_score_delta < self.min_score_delta:
+            raise ValueError('extreme_outlier_min_score_delta 不能低于 min_score_delta')
+        if not 0 <= self.extreme_outlier_confidence_threshold <= 1:
+            raise ValueError('extreme_outlier_confidence_threshold 必须位于 [0, 1]')
         if self.max_suggestions is not None and self.max_suggestions < 1:
             raise ValueError('max_suggestions 必须为正数或 None')
 
@@ -582,7 +591,11 @@ def _evaluate_target(
     if preference.comparison_count < config.min_comparisons_for_suggestion:
         base['exclusion_reason'] = CalibrationExclusionReason.COMPARISONS_INSUFFICIENT.value
         return ScoreCalibrationEvaluation(**base)
-    if not _stability_meets_threshold(preference.stability, config.min_stability):
+    high_evidence_order_uncertain = (
+        preference.stability == RankerStability.ORDER_UNCERTAIN
+        and preference.comparison_count >= config.order_uncertain_min_comparisons
+    )
+    if not _stability_meets_threshold(preference.stability, config.min_stability) and not high_evidence_order_uncertain:
         base['exclusion_reason'] = CalibrationExclusionReason.STABILITY_INSUFFICIENT.value
         return ScoreCalibrationEvaluation(**base)
 
@@ -667,8 +680,13 @@ def _evaluate_target(
     timings['prediction'] += time.perf_counter() - prediction_started
 
     filtering_started = time.perf_counter()
+    extreme_outlier = (
+        preference.comparison_count >= config.order_uncertain_min_comparisons
+        and abs(predicted_score - rating.current_score) >= config.extreme_outlier_min_score_delta
+        and not lower <= rating.current_score <= upper
+    )
     exclusion_reason: str | None = None
-    if local_support < config.min_local_support:
+    if local_support < config.min_local_support and not extreme_outlier:
         exclusion_reason = CalibrationExclusionReason.LOCAL_SUPPORT_INSUFFICIENT.value
     elif lower <= rating.current_score <= upper:
         exclusion_reason = CalibrationExclusionReason.CURRENT_SCORE_WITHIN_INTERVAL.value
@@ -680,13 +698,15 @@ def _evaluate_target(
             if model_freshness is CalibrationFreshness.FAST
             else config.confidence_threshold
         )
+        if extreme_outlier:
+            threshold = config.extreme_outlier_confidence_threshold
         if any(
             item.content_id == target_id
             and item.active
             and item.suggestion_key == key
             for item in previous_suggestions
         ):
-            threshold = config.hysteresis_confidence_threshold
+            threshold = min(threshold, config.hysteresis_confidence_threshold)
         if confidence < threshold:
             exclusion_reason = CalibrationExclusionReason.CONFIDENCE_INSUFFICIENT.value
         elif _is_suppressed(

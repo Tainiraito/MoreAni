@@ -262,6 +262,59 @@ def test_unstable_rank_results_do_not_create_suggestions(stability):
     assert result.diagnostics.candidate_count == 6
 
 
+def test_high_evidence_extreme_order_uncertain_outlier_can_create_suggestion():
+    candidates, preferences, ratings = _inputs(
+        current_scores=[20, 100, 100, 100, 100, 100, 100, 100, 100],
+        anchors=[20, 100, 100, 100, 100, 100, 100, 100, 100],
+        preferences=[5.2, 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+        stability=RankerStability.ORDER_UNCERTAIN,
+        comparison_count=76,
+    )
+
+    result = generate_score_calibrations(
+        candidates,
+        preferences,
+        ratings,
+        config=ScoreCalibrationConfig(),
+    )
+
+    target = next(item for item in result.evaluations if item.content_id == 1)
+    assert target.eligible is True
+    assert target.local_support == 0
+    assert target.predicted_score is not None and target.predicted_score >= 95
+    assert target.confidence >= 0.60
+    assert any(item.content_id == 1 for item in result.suggestions)
+
+    fast_result = generate_score_calibrations(
+        candidates,
+        preferences,
+        ratings,
+        config=ScoreCalibrationConfig(),
+        model_freshness=CalibrationFreshness.FAST,
+    )
+    fast_target = next(item for item in fast_result.evaluations if item.content_id == 1)
+    assert fast_target.eligible is True
+    assert any(item.content_id == 1 for item in fast_result.suggestions)
+
+    stable_result = generate_score_calibrations(
+        candidates,
+        preferences,
+        ratings,
+        config=ScoreCalibrationConfig(),
+        previous_suggestions=(
+            PreviousCalibrationSuggestion(
+                content_id=target.content_id,
+                suggestion_key=target.suggestion_key or '',
+                confidence=target.confidence,
+            ),
+        ),
+        model_freshness=CalibrationFreshness.FAST,
+    )
+    stable_target = next(item for item in stable_result.evaluations if item.content_id == 1)
+    assert stable_target.eligible is True
+    assert any(item.content_id == 1 for item in stable_result.suggestions)
+
+
 def test_comparison_count_and_local_support_are_required():
     candidates, preferences, ratings = _inputs(
         current_scores=[70, 80, 85, 90, 95, 95],

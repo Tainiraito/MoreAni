@@ -31,6 +31,7 @@ interface RetryComparison extends CreateRedBlueComparisonRequest {
 }
 
 const RED_BLUE_PAGE_SIZE = 100
+const RED_BLUE_RECALIBRATION_POLL_MS = 750
 
 function createClientEventId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -154,6 +155,13 @@ export function RedBlueBattlePage() {
     staleTime: 15_000,
     retry: false,
     refetchOnWindowFocus: false,
+    refetchInterval: query => {
+      const state = query.state.data
+      return state !== undefined && (state.full_recalibration_required || state.full_recalibration_running)
+        ? RED_BLUE_RECALIBRATION_POLL_MS
+        : false
+    },
+    refetchIntervalInBackground: false,
   })
   const historyQuery = useQuery({
     queryKey: historyQueryKey,
@@ -242,6 +250,12 @@ export function RedBlueBattlePage() {
         setRetryComparison(null)
         setSelectedOutcome(null)
         void queryClient.invalidateQueries({ queryKey: RED_BLUE_COMPARISONS_QUERY_KEY })
+        // Fast 响应只携带当前权威 Full snapshot 的 uncertainty 字段；
+        // 主动刷新并在 Full worker 运行期间轮询，确保 badge/rank interval
+        // 不需要用户手动刷新页面才能跟上新的 snapshot。
+        if (response.full_recalibration_required || response.full_recalibration_running) {
+          void queryClient.invalidateQueries({ queryKey: stateQueryKey })
+        }
       },
       onError: error => {
         setSelectedOutcome(null)

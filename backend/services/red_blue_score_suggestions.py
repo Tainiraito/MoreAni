@@ -399,13 +399,35 @@ class ScoreSuggestionService:
         old_by_key: dict[tuple[int, str], ScoreSuggestion] = {
             (row.content_id, row.suggestion_key): row for row in old_rows
         }
+        # 同一 model run 内，旧的 PENDING 行可能在上一次 reconciliation 中被
+        # 标为 EXPIRED；如果新的计算又得到完全相同的 suggestion_key，应复用
+        # 这条派生行，而不是撞上 model_run/user/content/key 唯一约束。它没有
+        # 用户 action 事实，重新出现仍然由当前纯算法结果决定。
+        content_ids = tuple({suggestion.content_id for suggestion in suggestions})
+        reusable_rows = (
+            db.query(ScoreSuggestion)
+            .filter(
+                ScoreSuggestion.user_id == user_id,
+                ScoreSuggestion.model_run_id == model_run_id,
+                ScoreSuggestion.content_id.in_(content_ids),
+                ScoreSuggestion.status == ScoreSuggestionStatus.EXPIRED,
+            )
+            .all()
+            if content_ids
+            else []
+        )
+        reusable_by_key = {
+            (row.content_id, row.suggestion_key): row
+            for row in reusable_rows
+        }
         seen_ids: set[int] = set()
         added: list[ScoreSuggestionView] = []
         updated: list[ScoreSuggestionView] = []
         for suggestion in suggestions:
             key = (suggestion.content_id, suggestion.suggestion_key)
-            row = old_by_key.get(key)
-            is_new = row is None
+            visible_row = old_by_key.get(key)
+            row = visible_row or reusable_by_key.get(key)
+            is_new = visible_row is None
             if row is None:
                 row = ScoreSuggestion(
                     user_id=user_id,

@@ -430,6 +430,9 @@ class RedBlueRankingDeltaResponse(BaseModel):
     new_rank: int
     preference_mean: float
     comparison_count: int
+    stability: str
+    rank_low: int | None = None
+    rank_high: int | None = None
 
 
 class RedBlueScoreSuggestionDeltaResponse(BaseModel):

@@ -62,8 +62,8 @@ function comparisonResponse(): CreateRedBlueComparisonResponse {
     },
     state_version: 5,
     ranking_delta: [
-      { content_id: 1, old_rank: 1, new_rank: 2, preference_mean: 0.9, comparison_count: 4 },
-      { content_id: 2, old_rank: 2, new_rank: 1, preference_mean: 1.1, comparison_count: 4 },
+      { content_id: 1, old_rank: 1, new_rank: 2, preference_mean: 0.9, comparison_count: 4, stability: 'ORDER_UNCERTAIN', rank_low: 1, rank_high: 3 },
+      { content_id: 2, old_rank: 2, new_rank: 1, preference_mean: 1.1, comparison_count: 4, stability: 'STABLE', rank_low: 1, rank_high: 1 },
     ],
     score_suggestion_delta: {
       added: [{
@@ -140,6 +140,9 @@ describe('red-blue query cache patching', () => {
     expect(next?.state_version).toBe(5)
     expect(next?.ranking.map(item => item.content.content_id)).toEqual([2, 1])
     expect(next?.ranking[0].score_suggestion?.id).toBe(20)
+    expect(next?.ranking.find(item => item.content.content_id === 1)?.stability).toBe('ORDER_UNCERTAIN')
+    expect(next?.ranking.find(item => item.content.content_id === 1)?.rank_low).toBe(1)
+    expect(next?.ranking.find(item => item.content.content_id === 1)?.rank_high).toBe(3)
     expect(next?.current_pair).toBeNull()
   })
 

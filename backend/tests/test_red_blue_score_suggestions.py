@@ -269,6 +269,25 @@ def test_refresh_reconciles_top_suggestion_from_anchor_without_self_feedback(db,
     assert persisted.suggestion_key.startswith(f'sc-v1:{contents[0].id}:20:')
     assert any(item.id == persisted.id for item in visible)
 
+    persisted.status = ScoreSuggestionStatus.EXPIRED
+    persisted.handled_at = datetime.now(UTC)
+    db.commit()
+    reappeared_delta, reappeared = service.refresh_score_suggestions(
+        db,
+        user_id=user.id,
+        model_run_id=run.id,
+        model_freshness=CalibrationFreshness.FULL,
+        comparison_state_version=4,
+        effective_comparison_max_id=12,
+        candidates=candidates,
+        preference_results=preferences,
+        ratings=ratings,
+    )
+    assert any(item.id == persisted.id for item in reappeared_delta.added)
+    assert any(item.id == persisted.id for item in reappeared)
+    db.refresh(persisted)
+    assert persisted.status == ScoreSuggestionStatus.PENDING
+
     changed_ratings = tuple(
         CalibrationRating(
             content_id=content.id,

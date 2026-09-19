@@ -263,6 +263,9 @@ class RankingDelta:
     new_rank: int
     preference_mean: float
     comparison_count: int
+    stability: str
+    rank_low: int | None
+    rank_high: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -657,6 +660,10 @@ class RedBlueService:
             db.refresh(comparison)
             old_state = self.cache.get(user_id)
             state = self._get_or_build_state_locked(db, user_id=user_id)
+            if state.requires_full_ranker:
+                self.request_full_recalibration(user_id, self._reason_for_state(state))
+            elif state.fast_updates_since_full >= self.config.max_fast_updates_before_full:
+                self.request_full_recalibration(user_id, FullRecalibrationReason.FAST_UPDATE_LIMIT)
             result = self._comparison_result(
                 db,
                 state,
@@ -670,10 +677,6 @@ class RedBlueService:
                     else ScoreSuggestionDelta()
                 ),
             )
-            if state.requires_full_ranker:
-                self.request_full_recalibration(user_id, self._reason_for_state(state))
-            elif state.fast_updates_since_full >= self.config.max_fast_updates_before_full:
-                self.request_full_recalibration(user_id, FullRecalibrationReason.FAST_UPDATE_LIMIT)
             return result
 
     def revoke_comparison(
@@ -1683,6 +1686,10 @@ def _ranking_delta(
 ) -> tuple[RankingDelta, ...]:
     """返回所有 rank 发生变化的作品，并保证 A/B 即使同名次也被纳入。"""
     new_results = {result.content_id: result for result in new_state.algorithm_state.fast_results}
+    authoritative_results = {
+        result.content_id: result
+        for result in new_state.algorithm_state.authoritative_results
+    }
     old_results = (
         {result.content_id: result for result in old_state.algorithm_state.fast_results}
         if old_state is not None
@@ -1701,6 +1708,21 @@ def _ranking_delta(
                 new_rank=result.provisional_rank,
                 preference_mean=result.preference_mean,
                 comparison_count=result.comparison_count,
+                stability=(
+                    authoritative_results[content_id].stability.value
+                    if content_id in authoritative_results
+                    else RankerStability.UNCALIBRATED.value
+                ),
+                rank_low=(
+                    authoritative_results[content_id].rank_low
+                    if content_id in authoritative_results
+                    else None
+                ),
+                rank_high=(
+                    authoritative_results[content_id].rank_high
+                    if content_id in authoritative_results
+                    else None
+                ),
             ),
         )
     return tuple(sorted(deltas, key=lambda item: (item.new_rank, item.content_id)))

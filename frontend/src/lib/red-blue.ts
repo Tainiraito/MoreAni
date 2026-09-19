@@ -88,6 +88,9 @@ export function patchRedBlueComparisonState(
         rank: delta.new_rank,
         preference_mean: delta.preference_mean,
         comparison_count: delta.comparison_count,
+        ...(delta.stability === undefined ? {} : { stability: delta.stability }),
+        ...(delta.rank_low === undefined ? {} : { rank_low: delta.rank_low }),
+        ...(delta.rank_high === undefined ? {} : { rank_high: delta.rank_high }),
       }
       : item
     return applySuggestionDelta(patched, response)

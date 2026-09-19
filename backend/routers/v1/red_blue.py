@@ -288,6 +288,9 @@ def create_comparison(
                 new_rank=item.new_rank,
                 preference_mean=item.preference_mean,
                 comparison_count=item.comparison_count,
+                stability=item.stability,
+                rank_low=item.rank_low,
+                rank_high=item.rank_high,
             )
             for item in result.ranking_delta
         ],

@@ -74,6 +74,9 @@ export interface RedBlueRankingDelta {
   new_rank: number
   preference_mean: number
   comparison_count: number
+  stability?: RedBlueStability | string
+  rank_low?: number | null
+  rank_high?: number | null
 }
 
 export type RedBlueRankingChangeDirection = 'UP' | 'DOWN'
