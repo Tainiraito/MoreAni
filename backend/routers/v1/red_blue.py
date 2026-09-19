@@ -12,6 +12,7 @@ from schemas import (
     CreateComparisonResponse,
     RedBlueComparisonHistoryContentResponse,
     RedBlueComparisonHistoryItemResponse,
+    RedBlueComparisonHistoryPageResponse,
     RedBlueComparisonResponse,
     RedBlueContentSummaryResponse,
     RedBluePairResponse,
@@ -112,9 +113,13 @@ def _state_response(
     *,
     service: RedBlueService,
     state: BattleState,
+    page: int = 1,
+    size: int = 100,
 ) -> RedBlueStateResponse:
-    """将完整领域状态转换为可恢复的页面状态。"""
-    content_ids = [item.content_id for item in state.items]
+    """将领域状态转换为当前排名页和可恢复的页面状态。"""
+    ranking_total = len(state.items)
+    ranking_items = state.items[(page - 1) * size:page * size]
+    content_ids = [item.content_id for item in ranking_items]
     if state.next_pair is not None:
         content_ids.extend((state.next_pair.left_content_id, state.next_pair.right_content_id))
     snapshots = service.get_content_snapshots(db, user_id=state.user_id, content_ids=content_ids)
@@ -124,7 +129,7 @@ def _state_response(
     }
 
     ranking: list[RedBlueRankingItemResponse] = []
-    for item in state.items:
+    for item in ranking_items:
         snapshot = snapshots.get(item.content_id)
         if snapshot is None:
             continue
@@ -152,6 +157,9 @@ def _state_response(
         pair_status=state.pair_status.value,
         current_pair=_pair_response(state.next_pair, snapshots),
         ranking=ranking,
+        ranking_total=ranking_total,
+        ranking_page=page,
+        ranking_size=size,
         full_recalibration_required=state.full_recalibration_required,
         full_recalibration_running=state.full_recalibration_running,
     )
@@ -210,27 +218,33 @@ def _map_service_error(error: ValueError) -> HTTPException:
 
 @router.get('/state', response_model=RedBlueStateResponse)
 def get_state(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     service: RedBlueService = Depends(get_red_blue_service),
 ) -> RedBlueStateResponse:
     """获取当前用户可恢复的 PK、排名和模型状态。"""
     state = service.get_battle_state(db, user_id=user.id)
-    return _state_response(db, service=service, state=state)
+    return _state_response(db, service=service, state=state, page=page, size=size)
 
 
-@router.get('/comparisons', response_model=list[RedBlueComparisonHistoryItemResponse])
+@router.get('/comparisons', response_model=RedBlueComparisonHistoryPageResponse)
 def list_comparisons(
-    limit: int = Query(default=100, ge=1, le=500),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     service: RedBlueService = Depends(get_red_blue_service),
-) -> list[RedBlueComparisonHistoryItemResponse]:
-    """获取当前用户仍可撤销的 PK 历史；已撤销事实仍保留在数据库中。"""
-    return [
-        _comparison_history_response(item)
-        for item in service.list_active_comparisons(db, user_id=user.id, limit=limit)
-    ]
+) -> RedBlueComparisonHistoryPageResponse:
+    """分页获取当前用户仍可撤销的 PK 历史；已撤销事实仍保留在数据库中。"""
+    history = service.list_active_comparisons(db, user_id=user.id, page=page, size=size)
+    return RedBlueComparisonHistoryPageResponse(
+        items=[_comparison_history_response(item) for item in history.items],
+        total=history.total,
+        page=history.page,
+        size=history.size,
+    )
 
 
 @router.post('/comparisons', response_model=CreateComparisonResponse)
@@ -336,6 +350,8 @@ def revoke_comparison(
 def handle_score_suggestion_action(
     body: ScoreSuggestionActionRequest,
     suggestion_id: int = Path(ge=1),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     service: RedBlueService = Depends(get_red_blue_service),
@@ -354,7 +370,7 @@ def handle_score_suggestion_action(
         raise _map_service_error(error) from error
     return _action_response(
         result,
-        _state_response(db, service=service, state=state),
+        _state_response(db, service=service, state=state, page=page, size=size),
     )
 
 

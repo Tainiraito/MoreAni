@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle, RefreshCw, Sparkles } from 'lucide-react'
 
@@ -16,6 +16,7 @@ import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
 import type {
   CreateRedBlueComparisonRequest,
+  RedBlueComparisonHistoryPage,
   RedBlueComparisonHistoryItem,
   RedBlueOutcome,
   RedBlueRankingChange,
@@ -28,6 +29,8 @@ interface RetryComparison extends CreateRedBlueComparisonRequest {
   leftTitle: string
   rightTitle: string
 }
+
+const RED_BLUE_PAGE_SIZE = 100
 
 function createClientEventId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -127,6 +130,8 @@ export function RedBlueBattlePage() {
   const [lastRankingDelta, setLastRankingDelta] = useState<Record<number, RedBlueRankingChange>>({})
   const [actionPendingId, setActionPendingId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking')
+  const [rankingPage, setRankingPage] = useState(1)
+  const [historyPage, setHistoryPage] = useState(1)
   const [focusContentId, setFocusContentId] = useState<number | null>(null)
   const [battleVisible, setBattleVisible] = useState(true)
   const battleSectionRef = useRef<HTMLElement | null>(null)
@@ -134,16 +139,25 @@ export function RedBlueBattlePage() {
     setFocusContentId(current => current === contentId ? null : contentId)
   }, [])
 
+  const stateQueryKey = useMemo(
+    () => [...RED_BLUE_STATE_QUERY_KEY, rankingPage, RED_BLUE_PAGE_SIZE] as const,
+    [rankingPage],
+  )
+  const historyQueryKey = useMemo(
+    () => [...RED_BLUE_COMPARISONS_QUERY_KEY, historyPage, RED_BLUE_PAGE_SIZE] as const,
+    [historyPage],
+  )
+
   const stateQuery = useQuery({
-    queryKey: RED_BLUE_STATE_QUERY_KEY,
-    queryFn: () => api.getRedBlueState(),
+    queryKey: stateQueryKey,
+    queryFn: () => api.getRedBlueState({ page: rankingPage, size: RED_BLUE_PAGE_SIZE }),
     staleTime: 15_000,
     retry: false,
     refetchOnWindowFocus: false,
   })
   const historyQuery = useQuery({
-    queryKey: RED_BLUE_COMPARISONS_QUERY_KEY,
-    queryFn: () => api.getRedBlueComparisons(),
+    queryKey: historyQueryKey,
+    queryFn: () => api.getRedBlueComparisons({ page: historyPage, size: RED_BLUE_PAGE_SIZE }),
     staleTime: 15_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -153,12 +167,12 @@ export function RedBlueBattlePage() {
     mutationFn: (payload: CreateRedBlueComparisonRequest) => api.createRedBlueComparison(payload),
   })
   const actionMutation = useMutation({
-    mutationFn: ({ suggestion, action, clientEventId }: { suggestion: RedBlueScoreSuggestion; action: RedBlueSuggestionAction; clientEventId: string }) =>
+    mutationFn: ({ suggestion, action, clientEventId, page }: { suggestion: RedBlueScoreSuggestion; action: RedBlueSuggestionAction; clientEventId: string; page: number }) =>
       api.handleRedBlueSuggestionAction(suggestion.id, {
         action,
         suggestion_key: suggestion.suggestion_key,
         client_event_id: clientEventId,
-      }),
+      }, { page, size: RED_BLUE_PAGE_SIZE }),
   })
   const revokeMutation = useMutation({
     mutationFn: (comparisonId: number) => api.revokeRedBlueComparison(comparisonId),
@@ -177,13 +191,13 @@ export function RedBlueBattlePage() {
 
   const reloadState = useCallback(async () => {
     await queryClient.fetchQuery({
-      queryKey: RED_BLUE_STATE_QUERY_KEY,
-      queryFn: () => api.getRedBlueState(),
+      queryKey: stateQueryKey,
+      queryFn: () => api.getRedBlueState({ page: rankingPage, size: RED_BLUE_PAGE_SIZE }),
     })
-  }, [queryClient])
+  }, [queryClient, rankingPage, stateQueryKey])
 
   const submitComparison = useCallback((outcome: RedBlueOutcome) => {
-    const current = queryClient.getQueryData<RedBlueState>(RED_BLUE_STATE_QUERY_KEY)
+    const current = queryClient.getQueryData<RedBlueState>(stateQueryKey)
     const pair = current?.current_pair
     if (pair === null || pair === undefined || comparisonMutation.isPending) return
 
@@ -210,7 +224,7 @@ export function RedBlueBattlePage() {
     setSelectedOutcome(outcome)
     comparisonMutation.mutate(payload, {
       onSuccess: response => {
-        const previous = queryClient.getQueryData<RedBlueState>(RED_BLUE_STATE_QUERY_KEY)
+        const previous = queryClient.getQueryData<RedBlueState>(stateQueryKey)
         const responseIsStale = previous !== undefined && response.state_version < previous.state_version
         if (previous === undefined) {
           void reloadState()
@@ -219,7 +233,7 @@ export function RedBlueBattlePage() {
           if (patched === null) {
             void reloadState()
           } else {
-            queryClient.setQueryData(RED_BLUE_STATE_QUERY_KEY, patched)
+            queryClient.setQueryData(stateQueryKey, patched)
           }
         }
         if (!responseIsStale && response.comparison.outcome !== 'SKIP') {
@@ -241,16 +255,16 @@ export function RedBlueBattlePage() {
         }
       },
     })
-  }, [addToast, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison])
+  }, [addToast, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison, stateQueryKey])
 
   const handleSuggestionAction = useCallback((suggestion: RedBlueScoreSuggestion, action: RedBlueSuggestionAction) => {
     if (actionPendingId !== null) return
     const clientEventId = createClientEventId()
     setActionPendingId(suggestion.id)
-    actionMutation.mutate({ suggestion, action, clientEventId }, {
+    actionMutation.mutate({ suggestion, action, clientEventId, page: rankingPage }, {
       onSuccess: response => {
-        const current = queryClient.getQueryData<RedBlueState>(RED_BLUE_STATE_QUERY_KEY)
-        if (current !== undefined) queryClient.setQueryData(RED_BLUE_STATE_QUERY_KEY, patchRedBlueSuggestionAction(current, response))
+        const current = queryClient.getQueryData<RedBlueState>(stateQueryKey)
+        if (current !== undefined) queryClient.setQueryData(stateQueryKey, patchRedBlueSuggestionAction(current, response))
         setActionPendingId(null)
         if (action === 'ACCEPTED') addToast('success', `评分已调整为 ${formatScore(response.updated_score)}`)
         if (action === 'DISMISSED') addToast('info', '已暂时忽略这条评分建议')
@@ -266,15 +280,20 @@ export function RedBlueBattlePage() {
         }
       },
     })
-  }, [actionMutation, actionPendingId, addToast, queryClient, reloadState])
+  }, [actionMutation, actionPendingId, addToast, queryClient, rankingPage, reloadState, stateQueryKey])
 
   const revokeComparison = useCallback((item: RedBlueComparisonHistoryItem) => {
     if (revokeMutation.isPending) return
     setLastRankingDelta({})
     revokeMutation.mutate(item.id, {
       onSuccess: () => {
-        queryClient.setQueryData<RedBlueComparisonHistoryItem[]>(RED_BLUE_COMPARISONS_QUERY_KEY, current =>
-          current?.filter(historyItem => historyItem.id !== item.id),
+        queryClient.setQueryData<RedBlueComparisonHistoryPage>(historyQueryKey, current => current === undefined
+          ? current
+          : {
+            ...current,
+            items: current.items.filter(historyItem => historyItem.id !== item.id),
+            total: Math.max(0, current.total - 1),
+          },
         )
         addToast('success', '这次 PK 已撤销')
         void reloadState()
@@ -282,7 +301,17 @@ export function RedBlueBattlePage() {
       },
       onError: error => addToast('error', errorMessage(error)),
     })
-  }, [addToast, queryClient, reloadState, revokeMutation])
+  }, [addToast, historyQueryKey, queryClient, reloadState, revokeMutation])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((stateQuery.data?.ranking_total ?? stateQuery.data?.candidate_count ?? 0) / RED_BLUE_PAGE_SIZE))
+    if (rankingPage > totalPages) setRankingPage(totalPages)
+  }, [rankingPage, stateQuery.data?.candidate_count, stateQuery.data?.ranking_total])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil((historyQuery.data?.total ?? 0) / RED_BLUE_PAGE_SIZE))
+    if (historyPage > totalPages) setHistoryPage(totalPages)
+  }, [historyPage, historyQuery.data?.total])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -329,7 +358,14 @@ export function RedBlueBattlePage() {
   }
 
   const state = stateQuery.data
-  const comparisonHistory = historyQuery.data ?? []
+  const comparisonHistoryPage = historyQuery.data ?? {
+    items: [],
+    total: 0,
+    page: historyPage,
+    size: RED_BLUE_PAGE_SIZE,
+  }
+  const comparisonHistory = comparisonHistoryPage.items
+  const rankingTotal = state.ranking_total ?? state.candidate_count
   const pairMessage = pairStatusText(state)
   const canShowPair = state.current_pair !== null && state.pair_status !== 'INSUFFICIENT_CANDIDATES'
   const focusedContent = focusContentId === null
@@ -449,12 +485,12 @@ export function RedBlueBattlePage() {
               className="flex-none rounded-t-lg px-3 py-2 text-sm font-semibold text-[var(--text-muted)] after:bg-[var(--brand)] data-[active]:text-[var(--brand)]"
               data-testid="red-blue-history-tab"
             >
-              PK 历史 <span className="ml-1 opacity-70">{comparisonHistory.length}</span>
+              PK 历史
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="ranking" className="mt-0">
-            {state.ranking.length > 0 && (
+            {state.candidate_count > 0 && (
               <RankingList
                 ranking={state.ranking}
                 rankChanges={lastRankingDelta}
@@ -464,9 +500,12 @@ export function RedBlueBattlePage() {
                 candidateCount={state.candidate_count}
                 focusedContentId={focusContentId}
                 onFocusContent={toggleFocus}
+                page={state.ranking_page ?? rankingPage}
+                pageSize={state.ranking_size ?? RED_BLUE_PAGE_SIZE}
+                total={rankingTotal}
+                onPageChange={setRankingPage}
               />
             )}
-            {state.ranking.length === 0 && state.candidate_count > 0 && <EmptyBattleState candidateCount={state.candidate_count} />}
           </TabsContent>
           <TabsContent value="history" className="mt-0">
             <ComparisonHistoryList
@@ -476,6 +515,10 @@ export function RedBlueBattlePage() {
               onRetry={() => void historyQuery.refetch()}
               pendingId={revokeMutation.isPending ? revokeMutation.variables ?? null : null}
               onRevoke={revokeComparison}
+              page={comparisonHistoryPage.page}
+              pageSize={comparisonHistoryPage.size}
+              total={comparisonHistoryPage.total}
+              onPageChange={setHistoryPage}
             />
           </TabsContent>
         </Tabs>

@@ -118,6 +118,23 @@ describe('red-blue query cache patching', () => {
     expect(normalized.ranking.map(item => item.rank)).toEqual([1, 2])
   })
 
+  it('keeps global display ranks when normalizing a later ranking page', () => {
+    const current = state()
+    const normalized = normalizeRedBlueState({
+      ...current,
+      ranking_page: 2,
+      ranking_size: 100,
+      ranking_total: 102,
+      ranking: [
+        { ...current.ranking[0], rank: 101, preference_mean: 0.8 },
+        { ...current.ranking[1], rank: 102, preference_mean: 1.0 },
+      ],
+    })
+
+    expect(normalized.ranking.map(item => item.content.content_id)).toEqual([2, 1])
+    expect(normalized.ranking.map(item => item.rank)).toEqual([101, 102])
+  })
+
   it('patches ranking delta and suggestion additions, then sorts by rank', () => {
     const next = patchRedBlueComparisonState(state(), comparisonResponse())
     expect(next?.state_version).toBe(5)

@@ -212,6 +212,16 @@ class ComparisonHistoryItem:
 
 
 @dataclass(frozen=True, slots=True)
+class ComparisonHistoryPage:
+    """当前用户可撤销 PK 历史的一页及总数。"""
+
+    items: tuple[ComparisonHistoryItem, ...]
+    total: int
+    page: int
+    size: int
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeFastState:
     """纯算法 Fast State 加上数据库 watermark 的运行时封装。"""
 
@@ -509,12 +519,15 @@ class RedBlueService:
         db: Session,
         *,
         user_id: int,
-        limit: int = 100,
-    ) -> tuple[ComparisonHistoryItem, ...]:
-        """读取当前用户仍可撤销的 PK 历史，按最新记录优先返回。"""
+        page: int = 1,
+        size: int = 100,
+    ) -> ComparisonHistoryPage:
+        """分页读取当前用户仍可撤销的 PK 历史，按最新记录优先返回。"""
+        if page < 1 or size < 1:
+            raise ValueError('PK 历史分页参数无效')
         left_content = aliased(ContentItem)
         right_content = aliased(ContentItem)
-        rows = (
+        query = (
             db.query(RedBlueComparison, left_content, right_content)
             .join(left_content, left_content.id == RedBlueComparison.left_content_id)
             .join(right_content, right_content.id == RedBlueComparison.right_content_id)
@@ -522,11 +535,15 @@ class RedBlueService:
                 RedBlueComparison.user_id == user_id,
                 RedBlueComparison.revoked_at.is_(None),
             )
-            .order_by(RedBlueComparison.created_at.desc(), RedBlueComparison.id.desc())
-            .limit(limit)
+        )
+        total = query.order_by(None).count()
+        rows = (
+            query.order_by(RedBlueComparison.created_at.desc(), RedBlueComparison.id.desc())
+            .offset((page - 1) * size)
+            .limit(size)
             .all()
         )
-        return tuple(
+        items = tuple(
             ComparisonHistoryItem(
                 id=comparison.id,
                 left_content_id=comparison.left_content_id,
@@ -541,6 +558,7 @@ class RedBlueService:
             )
             for comparison, left, right in rows
         )
+        return ComparisonHistoryPage(items=items, total=total, page=page, size=size)
 
     def record_comparison(
         self,
@@ -1697,6 +1715,7 @@ __all__ = [
     'BattleState',
     'ContentSnapshot',
     'ComparisonResult',
+    'ComparisonHistoryPage',
     'FastStateItem',
     'FullRecalibrationReason',
     'FullRecalibrationResult',

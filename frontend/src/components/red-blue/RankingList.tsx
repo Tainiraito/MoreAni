@@ -2,6 +2,7 @@ import { Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { RankingRow } from '@/components/red-blue/RankingRow'
+import { RedBluePagination } from '@/components/red-blue/RedBluePagination'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueSuggestionAction } from '@/types/red-blue'
@@ -17,6 +18,10 @@ interface RankingListProps {
   candidateCount?: number
   focusedContentId?: number | null
   onFocusContent?: (contentId: number) => void
+  page?: number
+  pageSize?: number
+  total?: number
+  onPageChange?: (page: number) => void
 }
 
 const FILTERS: Array<{ key: RankingFilter; label: string }> = [
@@ -42,6 +47,10 @@ export function RankingList({
   candidateCount = ranking.length,
   focusedContentId = null,
   onFocusContent,
+  page = 1,
+  pageSize = 100,
+  total = ranking.length,
+  onPageChange,
 }: RankingListProps) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<RankingFilter>('all')
@@ -96,7 +105,7 @@ export function RankingList({
       <div className="mt-0 overflow-hidden rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
         {visibleRanking.length === 0 ? (
           <div className="flex min-h-36 items-center justify-center px-5 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-            没有符合当前搜索或筛选条件的作品。
+            {total === 0 ? '还没有可展示的排名。' : ranking.length === 0 ? '当前页暂无作品，请切换页码。' : '没有符合当前搜索或筛选条件的作品。'}
           </div>
         ) : (
           <ol>{visibleRanking.map(item => (
@@ -114,7 +123,16 @@ export function RankingList({
           ))}</ol>
         )}
       </div>
-      <p className="mt-3 text-right text-xs" style={{ color: 'var(--text-muted)' }}>显示 {visibleRanking.length} / {ranking.length} 部作品</p>
+      {onPageChange && (
+        <RedBluePagination
+          page={page}
+          size={pageSize}
+          total={total}
+          itemLabel="部作品"
+          ariaLabel="我的排名分页"
+          onPageChange={onPageChange}
+        />
+      )}
     </section>
   )
 }

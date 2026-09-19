@@ -353,7 +353,7 @@ class RedBlueRankingItemResponse(BaseModel):
 
 
 class RedBlueStateResponse(BaseModel):
-    """GET /red-blue/state 的完整可恢复页面状态。"""
+    """GET /red-blue/state 的当前排名页和可恢复页面状态。"""
 
     state_version: int
     model_freshness: str
@@ -361,6 +361,9 @@ class RedBlueStateResponse(BaseModel):
     pair_status: str
     current_pair: RedBluePairResponse | None = None
     ranking: list[RedBlueRankingItemResponse]
+    ranking_total: int = 0
+    ranking_page: int = 1
+    ranking_size: int = 100
     full_recalibration_required: bool
     full_recalibration_running: bool
 
@@ -408,6 +411,15 @@ class RedBlueComparisonHistoryItemResponse(BaseModel):
     selector_version: str
     created_at: datetime | None = None
     revoked_at: datetime | None = None
+
+
+class RedBlueComparisonHistoryPageResponse(BaseModel):
+    """PK 历史分页响应；已撤销事实不出现在 items 中。"""
+
+    items: list[RedBlueComparisonHistoryItemResponse]
+    total: int
+    page: int
+    size: int
 
 
 class RedBlueRankingDeltaResponse(BaseModel):

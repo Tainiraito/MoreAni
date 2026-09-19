@@ -8,6 +8,7 @@ import { RedBlueBattlePage } from '@/pages/RedBlueBattlePage'
 import type {
   CreateRedBlueComparisonResponse,
   RedBlueComparisonHistoryItem,
+  RedBlueComparisonHistoryPage,
   RevokeRedBlueComparisonResponse,
   RedBlueState,
   ScoreSuggestionActionResponse,
@@ -112,6 +113,19 @@ function historyItem(overrides: Partial<RedBlueComparisonHistoryItem> = {}): Red
   }
 }
 
+function historyPage(
+  items: RedBlueComparisonHistoryItem[] = [],
+  overrides: Partial<RedBlueComparisonHistoryPage> = {},
+): RedBlueComparisonHistoryPage {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    size: 100,
+    ...overrides,
+  }
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -129,14 +143,14 @@ describe('RedBlueBattlePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.getRedBlueState).mockResolvedValue(baseState())
-    vi.mocked(api.getRedBlueComparisons).mockResolvedValue([])
+    vi.mocked(api.getRedBlueComparisons).mockResolvedValue(historyPage())
     vi.mocked(api.createRedBlueComparison).mockResolvedValue(comparisonResponse())
   })
 
   it('loads a pair, submits LEFT and replaces it with the next pair', async () => {
     vi.mocked(api.getRedBlueComparisons)
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([historyItem()])
+      .mockResolvedValueOnce(historyPage())
+      .mockResolvedValue(historyPage([historyItem()]))
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
     expect(view.getByText('Personal ranking')).toBeInTheDocument()
@@ -158,7 +172,7 @@ describe('RedBlueBattlePage', () => {
     })))
     await waitFor(() => expect(view.getByTestId('battle-card-blue')).toHaveTextContent('左作品'))
     fireEvent.click(view.getByTestId('red-blue-history-tab'))
-    await waitFor(() => expect(view.getByTestId('comparison-history-item-11')).toHaveTextContent('已记录：更喜欢《左作品》'))
+    await waitFor(() => expect(view.getByTestId('comparison-history-result-11')).toHaveTextContent('《左作品》VS《右作品》'))
   })
 
   it('keeps ranking changes through search, focus and skip, then replaces them on the next valid PK', async () => {
@@ -228,9 +242,9 @@ describe('RedBlueBattlePage', () => {
     vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce(first)
     vi.mocked(api.revokeRedBlueComparison).mockResolvedValueOnce(revoked)
     vi.mocked(api.getRedBlueComparisons)
-      .mockResolvedValueOnce([historyItem()])
-      .mockResolvedValueOnce([historyItem()])
-      .mockResolvedValue([])
+      .mockResolvedValueOnce(historyPage([historyItem()]))
+      .mockResolvedValueOnce(historyPage([historyItem()]))
+      .mockResolvedValue(historyPage())
 
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
@@ -246,8 +260,8 @@ describe('RedBlueBattlePage', () => {
   it('keeps PK history visible in its tab and removes a row only after revoke succeeds', async () => {
     const item = historyItem({ id: 21, outcome: 'RIGHT_WIN' })
     vi.mocked(api.getRedBlueComparisons)
-      .mockResolvedValueOnce([item])
-      .mockResolvedValue([])
+      .mockResolvedValueOnce(historyPage([item]))
+      .mockResolvedValue(historyPage())
     vi.mocked(api.revokeRedBlueComparison).mockResolvedValue({
       comparison: { ...comparisonResponse().comparison, id: 21, outcome: 'RIGHT_WIN' },
       revoked: true,
@@ -260,8 +274,8 @@ describe('RedBlueBattlePage', () => {
     const view = renderPage()
     await waitFor(() => expect(view.getByText('红蓝合战')).toBeInTheDocument())
     fireEvent.click(view.getByTestId('red-blue-history-tab'))
-    await waitFor(() => expect(view.getByTestId('comparison-history-item-21')).toHaveTextContent('已记录：更喜欢《右作品》'))
-    expect(view.getByTestId('comparison-history-item-21')).toHaveTextContent('《左作品》 VS 《右作品》')
+    await waitFor(() => expect(view.getByTestId('comparison-history-result-21')).toHaveTextContent('《左作品》VS《右作品》'))
+    expect(view.getByTestId('comparison-history-result-21')).toHaveTextContent('《左作品》VS《右作品》')
 
     fireEvent.click(view.getByRole('button', { name: /撤销《左作品》与《右作品》这次 PK/ }))
     await waitFor(() => expect(api.revokeRedBlueComparison).toHaveBeenCalledWith(21))
@@ -398,7 +412,7 @@ describe('RedBlueBattlePage', () => {
     const view = renderPage()
     await waitFor(() => expect(view.getByTestId('score-suggestion-20')).toBeInTheDocument())
     fireEvent.click(view.getByRole('button', { name: '调整为 9.0' }))
-    await waitFor(() => expect(api.handleRedBlueSuggestionAction).toHaveBeenCalledWith(20, expect.objectContaining({ action: 'ACCEPTED', suggestion_key: '2:85:90:UP' })))
+    await waitFor(() => expect(api.handleRedBlueSuggestionAction).toHaveBeenCalledWith(20, expect.objectContaining({ action: 'ACCEPTED', suggestion_key: '2:85:90:UP' }), { page: 1, size: 100 }))
     await waitFor(() => expect(view.queryByTestId('score-suggestion-20')).not.toBeInTheDocument())
     const filters = within(view.getByRole('group', { name: '排名筛选' }))
     fireEvent.click(filters.getByRole('button'))

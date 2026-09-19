@@ -61,6 +61,9 @@ export interface RedBlueState {
   pair_status: RedBluePairStatus | string
   current_pair: RedBluePair | null
   ranking: RedBlueRankingItem[]
+  ranking_total?: number
+  ranking_page?: number
+  ranking_size?: number
   full_recalibration_required: boolean
   full_recalibration_running: boolean
 }
@@ -126,6 +129,13 @@ export interface RedBlueComparisonHistoryItem {
   selector_version: string
   created_at: string | null
   revoked_at: string | null
+}
+
+export interface RedBlueComparisonHistoryPage {
+  items: RedBlueComparisonHistoryItem[]
+  total: number
+  page: number
+  size: number
 }
 
 export interface CreateRedBlueComparisonResponse {

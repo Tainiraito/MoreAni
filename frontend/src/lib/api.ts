@@ -21,6 +21,7 @@ import type {
 import type {
   CreateRedBlueComparisonRequest,
   CreateRedBlueComparisonResponse,
+  RedBlueComparisonHistoryPage,
   RedBlueComparisonHistoryItem,
   RedBlueState,
   RevokeRedBlueComparisonResponse,
@@ -332,10 +333,22 @@ export const api = {
       body: JSON.stringify({ items }),
     }),
   // Red-blue battle
-  getRedBlueState: async (options?: RequestInit) =>
-    normalizeRedBlueState(await request<RedBlueState>('/red-blue/state', options)),
-  getRedBlueComparisons: async (options?: RequestInit) =>
-    request<RedBlueComparisonHistoryItem[]>('/red-blue/comparisons', options),
+  getRedBlueState: async (params?: { page?: number; size?: number }, options?: RequestInit) => {
+    const query = new URLSearchParams()
+    if (params?.page !== undefined) query.set('page', String(params.page))
+    if (params?.size !== undefined) query.set('size', String(params.size))
+    const suffix = query.toString() ? `?${query}` : ''
+    return normalizeRedBlueState(await request<RedBlueState>(`/red-blue/state${suffix}`, options))
+  },
+  getRedBlueComparisons: async (params?: { page?: number; size?: number }, options?: RequestInit) => {
+    const query = new URLSearchParams()
+    if (params?.page !== undefined) query.set('page', String(params.page))
+    if (params?.size !== undefined) query.set('size', String(params.size))
+    const suffix = query.toString() ? `?${query}` : ''
+    const response = await request<RedBlueComparisonHistoryPage | RedBlueComparisonHistoryItem[]>(`/red-blue/comparisons${suffix}`, options)
+    if (Array.isArray(response)) return { items: response, total: response.length, page: 1, size: response.length || 100 }
+    return response
+  },
   createRedBlueComparison: (data: CreateRedBlueComparisonRequest) =>
     request<CreateRedBlueComparisonResponse>('/red-blue/comparisons', {
       method: 'POST',
@@ -345,11 +358,16 @@ export const api = {
     request<RevokeRedBlueComparisonResponse>(`/red-blue/comparisons/${comparisonId}/revoke`, {
       method: 'POST',
     }),
-  handleRedBlueSuggestionAction: (suggestionId: number, data: ScoreSuggestionActionRequest) =>
-    request<ScoreSuggestionActionResponse>(`/red-blue/score-suggestions/${suggestionId}/actions`, {
+  handleRedBlueSuggestionAction: (suggestionId: number, data: ScoreSuggestionActionRequest, params?: { page?: number; size?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.page !== undefined) query.set('page', String(params.page))
+    if (params?.size !== undefined) query.set('size', String(params.size))
+    const suffix = query.toString() ? `?${query}` : ''
+    return request<ScoreSuggestionActionResponse>(`/red-blue/score-suggestions/${suggestionId}/actions${suffix}`, {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    })
+  },
   // Resource subscriptions
   listResourceSubscriptions: (contentId?: number) => {
     const suffix = contentId ? `?content_id=${contentId}` : ''

@@ -1,5 +1,6 @@
-import { Clock3, LoaderCircle, RotateCcw, Swords } from 'lucide-react'
+import { LoaderCircle, RotateCcw, Swords } from 'lucide-react'
 
+import { RedBluePagination } from '@/components/red-blue/RedBluePagination'
 import type { RedBlueComparisonHistoryItem } from '@/types/red-blue'
 
 interface ComparisonHistoryListProps {
@@ -9,27 +10,26 @@ interface ComparisonHistoryListProps {
   onRetry?: () => void
   pendingId: number | null
   onRevoke: (item: RedBlueComparisonHistoryItem) => void
+  page: number
+  pageSize: number
+  total: number
+  onPageChange: (page: number) => void
 }
 
-function comparisonMessage(item: RedBlueComparisonHistoryItem): string {
-  if (item.outcome === 'LEFT_WIN') return `已记录：更喜欢《${item.left_content.title}》`
-  if (item.outcome === 'RIGHT_WIN') return `已记录：更喜欢《${item.right_content.title}》`
-  if (item.outcome === 'TIE') return '已记录：两部作品差不多'
-  return '已记录：跳过这组作品'
+function resultClass(outcome: RedBlueComparisonHistoryItem['outcome'], side: 'left' | 'right'): string {
+  const winner = (side === 'left' && outcome === 'LEFT_WIN') || (side === 'right' && outcome === 'RIGHT_WIN')
+  return winner ? 'font-bold' : 'font-normal'
 }
 
-function formatCreatedAt(createdAt: string | null): string {
-  if (createdAt === null) return '刚刚'
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(createdAt))
+function resultStyle(outcome: RedBlueComparisonHistoryItem['outcome'], side: 'left' | 'right'): { color: string } {
+  if ((side === 'left' && outcome === 'LEFT_WIN') || (side === 'right' && outcome === 'RIGHT_WIN')) {
+    return { color: side === 'left' ? 'var(--battle-red-text)' : 'var(--battle-blue-text)' }
+  }
+  return { color: 'var(--text-muted)' }
 }
 
 /** 展示可持续查看、可逐条撤销的 PK 历史。 */
-export function ComparisonHistoryList({ history, loading = false, error = false, onRetry, pendingId, onRevoke }: ComparisonHistoryListProps) {
+export function ComparisonHistoryList({ history, loading = false, error = false, onRetry, pendingId, onRevoke, page, pageSize, total, onPageChange }: ComparisonHistoryListProps) {
   return (
     <section aria-label="PK 历史" data-testid="red-blue-history">
       <div className="mt-4 overflow-hidden rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)' }}>
@@ -49,8 +49,8 @@ export function ComparisonHistoryList({ history, loading = false, error = false,
         ) : history.length === 0 ? (
           <div className="flex min-h-36 flex-col items-center justify-center px-5 text-center" style={{ color: 'var(--text-muted)' }} data-testid="red-blue-history-empty">
             <Swords size={22} style={{ color: 'var(--brand)' }} />
-            <p className="mt-3 text-sm">还没有 PK 历史记录。</p>
-            <p className="mt-1 text-xs">完成一次选择后，记录会一直保留在这里。</p>
+            <p className="mt-3 text-sm">{total === 0 ? '还没有 PK 历史记录。' : '当前页暂无 PK 历史记录。'}</p>
+            <p className="mt-1 text-xs">{total === 0 ? '完成一次选择后，记录会一直保留在这里。' : '请切换页码查看其他记录。'}</p>
           </div>
         ) : (
           <ol>
@@ -62,12 +62,10 @@ export function ComparisonHistoryList({ history, loading = false, error = false,
                 data-testid={`comparison-history-item-${item.id}`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{comparisonMessage(item)}</p>
-                  <p className="mt-1 truncate text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    《{item.left_content.title}》 <span style={{ color: 'var(--text-muted)' }}>VS</span> 《{item.right_content.title}》
-                  </p>
-                  <p className="mt-2 inline-flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    <Clock3 size={13} /> {formatCreatedAt(item.created_at)}
+                  <p className="flex min-w-0 items-center gap-2 truncate text-sm" data-testid={`comparison-history-result-${item.id}`}>
+                    <span className={`min-w-0 truncate ${resultClass(item.outcome, 'left')}`} style={resultStyle(item.outcome, 'left')}>《{item.left_content.title}》</span>
+                    <span className="shrink-0 text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>VS</span>
+                    <span className={`min-w-0 truncate ${resultClass(item.outcome, 'right')}`} style={resultStyle(item.outcome, 'right')}>《{item.right_content.title}》</span>
                   </p>
                 </div>
                 <button
@@ -86,6 +84,14 @@ export function ComparisonHistoryList({ history, loading = false, error = false,
           </ol>
         )}
       </div>
+      <RedBluePagination
+        page={page}
+        size={pageSize}
+        total={total}
+        itemLabel="条记录"
+        ariaLabel="PK 历史分页"
+        onPageChange={onPageChange}
+      />
     </section>
   )
 }

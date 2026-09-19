@@ -17,16 +17,22 @@ function byDisplayOrder(left: RedBlueRankingItem, right: RedBlueRankingItem): nu
     || left.content.content_id - right.content.content_id
 }
 
-export function sortRedBlueRanking(ranking: RedBlueRankingItem[]): RedBlueRankingItem[] {
+export function sortRedBlueRanking(ranking: RedBlueRankingItem[], page = 1, pageSize = ranking.length || 1): RedBlueRankingItem[] {
+  const rankOffset = Math.max(0, page - 1) * pageSize
   return [...ranking]
     .sort(byDisplayOrder)
-    .map((item, index) => ({ ...item, rank: index + 1 }))
+    .map((item, index) => ({ ...item, rank: rankOffset + index + 1 }))
 }
 
 export function normalizeRedBlueState(state: RedBlueState): RedBlueState {
+  const page = state.ranking_page ?? 1
+  const pageSize = state.ranking_size ?? Math.max(state.ranking.length, 100)
   return {
     ...state,
-    ranking: sortRedBlueRanking(state.ranking),
+    ranking_total: state.ranking_total ?? state.candidate_count,
+    ranking_page: page,
+    ranking_size: pageSize,
+    ranking: sortRedBlueRanking(state.ranking, page, pageSize),
   }
 }
 
@@ -100,7 +106,11 @@ export function patchRedBlueComparisonState(
     current_pair: response.next_pair,
     full_recalibration_required: response.full_recalibration_required,
     full_recalibration_running: response.full_recalibration_running,
-    ranking: sortRedBlueRanking(ranking),
+    ranking: sortRedBlueRanking(
+      ranking,
+      current.ranking_page ?? 1,
+      current.ranking_size ?? Math.max(current.ranking.length, 100),
+    ),
   }
 }
 
@@ -119,7 +129,11 @@ export function patchRedBlueSuggestionAction(
   return {
     ...current,
     state_version: Math.max(current.state_version, response.state_version),
-    ranking: sortRedBlueRanking(ranking),
+    ranking: sortRedBlueRanking(
+      ranking,
+      current.ranking_page ?? 1,
+      current.ranking_size ?? Math.max(current.ranking.length, 100),
+    ),
   }
 }
 

@@ -87,6 +87,7 @@ def test_openapi_exposes_explicit_red_blue_contract(client):
         'RedBlueStateResponse',
         'RevokeComparisonResponse',
         'RedBlueComparisonHistoryItemResponse',
+        'RedBlueComparisonHistoryPageResponse',
     } <= set(schemas)
     assert 'score_suggestion_delta' in schemas['CreateComparisonResponse']['properties']
     assert schemas['RedBlueRankingItemResponse']['properties']['rank']['type'] == 'integer'
@@ -143,6 +144,17 @@ def test_state_bootstrap_full_fast_and_pair_contract(client, db, make_user, api_
         'rank_high',
     }
     _assert_display_ranks(bootstrap_payload)
+    bootstrap_page_two = client.get(
+        '/api/v1/red-blue/state?page=2&size=2',
+        cookies=auth_cookie(user),
+    )
+    assert bootstrap_page_two.status_code == 200
+    bootstrap_page_two_payload = bootstrap_page_two.json()
+    assert bootstrap_page_two_payload['ranking_total'] == 3
+    assert bootstrap_page_two_payload['ranking_page'] == 2
+    assert bootstrap_page_two_payload['ranking_size'] == 2
+    assert len(bootstrap_page_two_payload['ranking']) == 1
+    assert bootstrap_page_two_payload['ranking'][0]['rank'] == 3
     assert set(bootstrap_payload['current_pair']['left']) == {
         'content_id',
         'title',
@@ -293,17 +305,28 @@ def test_comparison_history_lists_active_facts_and_removes_revoked_rows(client, 
 
     history = client.get('/api/v1/red-blue/comparisons', cookies=cookies)
     assert history.status_code == 200
-    assert history.json()[0]['id'] == comparison_id
-    assert history.json()[0]['left_content']['title'] == first.title
-    assert history.json()[0]['right_content']['title'] == second.title
-    assert history.json()[0]['outcome'] == 'LEFT_WIN'
+    history_payload = history.json()
+    assert history_payload['total'] == 1
+    assert history_payload['page'] == 1
+    assert history_payload['size'] == 100
+    assert history_payload['items'][0]['id'] == comparison_id
+    assert history_payload['items'][0]['left_content']['title'] == first.title
+    assert history_payload['items'][0]['right_content']['title'] == second.title
+    assert history_payload['items'][0]['outcome'] == 'LEFT_WIN'
+
+    empty_page = client.get('/api/v1/red-blue/comparisons?page=2&size=1', cookies=cookies)
+    assert empty_page.status_code == 200
+    assert empty_page.json() == {'items': [], 'total': 1, 'page': 2, 'size': 1}
 
     revoked = client.post(
         f'/api/v1/red-blue/comparisons/{comparison_id}/revoke',
         cookies=cookies,
     )
     assert revoked.status_code == 200
-    assert client.get('/api/v1/red-blue/comparisons', cookies=cookies).json() == []
+    revoked_history = client.get('/api/v1/red-blue/comparisons', cookies=cookies)
+    assert revoked_history.status_code == 200
+    assert revoked_history.json()['items'] == []
+    assert revoked_history.json()['total'] == 0
     assert db.query(RedBlueComparison).filter_by(id=comparison_id).one().revoked_at is not None
 
 
@@ -572,8 +595,12 @@ def test_state_serialization_scale(client, db, make_user, api_service, count):
     elapsed = time.perf_counter() - started
 
     assert response.status_code == 200
-    assert response.json()['candidate_count'] == count
-    assert len(response.json()['ranking']) == count
+    payload = response.json()
+    assert payload['candidate_count'] == count
+    assert payload['ranking_total'] == count
+    assert payload['ranking_page'] == 1
+    assert payload['ranking_size'] == 100
+    assert len(payload['ranking']) == min(count, 100)
     assert len(response.content) > 0
     # 4C 记录实际测量值但不把机器相关的绝对耗时写死为硬门槛。
     print(f'RED_BLUE_STATE_BENCH count={count} seconds={elapsed:.6f} bytes={len(response.content)}')

@@ -99,12 +99,13 @@ describe('RankingList filters and intervals', () => {
         actionPendingId={null}
         onOpenContent={() => undefined}
         onSuggestionAction={() => undefined}
+        onPageChange={() => undefined}
       />,
     )
 
     chooseFilter(view, /有评分建议 \(3\)/)
     expect(view.getAllByTestId(/^ranking-row-/)).toHaveLength(3)
-    expect(view.getByText('显示 3 / 100 部作品')).toBeInTheDocument()
+    expect(view.getByText('第 1 / 1 页 · 共 100 部作品')).toBeInTheDocument()
   })
 
   it('does not render a fractional rank even for a legacy malformed item', () => {

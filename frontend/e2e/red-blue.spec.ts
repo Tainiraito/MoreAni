@@ -106,7 +106,11 @@ async function mockBattleApi(page: Page): Promise<BattleMockState> {
       return
     }
     if (path === '/api/v1/red-blue/comparisons' && request.method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mock.history) })
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: mock.history, total: mock.history.length, page: 1, size: 100 }),
+      })
       return
     }
     if (path === '/api/v1/red-blue/comparisons' && request.method() === 'POST') {
@@ -226,7 +230,7 @@ test.describe('红蓝合战页面', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/ratings/battle')
     await page.getByRole('button', { name: '差不多' }).click()
-    await expect(page.getByTestId('red-blue-history-tab')).toContainText('PK 历史 1')
+    await expect(page.getByTestId('red-blue-history-tab')).toHaveText('PK 历史')
     await page.getByTestId('red-blue-history-tab').click()
     await expect(page.getByTestId('comparison-history-item-1')).toBeVisible()
     await page.getByRole('button', { name: /撤销/ }).click()
