@@ -61,8 +61,8 @@ export function RankingRow({
 
   return (
     <div
-      className={`group grid cursor-pointer gap-3 bg-[var(--red-blue-row-background)] py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !focused ? 'red-blue-rank-moved' : ''}`}
-      style={{ '--red-blue-row-background': rowBackground, boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' } as CSSProperties}
+      className={`group grid cursor-pointer rounded-xl border bg-[var(--red-blue-row-background)] px-3 py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] sm:px-4 lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !focused ? 'red-blue-rank-moved' : ''}`}
+      style={{ '--red-blue-row-background': rowBackground, borderColor: 'var(--border-line)', boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' } as CSSProperties}
       data-testid={`ranking-row-${item.content.content_id}`}
       data-focused={focused ? 'true' : 'false'}
       role="button"

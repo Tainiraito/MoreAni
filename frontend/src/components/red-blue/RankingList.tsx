@@ -109,12 +109,11 @@ export function RankingList({
             {total === 0 ? '还没有可展示的排名。' : ranking.length === 0 ? '当前页暂无作品，请切换页码。' : '没有符合当前搜索或筛选条件的作品。'}
           </div>
         ) : (
-          <ol>
+          <ol className="space-y-2 p-2 sm:p-3">
             {visibleRanking.map(item => (
               <li
                 key={item.content.content_id}
-                className={`grid gap-2 border-t px-3 py-2 first:border-t-0 sm:px-4 ${item.score_suggestion != null ? 'lg:grid-cols-[minmax(0,1fr)_minmax(14rem,17rem)]' : ''}`}
-                style={{ borderColor: 'var(--border-line)' }}
+                className={`grid gap-2 ${item.score_suggestion != null ? 'lg:grid-cols-[minmax(0,1fr)_minmax(14rem,17rem)]' : ''}`}
               >
                 <RankingRow
                   item={item}

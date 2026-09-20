@@ -142,6 +142,7 @@ describe('RankingList filters and intervals', () => {
     expect(rankingRow).not.toContainElement(calibrationCard)
     expect(rankingRow.parentElement).toContainElement(calibrationCard)
     expect(rankingRow).toHaveAttribute('role', 'button')
+    expect(rankingRow).toHaveClass('rounded-xl', 'border')
     expect(rankingRow.querySelector('[aria-hidden="true"]')).not.toHaveClass('rounded-lg')
 
     fireEvent.click(rankingRow)
