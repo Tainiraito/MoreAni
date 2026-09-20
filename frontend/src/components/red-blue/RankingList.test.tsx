@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { RankingList } from '@/components/red-blue/RankingList'
 import type { RedBlueRankingItem, RedBlueScoreSuggestion } from '@/types/red-blue'
 
-function item(contentId: number, title: string, stability: string): RedBlueRankingItem {
+function item(contentId: number, title: string, stability: string, orderUncertain = false): RedBlueRankingItem {
   return {
     content: { content_id: contentId, title, description: '', cover_url: null, content_type: 'anime' },
     rank: contentId,
@@ -12,6 +12,7 @@ function item(contentId: number, title: string, stability: string): RedBlueRanki
     preference_mean: 1,
     comparison_count: 2,
     stability,
+    order_uncertain: orderUncertain,
     rank_low: contentId,
     rank_high: contentId + (stability === 'ORDER_UNCERTAIN' ? 8 : 1),
     score_suggestion: null,
@@ -70,6 +71,21 @@ describe('RankingList filters and intervals', () => {
     const filters = within(view.getByRole('group', { name: '排名筛选' }))
     fireEvent.click(filters.getByRole('button'))
     expect(view.getByRole('option', { name: /稳定 \(1\)/ })).toBeInTheDocument()
+  })
+
+  it('does not render the redundant order uncertainty tag', () => {
+    const view = render(
+      <RankingList
+        ranking={[item(1, '稳定但顺序不确定', 'STABLE', true)]}
+        rankChanges={{}}
+        actionPendingId={null}
+        onOpenContent={() => undefined}
+        onSuggestionAction={() => undefined}
+      />,
+    )
+
+    expect(view.getByText('稳定')).toBeInTheDocument()
+    expect(view.queryByText('顺序待确认')).not.toBeInTheDocument()
   })
 
   it('counts no suggestions when all 100 rows have null suggestions', () => {

@@ -57,11 +57,11 @@ export function ComparisonHistoryList({ history, loading = false, error = false,
             {history.map(item => (
               <li
                 key={item.id}
-                className="flex flex-col gap-3 border-b px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                className="flex h-10 items-center gap-2 border-b px-4 last:border-b-0 sm:px-5"
                 style={{ borderColor: 'var(--border-line)' }}
                 data-testid={`comparison-history-item-${item.id}`}
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="flex min-w-0 items-center gap-2 truncate text-sm" data-testid={`comparison-history-result-${item.id}`}>
                     <span className={`min-w-0 truncate ${resultClass(item.outcome, 'left')}`} style={resultStyle(item.outcome, 'left')}>《{item.left_content.title}》</span>
                     <span className="shrink-0 text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>VS</span>
@@ -72,7 +72,7 @@ export function ComparisonHistoryList({ history, loading = false, error = false,
                   type="button"
                   onClick={() => onRevoke(item)}
                   disabled={pendingId !== null}
-                  className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg px-3 text-xs font-semibold transition-colors hover:bg-[rgba(251,113,167,0.08)] disabled:opacity-50 sm:self-auto"
+                  className="inline-flex h-7 min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors hover:bg-[rgba(251,113,167,0.08)] disabled:opacity-50"
                   style={{ color: 'var(--accent-coral)', border: '1px solid color-mix(in srgb, var(--accent-coral) 35%, var(--border-line))' }}
                   aria-label={`撤销《${item.left_content.title}》与《${item.right_content.title}》这次 PK`}
                 >

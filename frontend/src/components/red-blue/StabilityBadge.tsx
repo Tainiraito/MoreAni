@@ -16,29 +16,17 @@ const COLORS: Record<string, string> = {
 
 interface StabilityBadgeProps {
   stability: RedBlueStability | string
-  orderUncertain?: boolean
 }
 
-export function StabilityBadge({ stability, orderUncertain = false }: StabilityBadgeProps) {
+export function StabilityBadge({ stability }: StabilityBadgeProps) {
   const color = COLORS[stability] ?? 'var(--text-muted)'
   return (
-    <>
-      <span
-        className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium whitespace-nowrap"
-        style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
-      >
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} aria-hidden="true" />
-        {LABELS[stability] ?? '状态待确认'}
-      </span>
-      {(orderUncertain || stability === 'ORDER_UNCERTAIN') && (
-        <span
-          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium whitespace-nowrap"
-          style={{ color: '#c99538', background: 'color-mix(in srgb, #c99538 12%, transparent)' }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#c99538' }} aria-hidden="true" />
-          顺序待确认
-        </span>
-      )}
-    </>
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium whitespace-nowrap"
+      style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} aria-hidden="true" />
+      {LABELS[stability] ?? '状态待确认'}
+    </span>
   )
 }

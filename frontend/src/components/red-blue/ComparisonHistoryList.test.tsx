@@ -49,5 +49,7 @@ describe('ComparisonHistoryList', () => {
     expect(result).not.toHaveTextContent('2026')
     expect(spans[0]).toHaveClass(leftWeight)
     expect(spans[2]).toHaveClass(rightWeight)
+    expect(view.getByTestId('comparison-history-item-1')).toHaveClass('h-10')
+    expect(view.getByRole('button', { name: /撤销/ })).toHaveClass('h-7', 'min-h-7')
   })
 })
