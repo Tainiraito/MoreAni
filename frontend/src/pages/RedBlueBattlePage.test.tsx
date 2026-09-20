@@ -175,6 +175,37 @@ describe('RedBlueBattlePage', () => {
     await waitFor(() => expect(view.getByTestId('comparison-history-result-11')).toHaveTextContent('《左作品》VS《右作品》'))
   })
 
+  it('keeps the active pair while Full Ranker polling refreshes server state', async () => {
+    const polledState = baseState({
+      state_version: 3,
+      current_pair: {
+        left: content(3, '轮询红方'),
+        right: content(4, '轮询蓝方'),
+        selector_version: 'v1',
+        selection_reason: 'poll',
+      },
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    })
+    vi.mocked(api.getRedBlueState)
+      .mockResolvedValueOnce(baseState())
+      .mockResolvedValue(polledState)
+    vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce({
+      ...comparisonResponse(),
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    })
+
+    const view = renderPage()
+    await waitFor(() => expect(view.getByTestId('battle-card-red')).toHaveTextContent('左作品'))
+    fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
+
+    await waitFor(() => expect(api.getRedBlueState).toHaveBeenCalledTimes(2))
+    expect(view.getByTestId('battle-card-red')).toHaveTextContent('右作品')
+    expect(view.getByTestId('battle-card-blue')).toHaveTextContent('左作品')
+    expect(view.queryByText('轮询红方')).not.toBeInTheDocument()
+  })
+
   it('patches a score suggestion from the comparison delta without waiting for refresh', async () => {
     const response = {
       ...comparisonResponse(),

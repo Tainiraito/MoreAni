@@ -19,6 +19,7 @@ import type {
   RedBlueComparisonHistoryPage,
   RedBlueComparisonHistoryItem,
   RedBlueOutcome,
+  RedBluePair,
   RedBlueRankingChange,
   RedBlueScoreSuggestion,
   RedBlueState,
@@ -135,6 +136,9 @@ export function RedBlueBattlePage() {
   const [historyPage, setHistoryPage] = useState(1)
   const [focusContentId, setFocusContentId] = useState<number | null>(null)
   const [battleVisible, setBattleVisible] = useState(true)
+  // activePair 是浏览器交互态；后台 Full Ranker 轮询只更新 React Query，不覆盖当前卡片。
+  const [activePair, setActivePair] = useState<RedBluePair | null | undefined>(undefined)
+  const activePairInitializedRef = useRef(false)
   const battleSectionRef = useRef<HTMLElement | null>(null)
   const toggleFocus = useCallback((contentId: number) => {
     setFocusContentId(current => current === contentId ? null : contentId)
@@ -171,6 +175,12 @@ export function RedBlueBattlePage() {
     refetchOnWindowFocus: false,
   })
 
+  useEffect(() => {
+    if (activePairInitializedRef.current || stateQuery.data === undefined) return
+    activePairInitializedRef.current = true
+    setActivePair(stateQuery.data.current_pair)
+  }, [stateQuery.data])
+
   const comparisonMutation = useMutation({
     mutationFn: (payload: CreateRedBlueComparisonRequest) => api.createRedBlueComparison(payload),
   })
@@ -195,18 +205,18 @@ export function RedBlueBattlePage() {
     )
     observer.observe(section)
     return () => observer.disconnect()
-  }, [stateQuery.data?.current_pair?.left.content_id, stateQuery.data?.current_pair?.right.content_id])
+  }, [activePair?.left.content_id, activePair?.right.content_id])
 
   const reloadState = useCallback(async () => {
-    await queryClient.fetchQuery({
+    const refreshedState = await queryClient.fetchQuery({
       queryKey: stateQueryKey,
       queryFn: () => api.getRedBlueState({ page: rankingPage, size: RED_BLUE_PAGE_SIZE }),
     })
+    setActivePair(refreshedState.current_pair)
   }, [queryClient, rankingPage, stateQueryKey])
 
   const submitComparison = useCallback((outcome: RedBlueOutcome) => {
-    const current = queryClient.getQueryData<RedBlueState>(stateQueryKey)
-    const pair = current?.current_pair
+    const pair = activePair
     if (pair === null || pair === undefined || comparisonMutation.isPending) return
 
     const canRetry = retryComparison !== null
@@ -244,6 +254,7 @@ export function RedBlueBattlePage() {
             queryClient.setQueryData(stateQueryKey, patched)
           }
         }
+        if (!responseIsStale) setActivePair(response.next_pair)
         if (!responseIsStale && response.comparison.outcome !== 'SKIP') {
           setLastRankingDelta(buildRedBlueRankingChanges(response.ranking_delta))
         }
@@ -269,7 +280,7 @@ export function RedBlueBattlePage() {
         }
       },
     })
-  }, [addToast, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison, stateQueryKey])
+  }, [activePair, addToast, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison, stateQueryKey])
 
   const handleSuggestionAction = useCallback((suggestion: RedBlueScoreSuggestion, action: RedBlueSuggestionAction) => {
     if (actionPendingId !== null) return
@@ -371,6 +382,8 @@ export function RedBlueBattlePage() {
     )
   }
 
+  if (activePair === undefined) return <BattlePageSkeleton />
+
   const state = stateQuery.data
   const comparisonHistoryPage = historyQuery.data ?? {
     items: [],
@@ -381,7 +394,7 @@ export function RedBlueBattlePage() {
   const comparisonHistory = comparisonHistoryPage.items
   const rankingTotal = state.ranking_total ?? state.candidate_count
   const pairMessage = pairStatusText(state)
-  const canShowPair = state.current_pair !== null && state.pair_status !== 'INSUFFICIENT_CANDIDATES'
+  const canShowPair = activePair !== null
   const focusedContent = focusContentId === null
     ? null
     : state.ranking.find(item => item.content.content_id === focusContentId)?.content ?? null
@@ -425,7 +438,7 @@ export function RedBlueBattlePage() {
           </div>
         )}
 
-        {state.candidate_count === 0 || (state.candidate_count === 1 && state.current_pair === null) ? (
+        {activePair === null && (state.candidate_count === 0 || state.candidate_count === 1) ? (
           <EmptyBattleState candidateCount={state.candidate_count} />
         ) : canShowPair ? (
           <section ref={battleSectionRef} aria-labelledby="red-blue-battle-title" data-testid="red-blue-main-battle">
@@ -440,7 +453,7 @@ export function RedBlueBattlePage() {
               </div>
             </div>
             <BattlePair
-              pair={state.current_pair}
+              pair={activePair}
               disabled={comparisonMutation.isPending}
               selectedOutcome={selectedOutcome}
               onChoose={submitComparison}
@@ -449,9 +462,9 @@ export function RedBlueBattlePage() {
           </section>
         ) : null}
 
-        {!battleVisible && canShowPair && state.current_pair && (
+        {!battleVisible && canShowPair && activePair && (
           <StickyMiniBattle
-            pair={state.current_pair}
+            pair={activePair}
             disabled={comparisonMutation.isPending}
             selectedOutcome={selectedOutcome}
             onChoose={submitComparison}
