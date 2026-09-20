@@ -82,7 +82,7 @@ export interface RedBlueRankingDelta {
   rank_high?: number | null
 }
 
-export type RedBlueRankingChangeDirection = 'UP' | 'DOWN'
+export type RedBlueRankingChangeDirection = 'UP' | 'DOWN' | 'UNCHANGED'
 
 export interface RedBlueRankingChange {
   old_rank: number

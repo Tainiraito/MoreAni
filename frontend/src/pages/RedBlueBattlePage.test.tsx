@@ -285,7 +285,7 @@ describe('RedBlueBattlePage', () => {
     fireEvent.change(view.getByRole('textbox', { name: '搜索作品' }), { target: { value: '' } })
     fireEvent.click(view.getByRole('button', { name: '更喜欢蓝方' }))
     await waitFor(() => expect(api.createRedBlueComparison).toHaveBeenCalledTimes(3))
-    await waitFor(() => expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument())
+    await waitFor(() => expect(view.getByTestId('ranking-change-1')).toHaveTextContent('0'))
     expect(view.getByTestId('ranking-change-2')).toHaveTextContent('4')
   })
 

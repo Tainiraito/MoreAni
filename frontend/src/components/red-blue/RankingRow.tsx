@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Target } from 'lucide-react'
+import { ArrowDown, ArrowUp, Minus, Target } from 'lucide-react'
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 
 import { CoverImage } from '@/components/ui/CoverImage'
@@ -73,14 +73,18 @@ export function RankingRow({
     >
       <div className="flex items-center gap-1 self-center lg:flex-col lg:items-start lg:gap-0.5">
         <span className="text-xl font-semibold leading-6" style={{ color: 'var(--text-primary)' }}>#{formatRank(item.rank)}</span>
-        {rankChange !== undefined && rankChange.amount >= 2 && (
+        {rankChange !== undefined && (
           <span
             className="inline-flex items-center text-xs font-semibold"
             style={{ color: rankChange.direction === 'UP' ? 'var(--brand)' : 'var(--text-muted)' }}
             data-testid={`ranking-change-${item.content.content_id}`}
             data-direction={rankChange.direction}
           >
-            {rankChange.direction === 'UP' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+            {rankChange.direction === 'UP'
+              ? <ArrowUp size={12} />
+              : rankChange.direction === 'DOWN'
+                ? <ArrowDown size={12} />
+                : <Minus size={12} />}
             {rankChange.amount}
           </span>
         )}

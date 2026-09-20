@@ -92,7 +92,7 @@ function comparisonResponse(): CreateRedBlueComparisonResponse {
 }
 
 describe('red-blue query cache patching', () => {
-  it('derives UP/DOWN from backend old_rank and new_rank', () => {
+  it('derives UP/DOWN/UNCHANGED from backend old_rank and new_rank', () => {
     const changes = buildRedBlueRankingChanges([
       { content_id: 1, old_rank: 10, new_rank: 4, preference_mean: 1, comparison_count: 4 },
       { content_id: 2, old_rank: 4, new_rank: 10, preference_mean: 0.8, comparison_count: 4 },
@@ -101,7 +101,7 @@ describe('red-blue query cache patching', () => {
 
     expect(changes[1]).toEqual({ old_rank: 10, new_rank: 4, direction: 'UP', amount: 6 })
     expect(changes[2]).toEqual({ old_rank: 4, new_rank: 10, direction: 'DOWN', amount: 6 })
-    expect(changes[3]).toBeUndefined()
+    expect(changes[3]).toEqual({ old_rank: 4, new_rank: 4, direction: 'UNCHANGED', amount: 0 })
   })
 
   it('normalizes any legacy/fractional ranks into mean-ordered display ranks', () => {

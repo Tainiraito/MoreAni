@@ -2,7 +2,7 @@ import { fireEvent, render, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { RankingList } from '@/components/red-blue/RankingList'
-import type { RedBlueRankingItem, RedBlueScoreSuggestion } from '@/types/red-blue'
+import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueScoreSuggestion } from '@/types/red-blue'
 
 function item(contentId: number, title: string, stability: string, orderUncertain = false): RedBlueRankingItem {
   return {
@@ -137,6 +137,27 @@ describe('RankingList filters and intervals', () => {
 
     expect(view.queryByText('#1.5')).not.toBeInTheDocument()
     expect(view.getByText('#—')).toBeInTheDocument()
+  })
+
+  it('shows unchanged and one-position ranking changes', () => {
+    const rankChanges: Record<number, RedBlueRankingChange> = {
+      1: { old_rank: 1, new_rank: 1, direction: 'UNCHANGED', amount: 0 },
+      2: { old_rank: 2, new_rank: 1, direction: 'UP', amount: 1 },
+    }
+    const view = render(
+      <RankingList
+        ranking={[item(1, '排名不变', 'STABLE'), item(2, '上升一位', 'STABLE')]}
+        rankChanges={rankChanges}
+        actionPendingId={null}
+        onOpenContent={() => undefined}
+        onSuggestionAction={() => undefined}
+      />,
+    )
+
+    expect(view.getByTestId('ranking-change-1')).toHaveTextContent('0')
+    expect(view.getByTestId('ranking-change-1')).toHaveAttribute('data-direction', 'UNCHANGED')
+    expect(view.getByTestId('ranking-change-2')).toHaveTextContent('1')
+    expect(view.getByTestId('ranking-change-2')).toHaveAttribute('data-direction', 'UP')
   })
 
   it('keeps the calibration card beside the clickable row and exposes three direct actions', () => {

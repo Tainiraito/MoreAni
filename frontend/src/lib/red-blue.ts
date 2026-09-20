@@ -41,12 +41,13 @@ export function buildRedBlueRankingChanges(
 ): Record<number, RedBlueRankingChange> {
   const changes: Record<number, RedBlueRankingChange> = {}
   for (const delta of deltas) {
-    if (delta.old_rank === null || delta.old_rank === delta.new_rank) continue
-    const movedUp = delta.new_rank < delta.old_rank
+    if (delta.old_rank === null) continue
+    const isUnchanged = delta.old_rank === delta.new_rank
+    const movedUp = !isUnchanged && delta.new_rank < delta.old_rank
     changes[delta.content_id] = {
       old_rank: delta.old_rank,
       new_rank: delta.new_rank,
-      direction: movedUp ? 'UP' : 'DOWN',
+      direction: isUnchanged ? 'UNCHANGED' : movedUp ? 'UP' : 'DOWN',
       amount: Math.abs(delta.new_rank - delta.old_rank),
     }
   }
