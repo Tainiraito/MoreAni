@@ -1,16 +1,14 @@
 import { ArrowDown, ArrowUp, Target } from 'lucide-react'
+import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 
 import { CoverImage } from '@/components/ui/CoverImage'
-import { ScoreCalibrationCard } from '@/components/red-blue/ScoreCalibrationCard'
 import { StabilityBadge } from '@/components/red-blue/StabilityBadge'
-import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueSuggestionAction } from '@/types/red-blue'
+import type { RedBlueRankingChange, RedBlueRankingItem } from '@/types/red-blue'
 
 interface RankingRowProps {
   item: RedBlueRankingItem
   rankChange: RedBlueRankingChange | undefined
-  actionPending: boolean
   onOpenContent: (contentId: number) => void
-  onSuggestionAction: (suggestion: NonNullable<RedBlueRankingItem['score_suggestion']>, action: RedBlueSuggestionAction) => void
   candidateCount?: number
   focused?: boolean
   onFocusContent?: (contentId: number) => void
@@ -27,9 +25,7 @@ function formatRank(rank: number): string {
 export function RankingRow({
   item,
   rankChange,
-  actionPending,
   onOpenContent,
-  onSuggestionAction,
   candidateCount = 1,
   focused = false,
   onFocusContent,
@@ -44,20 +40,38 @@ export function RankingRow({
       return '排名仍在确认中'
     })()
     : null
-  const scoreSuggestion = item.score_suggestion
-  const hasScoreSuggestion = scoreSuggestion != null
-  const rowColumns = hasScoreSuggestion
-    ? 'lg:grid-cols-[4rem_minmax(0,1fr)_minmax(14rem,17rem)_auto]'
-    : 'lg:grid-cols-[4rem_minmax(0,1fr)_auto]'
+
+  const openContent = () => onOpenContent(item.content.content_id)
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openContent()
+  }
+  const stopFocusClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }
+  const stopFocusKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }
+  const rowBackground = focused
+    ? 'rgba(251,113,167,0.08)'
+    : rankChange
+      ? 'rgba(251,113,167,0.055)'
+      : 'transparent'
 
   return (
-    <li
-      className={`group grid gap-3 px-3 py-3 transition-colors duration-300 sm:px-4 ${rowColumns} lg:items-stretch ${rankChange && !focused ? 'red-blue-rank-moved' : ''}`}
-      style={{ background: focused ? 'rgba(251,113,167,0.08)' : rankChange ? 'rgba(251,113,167,0.055)' : 'transparent', borderTop: '1px solid var(--border-line)', boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' }}
+    <div
+      className={`group grid cursor-pointer gap-3 bg-[var(--red-blue-row-background)] py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !focused ? 'red-blue-rank-moved' : ''}`}
+      style={{ '--red-blue-row-background': rowBackground, boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' } as CSSProperties}
       data-testid={`ranking-row-${item.content.content_id}`}
       data-focused={focused ? 'true' : 'false'}
+      role="button"
+      tabIndex={0}
+      aria-label={`查看《${item.content.title}》详情`}
+      onClick={openContent}
+      onKeyDown={handleRowKeyDown}
     >
-      <div className="flex items-center gap-1 lg:flex-col lg:items-start lg:gap-0.5">
+      <div className="flex items-center gap-1 self-center lg:flex-col lg:items-start lg:gap-0.5">
         <span className="text-xl font-semibold leading-6" style={{ color: 'var(--text-primary)' }}>#{formatRank(item.rank)}</span>
         {rankChange !== undefined && rankChange.amount >= 2 && (
           <span
@@ -73,25 +87,18 @@ export function RankingRow({
       </div>
 
       <div className="flex min-w-0 items-stretch gap-3">
-        <button
-          type="button"
-          onClick={() => onOpenContent(item.content.content_id)}
-          className="-my-3 min-h-20 w-16 shrink-0 self-stretch overflow-hidden rounded-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+        <div
+          className="-my-3 min-h-20 w-16 shrink-0 self-stretch overflow-hidden"
           style={{ background: 'var(--bg-card-warm)', border: '1px solid var(--border-line)' }}
-          aria-label={`查看《${item.content.title}》详情`}
+          aria-hidden="true"
         >
           <CoverImage src={item.content.cover_url ?? ''} alt={item.content.title} />
-        </button>
+        </div>
         <div className="flex min-w-0 flex-col justify-center">
           <h3 className="truncate text-sm font-semibold" title={item.content.title}>
-            <button
-              type="button"
-              onClick={() => onOpenContent(item.content.content_id)}
-              className="max-w-full truncate text-left transition-colors hover:text-[var(--brand)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
-              style={{ color: 'var(--text-primary)' }}
-            >
+            <span className="block max-w-full truncate transition-colors group-hover:text-[var(--brand)]" style={{ color: 'var(--text-primary)' }}>
               {item.content.title}
-            </button>
+            </span>
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="font-semibold" style={{ color: 'var(--brand)' }}>{formatScore(item.current_score)}<span className="ml-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>/10</span></span>
@@ -104,18 +111,11 @@ export function RankingRow({
         </div>
       </div>
 
-      {hasScoreSuggestion && (
-        <ScoreCalibrationCard
-          suggestion={scoreSuggestion}
-          disabled={actionPending}
-          onAction={action => onSuggestionAction(scoreSuggestion, action)}
-        />
-      )}
-
       {onFocusContent && (
         <button
           type="button"
-          onClick={() => onFocusContent(item.content.content_id)}
+          onClick={event => { stopFocusClick(event); onFocusContent(item.content.content_id) }}
+          onKeyDown={stopFocusKeyDown}
           className={`inline-flex items-center justify-center gap-1 self-center justify-self-start whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] lg:justify-self-end ${focused ? '' : 'opacity-75 hover:opacity-100'}`}
           style={{ color: focused ? 'var(--brand)' : 'var(--text-muted)', background: focused ? 'rgba(251,113,167,0.1)' : 'transparent', border: focused ? '1px solid rgba(251,113,167,0.25)' : '1px solid transparent' }}
           aria-pressed={focused}
@@ -125,6 +125,6 @@ export function RankingRow({
           <Target size={14} /> {focused ? '重点校准中' : '重点校准'}
         </button>
       )}
-    </li>
+    </div>
   )
 }

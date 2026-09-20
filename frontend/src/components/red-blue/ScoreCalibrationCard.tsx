@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, CircleHelp, LoaderCircle } from 'lucide-react'
+import { ArrowDown, ArrowUp, CircleHelp, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 
 import type { RedBlueScoreSuggestion, RedBlueSuggestionAction } from '@/types/red-blue'
@@ -25,7 +25,6 @@ function reasonText(reasonCode: string): string {
 
 export function ScoreCalibrationCard({ suggestion, disabled, onAction }: ScoreCalibrationCardProps) {
   const [explanationOpen, setExplanationOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const DirectionIcon = suggestion.direction === 'UP' ? ArrowUp : ArrowDown
 
   return (
@@ -65,49 +64,35 @@ export function ScoreCalibrationCard({ suggestion, disabled, onAction }: ScoreCa
       {explanationOpen && (
         <p className="mt-2 text-xs leading-5" style={{ color: 'var(--text-muted)' }}>{reasonText(suggestion.reason_code)}</p>
       )}
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <button
           type="button"
           disabled={disabled}
           onClick={() => onAction('ACCEPTED')}
-          className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold transition-opacity hover:opacity-85 disabled:opacity-50"
+          className="inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold transition-opacity hover:opacity-85 disabled:opacity-50"
           style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
         >
           {disabled && <LoaderCircle size={13} className="animate-spin" />}
-          调整为 {formatScore(suggestion.recommended_score)}
+          确定
         </button>
-        <div className="relative">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setMenuOpen(value => !value)}
-            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium transition-colors hover:bg-[rgba(251,113,167,0.08)] disabled:opacity-50"
-            style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-line)' }}
-            aria-expanded={menuOpen}
-          >
-            保持当前评分 <ChevronDown size={13} />
-          </button>
-          {menuOpen && !disabled && (
-            <div className="absolute right-0 bottom-full z-10 mb-2 w-36 overflow-hidden rounded-lg p-1" data-red-blue-shortcut-block="true" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-line)', boxShadow: 'var(--shadow-popup)' }}>
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); onAction('DISMISSED') }}
-                className="block w-full rounded-md px-2 py-2 text-left text-xs hover:bg-[rgba(251,113,167,0.08)]"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                暂时忽略
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); onAction('REJECTED') }}
-                className="block w-full rounded-md px-2 py-2 text-left text-xs hover:bg-[rgba(251,113,167,0.08)]"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                保持当前评分
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAction('REJECTED')}
+          className="inline-flex min-h-9 w-full items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors hover:bg-[rgba(251,113,167,0.08)] disabled:opacity-50"
+          style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-line)' }}
+        >
+          保持
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onAction('DISMISSED')}
+          className="inline-flex min-h-9 w-full items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors hover:bg-[rgba(251,113,167,0.08)] disabled:opacity-50"
+          style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-line)' }}
+        >
+          暂时忽略
+        </button>
       </div>
     </aside>
   )

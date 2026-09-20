@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 
 import { RankingRow } from '@/components/red-blue/RankingRow'
 import { RedBluePagination } from '@/components/red-blue/RedBluePagination'
+import { ScoreCalibrationCard } from '@/components/red-blue/ScoreCalibrationCard'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueSuggestionAction } from '@/types/red-blue'
@@ -108,19 +109,31 @@ export function RankingList({
             {total === 0 ? '还没有可展示的排名。' : ranking.length === 0 ? '当前页暂无作品，请切换页码。' : '没有符合当前搜索或筛选条件的作品。'}
           </div>
         ) : (
-          <ol>{visibleRanking.map(item => (
-            <RankingRow
-              key={item.content.content_id}
-              item={item}
-              rankChange={rankChanges[item.content.content_id]}
-              actionPending={actionPendingId === item.score_suggestion?.id}
-              onOpenContent={onOpenContent}
-              onSuggestionAction={onSuggestionAction}
-              candidateCount={candidateCount}
-              focused={focusedContentId === item.content.content_id}
-              onFocusContent={onFocusContent}
-            />
-          ))}</ol>
+          <ol>
+            {visibleRanking.map(item => (
+              <li
+                key={item.content.content_id}
+                className={`grid gap-2 border-t px-3 py-2 first:border-t-0 sm:px-4 ${item.score_suggestion != null ? 'lg:grid-cols-[minmax(0,1fr)_minmax(14rem,17rem)]' : ''}`}
+                style={{ borderColor: 'var(--border-line)' }}
+              >
+                <RankingRow
+                  item={item}
+                  rankChange={rankChanges[item.content.content_id]}
+                  onOpenContent={onOpenContent}
+                  candidateCount={candidateCount}
+                  focused={focusedContentId === item.content.content_id}
+                  onFocusContent={onFocusContent}
+                />
+                {item.score_suggestion != null && (
+                  <ScoreCalibrationCard
+                    suggestion={item.score_suggestion}
+                    disabled={actionPendingId === item.score_suggestion.id}
+                    onAction={action => onSuggestionAction(item.score_suggestion!, action)}
+                  />
+                )}
+              </li>
+            ))}
+          </ol>
         )}
       </div>
       {onPageChange && (

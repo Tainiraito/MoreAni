@@ -122,4 +122,33 @@ describe('RankingList filters and intervals', () => {
     expect(view.queryByText('#1.5')).not.toBeInTheDocument()
     expect(view.getByText('#—')).toBeInTheDocument()
   })
+
+  it('keeps the calibration card beside the clickable row and exposes three direct actions', () => {
+    const opened: number[] = []
+    const actions: string[] = []
+    const row = { ...item(1, '可点击作品', 'STABLE'), score_suggestion: suggestion(1) }
+    const view = render(
+      <RankingList
+        ranking={[row]}
+        rankChanges={{}}
+        actionPendingId={null}
+        onOpenContent={contentId => opened.push(contentId)}
+        onSuggestionAction={(_, action) => actions.push(action)}
+      />,
+    )
+
+    const rankingRow = view.getByTestId('ranking-row-1')
+    const calibrationCard = view.getByTestId('score-suggestion-1001')
+    expect(rankingRow).not.toContainElement(calibrationCard)
+    expect(rankingRow.parentElement).toContainElement(calibrationCard)
+    expect(rankingRow).toHaveAttribute('role', 'button')
+    expect(rankingRow.querySelector('[aria-hidden="true"]')).not.toHaveClass('rounded-lg')
+
+    fireEvent.click(rankingRow)
+    expect(opened).toEqual([1])
+    fireEvent.click(view.getByRole('button', { name: '确定' }))
+    fireEvent.click(view.getByRole('button', { name: '保持' }))
+    fireEvent.click(view.getByRole('button', { name: '暂时忽略' }))
+    expect(actions).toEqual(['ACCEPTED', 'REJECTED', 'DISMISSED'])
+  })
 })

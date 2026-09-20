@@ -445,7 +445,7 @@ describe('RedBlueBattlePage', () => {
     vi.mocked(api.handleRedBlueSuggestionAction).mockResolvedValue(actionResponse)
     const view = renderPage()
     await waitFor(() => expect(view.getByTestId('score-suggestion-20')).toBeInTheDocument())
-    fireEvent.click(view.getByRole('button', { name: '调整为 9.0' }))
+    fireEvent.click(view.getByRole('button', { name: '确定' }))
     await waitFor(() => expect(api.handleRedBlueSuggestionAction).toHaveBeenCalledWith(20, expect.objectContaining({ action: 'ACCEPTED', suggestion_key: '2:85:90:UP' }), { page: 1, size: 100 }))
     await waitFor(() => expect(view.queryByTestId('score-suggestion-20')).not.toBeInTheDocument())
     const filters = within(view.getByRole('group', { name: '排名筛选' }))

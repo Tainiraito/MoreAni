@@ -213,7 +213,7 @@ test.describe('红蓝合战页面', () => {
     await page.screenshot({ path: `/tmp/moreani-red-blue-${testInfo.project.name}-dark-top.png`, fullPage: false })
     await page.getByTestId('red-blue-ranking').scrollIntoViewIfNeeded()
     await page.screenshot({ path: `/tmp/moreani-red-blue-${testInfo.project.name}-dark-suggestion.png`, fullPage: false })
-    await page.getByRole('button', { name: '调整为 9.0' }).click()
+    await page.getByRole('button', { name: '确定' }).click()
     await expect(page.getByTestId('score-suggestion-22')).toHaveCount(0)
     await expect(page.getByTestId('ranking-row-2')).toContainText('9.0')
 
