@@ -67,6 +67,7 @@ class SelectorCandidate:
     rank_high: int | None = None
     comparison_count: int = 0
     stability: str | None = None
+    order_uncertain: bool = False
     # 仅作为没有完整 Ranker 结果时的粗粒度 fallback，不是 Rating.score。
     score_anchor: float | None = None
 
@@ -82,6 +83,8 @@ class SelectorComparison:
     revoked: bool = False
     revoked_at: datetime | None = None
     id: int = 0
+    # 可由上游提供的全历史有效比较次数；缺失时由当前输入窗口回退计算。
+    pair_comparison_count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +142,15 @@ class SelectorConfig:
     skip_pair_penalty: float = 1.40
     content_recency_penalty: float = 0.65
     excessive_repeat_penalty: float = 1.00
+    # 覆盖目标随候选规模增长，避免 100 部作品仍依赖固定硬编码次数。
+    coverage_target_min_comparisons: int = 4
+    coverage_target_max_comparisons: int = 8
+    coverage_target_log2_offset: float = 0.0
+    coverage_floor_weight: float = 4.0
+    # 同一无序 Pair 的正常上限；重点校准允许有限放宽，最终无替代时才回退。
+    max_pair_comparisons: int = 5
+    focus_max_pair_comparisons: int = 8
+    repeat_pair_pressure_weight: float = 1.5
     pair_cooldown_count: int = 2
     pair_cooldown_seconds: float | None = None
     skip_cooldown_count: int = 5
@@ -187,6 +199,8 @@ class SelectorConfig:
             'skip_pair_penalty',
             'content_recency_penalty',
             'excessive_repeat_penalty',
+            'coverage_floor_weight',
+            'repeat_pair_pressure_weight',
             'exploration_graph_weight',
             'exploration_underexplored_weight',
             'exploration_distance_weight',
@@ -220,11 +234,23 @@ class SelectorConfig:
             'exploration_seed_count',
             'exploration_pair_count',
             'boundary_neighbor_window',
+            'coverage_target_min_comparisons',
+            'coverage_target_max_comparisons',
+            'max_pair_comparisons',
+            'focus_max_pair_comparisons',
         ):
             if getattr(self, field_name) < 0:
                 raise ValueError(f'{field_name} 不能为负数')
         if self.max_pair_evaluations < 1:
             raise ValueError('max_pair_evaluations 必须至少为 1')
+        if self.coverage_target_min_comparisons < 0:
+            raise ValueError('coverage_target_min_comparisons 不能为负数')
+        if self.coverage_target_max_comparisons < self.coverage_target_min_comparisons:
+            raise ValueError('coverage_target_max_comparisons 不能小于最小值')
+        if self.coverage_target_log2_offset < 0:
+            raise ValueError('coverage_target_log2_offset 不能为负数')
+        if self.max_pair_comparisons < 1 or self.focus_max_pair_comparisons < self.max_pair_comparisons:
+            raise ValueError('Pair 比较上限无效')
         for field_name in ('pair_cooldown_seconds', 'skip_cooldown_seconds'):
             value = getattr(self, field_name)
             if value is not None and value < 0:
@@ -302,6 +328,7 @@ class _Interaction:
     outcome: SelectorOutcome
     created_at: datetime | None
     id: int
+    pair_comparison_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,6 +344,7 @@ class _CandidateFeatures:
     graph_degree: int
     graph_component: int
     stability: str | None
+    order_uncertain: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +357,7 @@ class _PairScore:
     pair_cooldown_blocked: bool
     skip_cooldown_blocked: bool
     excessive_exposure: bool
+    repeat_ceiling_blocked: bool
     primary_reason: SelectionReason
 
 
@@ -350,6 +379,15 @@ def _finite(value: float, fallback: float = 0.0) -> float:
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     """将归一化 component 限制在闭区间。"""
     return max(lower, min(upper, _finite(value, lower)))
+
+
+def _coverage_target(candidate_count: int, config: SelectorConfig) -> int:
+    """返回随候选规模增长的每部作品比较覆盖目标。"""
+    scale_target = math.ceil(math.log2(max(candidate_count, 2)) + config.coverage_target_log2_offset)
+    return max(
+        config.coverage_target_min_comparisons,
+        min(config.coverage_target_max_comparisons, scale_target),
+    )
 
 
 def _pair_key(first_content_id: int, second_content_id: int) -> tuple[int, int]:
@@ -380,10 +418,12 @@ def _prepare_history(
     """过滤历史并按最近优先排序；SKIP 保留为 interaction。"""
     interactions: list[_Interaction] = []
     ignored: dict[str, int] = {}
+    pair_counts: dict[tuple[int, int], int] = {}
 
     def ignore(reason: str) -> None:
         ignored[reason] = ignored.get(reason, 0) + 1
 
+    parsed_comparisons: list[tuple[SelectorComparison, tuple[int, int], SelectorOutcome]] = []
     for comparison in comparisons:
         if comparison.revoked or comparison.revoked_at is not None:
             ignore('revoked')
@@ -398,12 +438,23 @@ def _prepare_history(
         if parsed_outcome is None:
             ignore('invalid_outcome')
             continue
+        pair = _pair_key(comparison.left_content_id, comparison.right_content_id)
+        if parsed_outcome is not SelectorOutcome.SKIP:
+            pair_counts[pair] = pair_counts.get(pair, 0) + 1
+        parsed_comparisons.append((comparison, pair, parsed_outcome))
+
+    for comparison, pair, parsed_outcome in parsed_comparisons:
+        annotated_count = comparison.pair_comparison_count
         interactions.append(
             _Interaction(
-                pair=_pair_key(comparison.left_content_id, comparison.right_content_id),
+                pair=pair,
                 outcome=parsed_outcome,
                 created_at=comparison.created_at,
                 id=comparison.id,
+                pair_comparison_count=max(
+                    0,
+                    int(annotated_count) if annotated_count is not None else pair_counts.get(pair, 0),
+                ),
             ),
         )
 
@@ -524,6 +575,7 @@ def _candidate_features(
             graph_degree=degree.get(candidate.content_id, 0),
             graph_component=components.get(candidate.content_id, candidate.content_id),
             stability=candidate.stability,
+            order_uncertain=candidate.order_uncertain,
         )
     return features
 
@@ -565,6 +617,7 @@ def _primary_reason(components: Mapping[str, float]) -> SelectionReason:
         ('uncertainty_score', SelectionReason.UNCERTAIN_PAIR, 4),
         ('rank_interval_overlap', SelectionReason.UNCERTAIN_PAIR, 3),
         ('rank_boundary', SelectionReason.RANK_BOUNDARY, 2),
+        ('coverage_floor', SelectionReason.UNDEREXPLORED, 2),
         ('underexplored', SelectionReason.UNDEREXPLORED, 1),
         ('anchor_changed', SelectionReason.UNDEREXPLORED, 0),
     )
@@ -722,6 +775,27 @@ def _underexplored_seed_ids(
     return tuple(feature.content_id for feature in ordered[:count])
 
 
+def _coverage_floor_seed_ids(
+    features: Mapping[int, _CandidateFeatures],
+    candidate_count: int,
+    config: SelectorConfig,
+    count: int,
+) -> tuple[int, ...]:
+    """优先把低于动态覆盖目标的作品送入 shortlist。"""
+    target = _coverage_target(candidate_count, config)
+    ordered = sorted(
+        features.values(),
+        key=lambda feature: (
+            feature.comparison_count >= target,
+            feature.comparison_count,
+            feature.graph_degree,
+            feature.expected_rank,
+            feature.content_id,
+        ),
+    )
+    return tuple(feature.content_id for feature in ordered[:count])
+
+
 def _add_boundary_pairs(
     pair_sources: dict[tuple[int, int], set[str]],
     features: Mapping[int, _CandidateFeatures],
@@ -749,6 +823,7 @@ def _preliminary_pair_score(
     context: SelectorContext,
     config: SelectorConfig,
     tie_strength: float,
+    candidate_count: int | None = None,
 ) -> float:
     """Shortlist 截断时使用的轻量上界近似，不替代完整 acquisition score。"""
     probability = pairwise_probability(first.preference_mean, second.preference_mean, tie_strength)
@@ -762,6 +837,8 @@ def _preliminary_pair_score(
     )
     minimum_comparisons = min(first.comparison_count, second.comparison_count)
     underexplored = _clamp(1.0 / (1.0 + minimum_comparisons / config.underexplored_scale))
+    coverage_target = _coverage_target(candidate_count or max(first.comparison_count, second.comparison_count, 2), config)
+    coverage_floor = _clamp((coverage_target - minimum_comparisons) / max(coverage_target, 1))
     new_content = float(minimum_comparisons == 0)
     graph = 1.0 if first.graph_component != second.graph_component else _clamp(
         1.0 - min(first.graph_degree, second.graph_degree) / max(first.graph_degree, second.graph_degree, 1),
@@ -780,6 +857,7 @@ def _preliminary_pair_score(
         + config.rank_overlap_weight * overlap
         + config.rank_proximity_weight * proximity
         + config.underexplored_weight * underexplored
+        + config.coverage_floor_weight * coverage_floor
         + config.new_content_weight * new_content
         + config.graph_connectivity_weight * graph
         + config.rank_boundary_weight * boundary
@@ -826,6 +904,19 @@ def _build_pair_shortlist(
         seed_ids,
         config.underexplored_opponent_count,
         'underexplored',
+    )
+    coverage_seed_ids = _coverage_floor_seed_ids(
+        features,
+        len(candidate_ids),
+        config,
+        config.underexplored_content_count,
+    )
+    _add_seed_opponents(
+        pair_sources,
+        features,
+        coverage_seed_ids,
+        config.underexplored_opponent_count,
+        'coverage_floor',
     )
     _add_seed_opponents(
         pair_sources,
@@ -908,7 +999,7 @@ def _build_pair_shortlist(
     def priority(pair: tuple[int, int]) -> float:
         first = features[pair[0]]
         second = features[pair[1]]
-        return _preliminary_pair_score(first, second, context, config, tie_strength)
+        return _preliminary_pair_score(first, second, context, config, tie_strength, len(candidate_ids))
 
     ordered_pairs = sorted(
         pair_sources,
@@ -1024,6 +1115,8 @@ def _score_pair(
     rank_proximity = _clamp(math.exp(-rank_distance / config.rank_proximity_scale))
     minimum_comparisons = min(first.comparison_count, second.comparison_count)
     underexplored = _clamp(1.0 / (1.0 + minimum_comparisons / config.underexplored_scale))
+    coverage_target = _coverage_target(component_count, config)
+    coverage_floor = _clamp((coverage_target - minimum_comparisons) / max(coverage_target, 1))
     new_content = 1.0 if minimum_comparisons == 0 else 0.0
 
     maximum_degree = max(first.graph_degree, second.graph_degree, 1)
@@ -1063,6 +1156,23 @@ def _score_pair(
         context,
         skip_only=True,
     )
+    effective_pair_count = max(
+        sum(
+            interactions[position].outcome is not SelectorOutcome.SKIP
+            for position in positions
+        ),
+        max(
+            (interactions[position].pair_comparison_count for position in positions),
+            default=0,
+        ),
+    )
+    pair_limit = (
+        config.focus_max_pair_comparisons
+        if context.focus_content_id in pair
+        else config.max_pair_comparisons
+    )
+    repeat_ceiling_blocked = effective_pair_count >= pair_limit
+    repeat_pressure = _clamp(effective_pair_count / max(pair_limit, 1))
     pair_window = max(config.max_recent_exposure, config.pair_cooldown_count, 1)
     repeat_recency = _clamp(sum(position < pair_window for position in positions) / pair_window)
     skip_recency = _clamp(
@@ -1096,6 +1206,7 @@ def _score_pair(
         'rank_interval_overlap': rank_interval_overlap,
         'rank_proximity': rank_proximity,
         'underexplored': underexplored,
+        'coverage_floor': coverage_floor,
         'new_content': new_content,
         'graph_connectivity': graph_connectivity,
         'rank_boundary': rank_boundary,
@@ -1107,6 +1218,7 @@ def _score_pair(
         + config.rank_overlap_weight * rank_interval_overlap
         + config.rank_proximity_weight * rank_proximity
         + config.underexplored_weight * underexplored
+        + config.coverage_floor_weight * coverage_floor
         + config.new_content_weight * new_content
         + config.graph_connectivity_weight * graph_connectivity
         + config.rank_boundary_weight * rank_boundary
@@ -1116,6 +1228,7 @@ def _score_pair(
         - config.skip_pair_penalty * skip_recency
         - config.content_recency_penalty * content_recency
         - config.excessive_repeat_penalty * excessive_repeat
+        - config.repeat_pair_pressure_weight * repeat_pressure
     )
     total_score = _finite(total_score, -1e9)
     exploration_denominator = (
@@ -1145,6 +1258,8 @@ def _score_pair(
                 'skip_recency_penalty': skip_recency,
                 'content_recency_penalty': content_recency,
                 'excessive_repeat_penalty': excessive_repeat,
+                'repeat_pressure': repeat_pressure,
+                'repeat_ceiling_blocked': float(repeat_ceiling_blocked),
                 'pair_cooldown_blocked': float(pair_cooldown_blocked),
                 'skip_cooldown_blocked': float(skip_cooldown_blocked),
                 'exploration_score': exploration_score,
@@ -1161,6 +1276,7 @@ def _score_pair(
         pair_cooldown_blocked=pair_cooldown_blocked,
         skip_cooldown_blocked=skip_cooldown_blocked,
         excessive_exposure=excessive_exposure,
+        repeat_ceiling_blocked=repeat_ceiling_blocked,
         primary_reason=_primary_reason(dict(components)),
     )
 
@@ -1179,6 +1295,24 @@ def _pair_hard_blocked(
     if _cooldown_blocked(pair, positions_by_pair.get(pair, ()), interactions, config, context, skip_only=False):
         return True
     if _cooldown_blocked(pair, positions_by_pair.get(pair, ()), interactions, config, context, skip_only=True):
+        return True
+    pair_positions = positions_by_pair.get(pair, ())
+    effective_pair_count = max(
+        sum(
+            interactions[position].outcome is not SelectorOutcome.SKIP
+            for position in pair_positions
+        ),
+        max(
+            (interactions[position].pair_comparison_count for position in pair_positions),
+            default=0,
+        ),
+    )
+    pair_limit = (
+        config.focus_max_pair_comparisons
+        if context.focus_content_id in pair
+        else config.max_pair_comparisons
+    )
+    if effective_pair_count >= pair_limit:
         return True
     _, first_consecutive = exposure_by_content.get(first.content_id, (0, 0))
     _, second_consecutive = exposure_by_content.get(second.content_id, (0, 0))
@@ -1224,6 +1358,7 @@ def _fallback_pair_keys(
                     context,
                     config,
                     tie_strength,
+                    len(candidate_ids),
                 ),
                 pair,
             ),
@@ -1368,6 +1503,7 @@ def select_pair(
         if not pair.pair_cooldown_blocked
         and not pair.skip_cooldown_blocked
         and not pair.excessive_exposure
+        and not pair.repeat_ceiling_blocked
     )
     full_acquisition_scoring_seconds = time.perf_counter() - score_started_at
 
@@ -1410,6 +1546,7 @@ def select_pair(
                 if not pair.pair_cooldown_blocked
                 and not pair.skip_cooldown_blocked
                 and not pair.excessive_exposure
+                and not pair.repeat_ceiling_blocked
             )
             fallback_used = bool(eligible_pairs)
             fallback_reason = SelectionReason.COOLDOWN_FALLBACK

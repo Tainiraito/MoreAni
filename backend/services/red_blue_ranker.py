@@ -14,7 +14,7 @@ import json
 import math
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from statistics import NormalDist
@@ -213,6 +213,8 @@ class PreferenceResult:
     rank_high: int
     stability: RankerStability
     comparison_count: int
+    # 与基础稳定度分离：STABLE 仍可能因为邻近作品无法可靠分先后而为 True。
+    order_uncertain: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -697,24 +699,69 @@ def _stability_for(
     ambiguous_ids: set[int],
     config: RankerConfig,
 ) -> RankerStability:
-    """按明确优先级输出稳定性。"""
-    if comparison_count <= config.uncalibrated_max_comparisons:
+    """返回基础稳定度；邻近顺序不确定不再覆盖基础稳定度。"""
+    del content_id, ambiguous_ids
+    return base_stability_for(comparison_count, interval_width, config)
+
+
+def base_stability_for(
+    comparison_count: int,
+    interval_width: int,
+    config: RankerConfig | None = None,
+) -> RankerStability:
+    """按比较次数和 rank interval 计算不含顺序标记的基础稳定度。"""
+    active_config = config or RankerConfig()
+    if comparison_count <= active_config.uncalibrated_max_comparisons:
         return RankerStability.UNCALIBRATED
-    # ORDER_UNCERTAIN 优先于 STABLE，避免“数据很多但附近仍无法分先后”
-    # 被狭窄的整体 rank interval 覆盖。
-    if content_id in ambiguous_ids:
-        return RankerStability.ORDER_UNCERTAIN
     if (
-        comparison_count >= config.stable_min_comparisons
-        and interval_width <= config.stable_max_interval_width
+        comparison_count >= active_config.stable_min_comparisons
+        and interval_width <= active_config.stable_max_interval_width
     ):
         return RankerStability.STABLE
     if (
-        comparison_count >= config.relatively_stable_min_comparisons
-        and interval_width <= config.relatively_stable_max_interval_width
+        comparison_count >= active_config.relatively_stable_min_comparisons
+        and interval_width <= active_config.relatively_stable_max_interval_width
     ):
         return RankerStability.RELATIVELY_STABLE
     return RankerStability.CALIBRATING
+
+
+def normalize_preference_results(
+    results: Sequence[PreferenceResult],
+    config: RankerConfig | None = None,
+) -> tuple[PreferenceResult, ...]:
+    """兼容旧快照并补齐基础稳定度/顺序不确定语义。"""
+    active_config = config or RankerConfig()
+    if not results:
+        return ()
+    ordered = tuple(sorted(results, key=lambda result: result.content_id))
+    candidate_ids = tuple(result.content_id for result in ordered)
+    ambiguous_ids = _ambiguous_candidates(
+        np.asarray([result.preference_mean for result in ordered], dtype=float),
+        np.asarray([result.expected_rank for result in ordered], dtype=float),
+        np.asarray([result.rank_low for result in ordered], dtype=int),
+        np.asarray([result.rank_high for result in ordered], dtype=int),
+        {result.content_id: result.comparison_count for result in ordered},
+        candidate_ids,
+        active_config,
+    )
+    return tuple(
+        replace(
+            result,
+            stability=base_stability_for(
+                result.comparison_count,
+                result.rank_high - result.rank_low,
+                active_config,
+            ),
+            order_uncertain=(
+                result.order_uncertain
+                or str(getattr(result.stability, 'value', result.stability))
+                == RankerStability.ORDER_UNCERTAIN.value
+                or result.content_id in ambiguous_ids
+            ),
+        )
+        for result in ordered
+    )
 
 
 def rank_preferences(
@@ -816,6 +863,7 @@ def rank_preferences(
                 active_config,
             ),
             comparison_count=comparison_counts_by_id[content_id],
+            order_uncertain=content_id in ambiguous_ids,
         )
 
     # expected_rank 相同时只用 content_id 作技术层确定性 tie-breaker，
@@ -862,7 +910,9 @@ __all__ = [
     'RankerStability',
     'ScoreAnchor',
     'ScorePrior',
+    'base_stability_for',
     'build_score_priors',
+    'normalize_preference_results',
     'pairwise_probability',
     'rank_preferences',
 ]

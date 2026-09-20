@@ -120,6 +120,27 @@ def test_low_coverage_content_receives_underexplored_bonus():
     assert 3 in _pair_key(result.selected_pair)
 
 
+def test_normal_pair_lifetime_ceiling_skips_repeated_pair_when_alternatives_exist():
+    candidates = [_candidate(1, count=8), _candidate(2, count=8), _candidate(3, count=8)]
+    history = [
+        _comparison(index, 1, 2)
+        for index in range(1, 6)
+    ]
+    result = select_pair(
+        candidates,
+        history,
+        config=SelectorConfig(
+            exploration_rate=0,
+            pair_cooldown_count=0,
+            skip_cooldown_count=0,
+            max_consecutive_content_exposure=0,
+            random_seed=0,
+        ),
+    )
+
+    assert _pair_key(result.selected_pair) != (1, 2)
+
+
 def test_recent_pair_is_cooled_down():
     candidates = [_candidate(1), _candidate(2), _candidate(3)]
     history = [_comparison(1, 1, 2)]

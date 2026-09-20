@@ -33,7 +33,7 @@ const FILTERS: Array<{ key: RankingFilter; label: string }> = [
 ]
 
 function matchesFilter(item: RedBlueRankingItem, filter: RankingFilter): boolean {
-  if (filter === 'uncertain') return ['UNCALIBRATED', 'CALIBRATING', 'ORDER_UNCERTAIN'].includes(item.stability)
+  if (filter === 'uncertain') return item.order_uncertain === true || ['UNCALIBRATED', 'CALIBRATING', 'ORDER_UNCERTAIN'].includes(item.stability)
   if (filter === 'suggestion') return item.score_suggestion != null
   if (filter === 'stable') return item.stability === 'STABLE' || item.stability === 'RELATIVELY_STABLE'
   return true

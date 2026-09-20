@@ -328,6 +328,7 @@ def to_selector_candidates(state: FastPreferenceState) -> tuple[SelectorCandidat
             rank_high=authoritative_by_id[result.content_id].rank_high,
             comparison_count=result.comparison_count,
             stability=authoritative_by_id[result.content_id].stability,
+            order_uncertain=authoritative_by_id[result.content_id].order_uncertain,
             score_anchor=anchors_by_id.get(result.content_id),
         )
         for result in sorted(state.fast_results, key=lambda item: item.content_id)

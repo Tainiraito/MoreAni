@@ -143,6 +143,7 @@ def _state_response(
                 preference_mean=item.preference_mean,
                 comparison_count=item.comparison_count,
                 stability=item.authoritative_stability,
+                order_uncertain=item.authoritative_order_uncertain,
                 rank_low=item.authoritative_rank_low,
                 rank_high=item.authoritative_rank_high,
                 score_suggestion=suggestions_by_content.get(item.content_id),
@@ -289,6 +290,7 @@ def create_comparison(
                 preference_mean=item.preference_mean,
                 comparison_count=item.comparison_count,
                 stability=item.stability,
+                order_uncertain=item.order_uncertain,
                 rank_low=item.rank_low,
                 rank_high=item.rank_high,
             )

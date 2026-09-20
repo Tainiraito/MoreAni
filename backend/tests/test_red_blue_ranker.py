@@ -10,8 +10,11 @@ from services.red_blue_ranker import (
     ComparisonOutcome,
     RankerConfig,
     RankerStability,
+    PreferenceResult,
     ScoreAnchor,
+    base_stability_for,
     build_score_priors,
+    normalize_preference_results,
     pairwise_probability,
     rank_preferences,
 )
@@ -318,6 +321,26 @@ def test_seed_makes_map_interval_and_stability_reproducible():
 
     assert first.results == second.results
     assert first.diagnostics.converged == second.diagnostics.converged
+
+
+def test_stable_base_state_can_keep_order_uncertain_flag():
+    assert base_stability_for(84, 1) is RankerStability.STABLE
+    normalized = normalize_preference_results(
+        [
+            PreferenceResult(
+                content_id=1,
+                preference_mean=0.0,
+                preference_std=0.4,
+                expected_rank=1.0,
+                rank_low=1,
+                rank_high=2,
+                stability=RankerStability.ORDER_UNCERTAIN,
+                comparison_count=84,
+            ),
+        ],
+    )
+    assert normalized[0].stability is RankerStability.STABLE
+    assert normalized[0].order_uncertain is True
 
 
 def test_extreme_inputs_do_not_return_nan_or_infinity():

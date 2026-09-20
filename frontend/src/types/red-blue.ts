@@ -49,6 +49,8 @@ export interface RedBlueRankingItem {
   preference_mean: number
   comparison_count: number
   stability: RedBlueStability | string
+  /** 顺序不确定是稳定度之外的附加标记。旧服务缺失时按 false 兼容。 */
+  order_uncertain?: boolean
   rank_low: number | null
   rank_high: number | null
   score_suggestion: RedBlueScoreSuggestion | null
@@ -75,6 +77,7 @@ export interface RedBlueRankingDelta {
   preference_mean: number
   comparison_count: number
   stability?: RedBlueStability | string
+  order_uncertain?: boolean
   rank_low?: number | null
   rank_high?: number | null
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -241,7 +242,7 @@ def test_prediction_interval_containing_current_score_suppresses_suggestion():
 
 @pytest.mark.parametrize(
     'stability',
-    [RankerStability.UNCALIBRATED, RankerStability.CALIBRATING, RankerStability.ORDER_UNCERTAIN],
+    [RankerStability.UNCALIBRATED, RankerStability.CALIBRATING],
 )
 def test_unstable_rank_results_do_not_create_suggestions(stability):
     result = _generate(
@@ -260,6 +261,19 @@ def test_unstable_rank_results_do_not_create_suggestions(stability):
     assert unstable.suggestions == ()
     assert all(item.exclusion_reason == 'STABILITY_INSUFFICIENT' for item in unstable.evaluations)
     assert result.diagnostics.candidate_count == 6
+
+
+def test_order_uncertain_is_additional_flag_and_does_not_block_calibration():
+    candidates, preferences, ratings = _inputs(
+        current_scores=[70, 80, 85, 90, 95, 95],
+        anchors=[80, 80, 85, 90, 95, 95],
+        preferences=[0, 0.5, 1, 1.5, 2, 2.5],
+        stability=RankerStability.RELATIVELY_STABLE,
+    )
+    preferences = tuple(replace(item, order_uncertain=True) for item in preferences)
+    result = generate_score_calibrations(candidates, preferences, ratings, config=_config())
+    target = next(item for item in result.evaluations if item.content_id == 1)
+    assert target.eligible is True
 
 
 def test_high_evidence_extreme_order_uncertain_outlier_can_create_suggestion():

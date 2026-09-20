@@ -102,7 +102,7 @@ export function RankingRow({
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span className="font-semibold" style={{ color: 'var(--brand)' }}>{formatScore(item.current_score)}<span className="ml-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>/10</span></span>
-            <StabilityBadge stability={item.stability} />
+            <StabilityBadge stability={item.stability} orderUncertain={item.order_uncertain} />
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>PK {item.comparison_count} 次</span>
           </div>
           {rankIntervalText && (

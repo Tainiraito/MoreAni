@@ -86,6 +86,7 @@ class CalibrationPreferenceResult:
     rank_high: int
     stability: RankerStability | str
     comparison_count: int
+    order_uncertain: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,7 +357,9 @@ def _stability_meets_threshold(value: RankerStability | str, minimum: str) -> bo
         RankerStability.CALIBRATING.value: 1,
         RankerStability.RELATIVELY_STABLE.value: 2,
         RankerStability.STABLE.value: 3,
-        RankerStability.ORDER_UNCERTAIN.value: -1,
+        # 旧快照可能仍只保存 ORDER_UNCERTAIN；它现在是附加布尔语义，
+        # 兼容读取时按其基础稳定度门槛继续判断。
+        RankerStability.ORDER_UNCERTAIN.value: 2,
     }
     return order.get(_normalize_stability(value), -1) >= order[minimum]
 
@@ -591,11 +594,7 @@ def _evaluate_target(
     if preference.comparison_count < config.min_comparisons_for_suggestion:
         base['exclusion_reason'] = CalibrationExclusionReason.COMPARISONS_INSUFFICIENT.value
         return ScoreCalibrationEvaluation(**base)
-    high_evidence_order_uncertain = (
-        preference.stability == RankerStability.ORDER_UNCERTAIN
-        and preference.comparison_count >= config.order_uncertain_min_comparisons
-    )
-    if not _stability_meets_threshold(preference.stability, config.min_stability) and not high_evidence_order_uncertain:
+    if not _stability_meets_threshold(preference.stability, config.min_stability):
         base['exclusion_reason'] = CalibrationExclusionReason.STABILITY_INSUFFICIENT.value
         return ScoreCalibrationEvaluation(**base)
 

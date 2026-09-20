@@ -73,6 +73,7 @@ from services.red_blue_ranker import (
     RankerStability,
     ScoreAnchor,
     build_score_priors,
+    normalize_preference_results,
     rank_preferences,
 )
 from services.red_blue_ranker import (
@@ -180,6 +181,7 @@ class FastStateItem:
     authoritative_rank_low: int | None
     authoritative_rank_high: int | None
     authoritative_stability: str
+    authoritative_order_uncertain: bool
     comparison_count: int
 
 
@@ -264,6 +266,7 @@ class RankingDelta:
     preference_mean: float
     comparison_count: int
     stability: str
+    order_uncertain: bool
     rank_low: int | None
     rank_high: int | None
 
@@ -939,7 +942,16 @@ class RedBlueService:
         run = self._latest_compatible_run(db, user_id, context)
         if run is None:
             return self._build_bootstrap_state(db, user_id, context, candidates, anchors)
-        return self._state_from_completed_run(db, user_id=user_id, run=run, candidates=candidates, anchors=anchors)
+        state = self._state_from_completed_run(
+            db,
+            user_id=user_id,
+            run=run,
+            candidates=candidates,
+            anchors=anchors,
+        )
+        # Full Snapshot 只覆盖它的输入 watermark；服务重启或 cache miss 后，
+        # 必须把之后的 comparison replay 回 Fast State，不能把旧 Full 当作当前状态。
+        return self._replay_new_comparisons_locked(db, state, context)
 
     def _build_bootstrap_state(
         self,
@@ -1028,7 +1040,7 @@ class RedBlueService:
         anchors: Sequence[ScoreAnchor],
     ) -> RuntimeFastState:
         """从 Full Snapshot 和完整 base history 构造纯算法状态。"""
-        results = tuple(
+        raw_results = tuple(
             AlgorithmPreferenceResult(
                 content_id=row.content_id,
                 preference_mean=row.preference_mean,
@@ -1041,6 +1053,11 @@ class RedBlueService:
             )
             for row in sorted(run.results, key=lambda item: item.content_id)
         )
+        try:
+            snapshot_ranker_config = RankerConfig.from_json(run.algorithm_config_json)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            snapshot_ranker_config = self.config.ranker_config
+        results = normalize_preference_results(raw_results, snapshot_ranker_config)
         if {result.content_id for result in results} != {candidate.content_id for candidate in candidates}:
             raise ValueError('Full Snapshot candidates 与当前候选集合不一致')
         base_comparisons = self._read_comparisons(db, user_id, max_id=run.input_comparison_max_id)
@@ -1428,6 +1445,7 @@ class RedBlueService:
                     ),
                     stability=item.authoritative_stability,
                     comparison_count=item.comparison_count,
+                    order_uncertain=item.authoritative_order_uncertain,
                 )
                 for item in items
             )
@@ -1575,7 +1593,7 @@ class RedBlueService:
             raise RedBlueComparisonConflictError('client_event_id 已用于不同 Comparison payload')
 
     def _selector_history(self, db: Session, user_id: int) -> tuple[SelectorComparison, ...]:
-        """只读取 Selector 需要的最近事实窗口，不加载全部历史。"""
+        """读取近期 Selector 历史，并补充全历史 Pair 次数用于硬上限。"""
         rows = (
             db.query(RedBlueComparison)
             .filter(RedBlueComparison.user_id == user_id)
@@ -1583,6 +1601,21 @@ class RedBlueService:
             .limit(self.config.selector_history_window)
             .all()
         )
+        pair_counts: dict[tuple[int, int], int] = {}
+        for left_content_id, right_content_id in (
+            db.query(
+                RedBlueComparison.left_content_id,
+                RedBlueComparison.right_content_id,
+            )
+            .filter(
+                RedBlueComparison.user_id == user_id,
+                RedBlueComparison.outcome != RedBlueOutcome.SKIP,
+                RedBlueComparison.revoked_at.is_(None),
+            )
+            .all()
+        ):
+            pair = tuple(sorted((left_content_id, right_content_id)))
+            pair_counts[pair] = pair_counts.get(pair, 0) + 1
         return tuple(
             SelectorComparison(
                 id=row.id,
@@ -1592,6 +1625,10 @@ class RedBlueService:
                 created_at=_aware_datetime(row.created_at),
                 revoked=row.revoked_at is not None,
                 revoked_at=_aware_datetime(row.revoked_at),
+                pair_comparison_count=pair_counts.get(
+                    tuple(sorted((row.left_content_id, row.right_content_id))),
+                    0,
+                ),
             )
             for row in reversed(rows)
         )
@@ -1661,6 +1698,11 @@ def _state_items(state: RuntimeFastState) -> tuple[FastStateItem, ...]:
                 if result.content_id in authoritative
                 else RankerStability.UNCALIBRATED.value
             ),
+            authoritative_order_uncertain=(
+                authoritative[result.content_id].order_uncertain
+                if result.content_id in authoritative
+                else False
+            ),
             comparison_count=result.comparison_count,
         )
         for result in sorted(state.algorithm_state.fast_results, key=lambda item: item.provisional_rank)
@@ -1713,6 +1755,11 @@ def _ranking_delta(
                     authoritative_results[content_id].stability.value
                     if content_id in authoritative_results
                     else RankerStability.UNCALIBRATED.value
+                ),
+                order_uncertain=(
+                    authoritative_results[content_id].order_uncertain
+                    if content_id in authoritative_results
+                    else False
                 ),
                 rank_low=(
                     authoritative_results[content_id].rank_low

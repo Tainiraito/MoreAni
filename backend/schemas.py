@@ -347,6 +347,7 @@ class RedBlueRankingItemResponse(BaseModel):
     preference_mean: float
     comparison_count: int
     stability: str
+    order_uncertain: bool = False
     rank_low: int | None = None
     rank_high: int | None = None
     score_suggestion: RedBlueScoreSuggestionResponse | None = None
@@ -431,6 +432,7 @@ class RedBlueRankingDeltaResponse(BaseModel):
     preference_mean: float
     comparison_count: int
     stability: str
+    order_uncertain: bool = False
     rank_low: int | None = None
     rank_high: int | None = None
 

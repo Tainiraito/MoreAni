@@ -89,6 +89,7 @@ export function patchRedBlueComparisonState(
         preference_mean: delta.preference_mean,
         comparison_count: delta.comparison_count,
         ...(delta.stability === undefined ? {} : { stability: delta.stability }),
+        ...(delta.order_uncertain === undefined ? {} : { order_uncertain: delta.order_uncertain }),
         ...(delta.rank_low === undefined ? {} : { rank_low: delta.rank_low }),
         ...(delta.rank_high === undefined ? {} : { rank_high: delta.rank_high }),
       }
