@@ -6,13 +6,14 @@ import { RedBluePagination } from '@/components/red-blue/RedBluePagination'
 import { ScoreCalibrationCard } from '@/components/red-blue/ScoreCalibrationCard'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueSuggestionAction } from '@/types/red-blue'
+import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueRecalibrationChange, RedBlueSuggestionAction } from '@/types/red-blue'
 
 type RankingFilter = 'all' | 'uncertain' | 'suggestion' | 'stable'
 
 interface RankingListProps {
   ranking: RedBlueRankingItem[]
   rankChanges: Record<number, RedBlueRankingChange>
+  recalibrationChanges?: Record<number, RedBlueRecalibrationChange>
   actionPendingId: number | null
   onOpenContent: (contentId: number) => void
   onSuggestionAction: (suggestion: NonNullable<RedBlueRankingItem['score_suggestion']>, action: RedBlueSuggestionAction) => void
@@ -42,6 +43,7 @@ function matchesFilter(item: RedBlueRankingItem, filter: RankingFilter): boolean
 export function RankingList({
   ranking,
   rankChanges,
+  recalibrationChanges = {},
   actionPendingId,
   onOpenContent,
   onSuggestionAction,
@@ -118,6 +120,7 @@ export function RankingList({
                 <RankingRow
                   item={item}
                   rankChange={rankChanges[item.content.content_id]}
+                  recalibrationChange={recalibrationChanges[item.content.content_id]}
                   onOpenContent={onOpenContent}
                   candidateCount={candidateCount}
                   focused={focusedContentId === item.content.content_id}

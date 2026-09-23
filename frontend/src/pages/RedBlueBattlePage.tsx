@@ -11,7 +11,7 @@ import { PageMain } from '@/components/layout/PageContainer'
 import { FeaturePageHeader } from '@/components/layout/FeaturePageHeader'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ApiError, api } from '@/lib/api'
-import { buildRedBlueRankingChanges, patchRedBlueComparisonState, patchRedBlueSuggestionAction, RED_BLUE_COMPARISONS_QUERY_KEY, RED_BLUE_STATE_QUERY_KEY } from '@/lib/red-blue'
+import { buildRedBlueRankingChanges, buildRedBlueRecalibrationChanges, patchRedBlueComparisonState, patchRedBlueSuggestionAction, RED_BLUE_COMPARISONS_QUERY_KEY, RED_BLUE_STATE_QUERY_KEY } from '@/lib/red-blue'
 import { useUIStore } from '@/stores/ui-store'
 import { useToastStore } from '@/stores/toast-store'
 import type {
@@ -21,6 +21,7 @@ import type {
   RedBlueOutcome,
   RedBluePair,
   RedBlueRankingChange,
+  RedBlueRecalibrationChange,
   RedBlueScoreSuggestion,
   RedBlueState,
   RedBlueSuggestionAction,
@@ -62,6 +63,22 @@ function pairStatusText(state: RedBlueState): string | null {
     return '至少需要两部已评分番剧才能继续红蓝合战。'
   }
   return null
+}
+
+function isFullRecalibrationPending(state: RedBlueState): boolean {
+  return state.full_recalibration_required
+    || state.full_recalibration_running
+    || state.model_freshness === 'STALE_REQUIRES_FULL'
+}
+
+function isAuthoritativeFullState(state: RedBlueState): boolean {
+  return state.model_freshness === 'FULL'
+    && !state.full_recalibration_required
+    && !state.full_recalibration_running
+}
+
+function isFullRecalibrationCompletion(previous: RedBlueState, next: RedBlueState): boolean {
+  return isFullRecalibrationPending(previous) && isAuthoritativeFullState(next)
 }
 
 const KEYBOARD_OUTCOMES: Record<string, RedBlueOutcome> = {
@@ -129,7 +146,9 @@ export function RedBlueBattlePage() {
   const addToast = useToastStore(state => state.addToast)
   const [selectedOutcome, setSelectedOutcome] = useState<RedBlueOutcome | null>(null)
   const [retryComparison, setRetryComparison] = useState<RetryComparison | null>(null)
-  const [lastRankingDelta, setLastRankingDelta] = useState<Record<number, RedBlueRankingChange>>({})
+  const [lastComparisonRankingDelta, setLastComparisonRankingDelta] = useState<Record<number, RedBlueRankingChange>>({})
+  const [fullRecalibrationDelta, setFullRecalibrationDelta] = useState<Record<number, RedBlueRecalibrationChange>>({})
+  const [fullRecalibrationAdjustedCount, setFullRecalibrationAdjustedCount] = useState<number | null>(null)
   const [actionPendingId, setActionPendingId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking')
   const [rankingPage, setRankingPage] = useState(1)
@@ -139,6 +158,7 @@ export function RedBlueBattlePage() {
   // activePair 是浏览器交互态；后台 Full Ranker 轮询只更新 React Query，不覆盖当前卡片。
   const [activePair, setActivePair] = useState<RedBluePair | null | undefined>(undefined)
   const activePairInitializedRef = useRef(false)
+  const lastObservedStateRef = useRef<{ queryKey: readonly unknown[]; state: RedBlueState } | null>(null)
   const battleSectionRef = useRef<HTMLElement | null>(null)
   const toggleFocus = useCallback((contentId: number) => {
     setFocusContentId(current => current === contentId ? null : contentId)
@@ -181,6 +201,23 @@ export function RedBlueBattlePage() {
     setActivePair(stateQuery.data.current_pair)
   }, [stateQuery.data])
 
+  useEffect(() => {
+    const nextState = stateQuery.data
+    if (nextState === undefined) return
+    const previousState = lastObservedStateRef.current?.queryKey === stateQueryKey
+      ? lastObservedStateRef.current.state
+      : undefined
+    if (previousState !== undefined && isFullRecalibrationCompletion(previousState, nextState)) {
+      const delta = buildRedBlueRecalibrationChanges(previousState.ranking, nextState.ranking)
+      const adjustedCount = Object.keys(delta).length
+      if (adjustedCount > 0) {
+        setFullRecalibrationDelta(delta)
+        setFullRecalibrationAdjustedCount(adjustedCount)
+      }
+    }
+    lastObservedStateRef.current = { queryKey: stateQueryKey, state: nextState }
+  }, [stateQuery.data, stateQueryKey])
+
   const comparisonMutation = useMutation({
     mutationFn: (payload: CreateRedBlueComparisonRequest) => api.createRedBlueComparison(payload),
   })
@@ -207,13 +244,19 @@ export function RedBlueBattlePage() {
     return () => observer.disconnect()
   }, [activePair?.left.content_id, activePair?.right.content_id])
 
+  const clearRecalibrationFeedback = useCallback(() => {
+    setFullRecalibrationDelta({})
+    setFullRecalibrationAdjustedCount(null)
+  }, [])
+
   const reloadState = useCallback(async () => {
+    clearRecalibrationFeedback()
     const refreshedState = await queryClient.fetchQuery({
       queryKey: stateQueryKey,
       queryFn: () => api.getRedBlueState({ page: rankingPage, size: RED_BLUE_PAGE_SIZE }),
     })
     setActivePair(refreshedState.current_pair)
-  }, [queryClient, rankingPage, stateQueryKey])
+  }, [clearRecalibrationFeedback, queryClient, rankingPage, stateQueryKey])
 
   const submitComparison = useCallback((outcome: RedBlueOutcome) => {
     const pair = activePair
@@ -256,7 +299,8 @@ export function RedBlueBattlePage() {
         }
         if (!responseIsStale) setActivePair(response.next_pair)
         if (!responseIsStale && response.comparison.outcome !== 'SKIP') {
-          setLastRankingDelta(buildRedBlueRankingChanges(response.ranking_delta))
+          setLastComparisonRankingDelta(buildRedBlueRankingChanges(response.ranking_delta))
+          clearRecalibrationFeedback()
         }
         setRetryComparison(null)
         setSelectedOutcome(null)
@@ -280,7 +324,7 @@ export function RedBlueBattlePage() {
         }
       },
     })
-  }, [activePair, addToast, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison, stateQueryKey])
+  }, [activePair, addToast, clearRecalibrationFeedback, comparisonMutation, focusContentId, queryClient, reloadState, retryComparison, stateQueryKey])
 
   const handleSuggestionAction = useCallback((suggestion: RedBlueScoreSuggestion, action: RedBlueSuggestionAction) => {
     if (actionPendingId !== null) return
@@ -309,7 +353,8 @@ export function RedBlueBattlePage() {
 
   const revokeComparison = useCallback((item: RedBlueComparisonHistoryItem) => {
     if (revokeMutation.isPending) return
-    setLastRankingDelta({})
+    setLastComparisonRankingDelta({})
+    clearRecalibrationFeedback()
     revokeMutation.mutate(item.id, {
       onSuccess: () => {
         queryClient.setQueryData<RedBlueComparisonHistoryPage>(historyQueryKey, current => current === undefined
@@ -326,7 +371,7 @@ export function RedBlueBattlePage() {
       },
       onError: error => addToast('error', errorMessage(error)),
     })
-  }, [addToast, historyQueryKey, queryClient, reloadState, revokeMutation])
+  }, [addToast, clearRecalibrationFeedback, historyQueryKey, queryClient, reloadState, revokeMutation])
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil((stateQuery.data?.ranking_total ?? stateQuery.data?.candidate_count ?? 0) / RED_BLUE_PAGE_SIZE))
@@ -371,7 +416,10 @@ export function RedBlueBattlePage() {
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>{errorMessage(stateQuery.error)}</p>
           <button
             type="button"
-            onClick={() => void stateQuery.refetch()}
+            onClick={() => {
+              clearRecalibrationFeedback()
+              void stateQuery.refetch()
+            }}
             className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold"
             style={{ background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-text)' }}
           >
@@ -413,6 +461,22 @@ export function RedBlueBattlePage() {
             </p>
           ) : undefined}
         />
+
+        {fullRecalibrationAdjustedCount !== null && (
+          <div
+            className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+            style={{ background: 'rgba(251,113,167,0.08)', border: '1px solid rgba(251,113,167,0.22)', color: 'var(--text-secondary)' }}
+            data-source="FULL_RECALIBRATION"
+            data-testid="red-blue-recalibration-notice"
+            aria-live="polite"
+          >
+            <RefreshCw size={16} style={{ color: 'var(--brand)' }} />
+            <span>
+              排名已重新校准
+              {fullRecalibrationAdjustedCount > 0 && ` · ${fullRecalibrationAdjustedCount} 个位置有所调整`}
+            </span>
+          </div>
+        )}
 
         {focusedContent && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(251,113,167,0.08)', border: '1px solid rgba(251,113,167,0.25)', color: 'var(--text-secondary)' }} data-testid="red-blue-focus-status">
@@ -520,7 +584,8 @@ export function RedBlueBattlePage() {
             {state.candidate_count > 0 && (
               <RankingList
                 ranking={state.ranking}
-                rankChanges={lastRankingDelta}
+                rankChanges={lastComparisonRankingDelta}
+                recalibrationChanges={fullRecalibrationDelta}
                 actionPendingId={actionPendingId}
                 onOpenContent={openDetail}
                 onSuggestionAction={handleSuggestionAction}

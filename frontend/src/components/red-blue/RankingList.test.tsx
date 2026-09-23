@@ -2,7 +2,7 @@ import { fireEvent, render, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { RankingList } from '@/components/red-blue/RankingList'
-import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueScoreSuggestion } from '@/types/red-blue'
+import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueRecalibrationChange, RedBlueScoreSuggestion } from '@/types/red-blue'
 
 function item(contentId: number, title: string, stability: string, orderUncertain = false): RedBlueRankingItem {
   return {
@@ -158,6 +158,25 @@ describe('RankingList filters and intervals', () => {
     expect(view.getByTestId('ranking-change-1')).toHaveAttribute('data-direction', 'UNCHANGED')
     expect(view.getByTestId('ranking-change-2')).toHaveTextContent('1')
     expect(view.getByTestId('ranking-change-2')).toHaveAttribute('data-direction', 'UP')
+  })
+
+  it('shows Full recalibration feedback separately from comparison arrows', () => {
+    const recalibrationChanges: Record<number, RedBlueRecalibrationChange> = {
+      1: { old_rank: 3, new_rank: 1, amount: 2 },
+    }
+    const view = render(
+      <RankingList
+        ranking={[item(1, '完整校准调整', 'STABLE')]}
+        rankChanges={{}}
+        recalibrationChanges={recalibrationChanges}
+        actionPendingId={null}
+        onOpenContent={() => undefined}
+        onSuggestionAction={() => undefined}
+      />,
+    )
+
+    expect(view.getByTestId('ranking-recalibration-1')).toHaveTextContent('校准调整')
+    expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument()
   })
 
   it('keeps the calibration card beside the clickable row and exposes three direct actions', () => {

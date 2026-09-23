@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildRedBlueRankingChanges, normalizeRedBlueState, patchRedBlueComparisonState, patchRedBlueSuggestionAction } from '@/lib/red-blue'
+import { buildRedBlueRankingChanges, buildRedBlueRecalibrationChanges, normalizeRedBlueState, patchRedBlueComparisonState, patchRedBlueSuggestionAction } from '@/lib/red-blue'
 import type {
   CreateRedBlueComparisonResponse,
   RedBlueState,
@@ -102,6 +102,22 @@ describe('red-blue query cache patching', () => {
     expect(changes[1]).toEqual({ old_rank: 10, new_rank: 4, direction: 'UP', amount: 6 })
     expect(changes[2]).toEqual({ old_rank: 4, new_rank: 10, direction: 'DOWN', amount: 6 })
     expect(changes[3]).toEqual({ old_rank: 4, new_rank: 4, direction: 'UNCHANGED', amount: 0 })
+  })
+
+  it('calculates only display-rank drift for a Full recalibration', () => {
+    const current = state()
+    const next = {
+      ...current,
+      ranking: [
+        { ...current.ranking[0], rank: 2 },
+        { ...current.ranking[1], rank: 1 },
+      ],
+    }
+
+    expect(buildRedBlueRecalibrationChanges(current.ranking, next.ranking)).toEqual({
+      1: { old_rank: 1, new_rank: 2, amount: 1 },
+      2: { old_rank: 2, new_rank: 1, amount: 1 },
+    })
   })
 
   it('normalizes any legacy/fractional ranks into mean-ordered display ranks', () => {

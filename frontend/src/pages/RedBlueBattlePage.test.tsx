@@ -206,6 +206,82 @@ describe('RedBlueBattlePage', () => {
     expect(view.queryByText('轮询红方')).not.toBeInTheDocument()
   })
 
+  it('keeps comparison arrows and labels rank drift from Full recalibration separately', async () => {
+    const initial = baseState()
+    const fastRanking = [
+      { ...initial.ranking[0], rank: 2, preference_mean: 0.7, comparison_count: 4 },
+      { ...initial.ranking[1], rank: 1, preference_mean: 1.1, comparison_count: 4 },
+    ]
+    const pendingState = baseState({
+      state_version: 2,
+      model_freshness: 'STALE_REQUIRES_FULL',
+      ranking: fastRanking,
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    })
+    const completedState = baseState({
+      state_version: 2,
+      model_freshness: 'FULL',
+      full_recalibration_required: false,
+      full_recalibration_running: false,
+    })
+    const response = {
+      ...comparisonResponse(),
+      ranking_delta: [
+        { content_id: 1, old_rank: 1, new_rank: 2, preference_mean: 0.7, comparison_count: 4 },
+        { content_id: 2, old_rank: 2, new_rank: 1, preference_mean: 1.1, comparison_count: 4 },
+      ],
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    }
+    vi.mocked(api.getRedBlueState)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(pendingState)
+      .mockResolvedValue(completedState)
+    vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce(response)
+
+    const view = renderPage()
+    await waitFor(() => expect(view.getByTestId('battle-card-red')).toHaveTextContent('左作品'))
+    fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
+
+    await waitFor(() => expect(view.getByTestId('red-blue-recalibration-notice')).toHaveTextContent('2 个位置有所调整'), { timeout: 3000 })
+    expect(view.getByTestId('ranking-change-1')).toHaveTextContent('1')
+    expect(view.getByTestId('ranking-change-2')).toHaveTextContent('1')
+    expect(view.getByTestId('ranking-recalibration-1')).toHaveTextContent('校准调整')
+    expect(view.getByTestId('ranking-recalibration-2')).toHaveTextContent('校准调整')
+  })
+
+  it('silently applies Full recalibration when display ranks do not change', async () => {
+    const pendingState = baseState({
+      state_version: 2,
+      model_freshness: 'STALE_REQUIRES_FULL',
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    })
+    const completedState = baseState({
+      state_version: 2,
+      model_freshness: 'FULL',
+      full_recalibration_required: false,
+      full_recalibration_running: false,
+    })
+    vi.mocked(api.getRedBlueState)
+      .mockResolvedValueOnce(baseState())
+      .mockResolvedValueOnce(pendingState)
+      .mockResolvedValue(completedState)
+    vi.mocked(api.createRedBlueComparison).mockResolvedValueOnce({
+      ...comparisonResponse(),
+      full_recalibration_required: true,
+      full_recalibration_running: true,
+    })
+
+    const view = renderPage()
+    await waitFor(() => expect(view.getByTestId('battle-card-red')).toHaveTextContent('左作品'))
+    fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
+    await waitFor(() => expect(vi.mocked(api.getRedBlueState).mock.calls.length).toBeGreaterThanOrEqual(3), { timeout: 3000 })
+
+    expect(view.queryByTestId('red-blue-recalibration-notice')).not.toBeInTheDocument()
+  })
+
   it('patches a score suggestion from the comparison delta without waiting for refresh', async () => {
     const response = {
       ...comparisonResponse(),

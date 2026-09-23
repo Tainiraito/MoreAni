@@ -3,6 +3,7 @@ import type {
   RedBlueRankingChange,
   RedBlueRankingDelta,
   RedBlueRankingItem,
+  RedBlueRecalibrationChange,
   RedBlueScoreSuggestion,
   RedBlueState,
   ScoreSuggestionActionResponse,
@@ -49,6 +50,24 @@ export function buildRedBlueRankingChanges(
       new_rank: delta.new_rank,
       direction: isUnchanged ? 'UNCHANGED' : movedUp ? 'UP' : 'DOWN',
       amount: Math.abs(delta.new_rank - delta.old_rank),
+    }
+  }
+  return changes
+}
+
+export function buildRedBlueRecalibrationChanges(
+  previousRanking: RedBlueRankingItem[],
+  nextRanking: RedBlueRankingItem[],
+): Record<number, RedBlueRecalibrationChange> {
+  const previousRanks = new Map(previousRanking.map(item => [item.content.content_id, item.rank]))
+  const changes: Record<number, RedBlueRecalibrationChange> = {}
+  for (const item of nextRanking) {
+    const oldRank = previousRanks.get(item.content.content_id)
+    if (oldRank === undefined || oldRank === item.rank) continue
+    changes[item.content.content_id] = {
+      old_rank: oldRank,
+      new_rank: item.rank,
+      amount: Math.abs(item.rank - oldRank),
     }
   }
   return changes

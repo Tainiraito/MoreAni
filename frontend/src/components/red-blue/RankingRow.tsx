@@ -3,11 +3,12 @@ import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 
 import { CoverImage } from '@/components/ui/CoverImage'
 import { StabilityBadge } from '@/components/red-blue/StabilityBadge'
-import type { RedBlueRankingChange, RedBlueRankingItem } from '@/types/red-blue'
+import type { RedBlueRankingChange, RedBlueRankingItem, RedBlueRecalibrationChange } from '@/types/red-blue'
 
 interface RankingRowProps {
   item: RedBlueRankingItem
   rankChange: RedBlueRankingChange | undefined
+  recalibrationChange: RedBlueRecalibrationChange | undefined
   onOpenContent: (contentId: number) => void
   candidateCount?: number
   focused?: boolean
@@ -25,6 +26,7 @@ function formatRank(rank: number): string {
 export function RankingRow({
   item,
   rankChange,
+  recalibrationChange,
   onOpenContent,
   candidateCount = 1,
   focused = false,
@@ -55,13 +57,13 @@ export function RankingRow({
   }
   const rowBackground = focused
     ? 'rgba(251,113,167,0.08)'
-    : rankChange
+    : (rankChange !== undefined || recalibrationChange !== undefined)
       ? 'rgba(251,113,167,0.055)'
       : 'transparent'
 
   return (
     <div
-      className={`group grid cursor-pointer rounded-xl border bg-[var(--red-blue-row-background)] px-3 py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] sm:px-4 lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !focused ? 'red-blue-rank-moved' : ''}`}
+      className={`group grid cursor-pointer rounded-xl border bg-[var(--red-blue-row-background)] px-3 py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] sm:px-4 lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !recalibrationChange && !focused ? 'red-blue-rank-moved' : ''} ${recalibrationChange && !focused ? 'red-blue-rank-recalibrated' : ''}`}
       style={{ '--red-blue-row-background': rowBackground, borderColor: 'var(--border-line)', boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' } as CSSProperties}
       data-testid={`ranking-row-${item.content.content_id}`}
       data-focused={focused ? 'true' : 'false'}
@@ -86,6 +88,15 @@ export function RankingRow({
                 ? <ArrowDown size={12} />
                 : <Minus size={12} />}
             {rankChange.amount}
+          </span>
+        )}
+        {recalibrationChange !== undefined && (
+          <span
+            className="inline-flex items-center text-[10px] font-medium whitespace-nowrap"
+            style={{ color: 'var(--text-muted)' }}
+            data-testid={`ranking-recalibration-${item.content.content_id}`}
+          >
+            校准调整
           </span>
         )}
       </div>

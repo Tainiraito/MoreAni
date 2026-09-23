@@ -91,6 +91,12 @@ export interface RedBlueRankingChange {
   amount: number
 }
 
+export interface RedBlueRecalibrationChange {
+  old_rank: number
+  new_rank: number
+  amount: number
+}
+
 export interface RedBlueScoreSuggestionDelta {
   added: RedBlueScoreSuggestion[]
   updated: RedBlueScoreSuggestion[]
