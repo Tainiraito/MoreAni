@@ -343,6 +343,22 @@ class _DatabaseContext:
 
 
 @dataclass(frozen=True, slots=True)
+class _FullRankerInputSnapshot:
+    """一次 Full Ranker 使用的不可变数据库输入及其版本指纹。"""
+
+    context: _DatabaseContext
+    candidates: tuple[Candidate, ...]
+    anchors: tuple[ScoreAnchor, ...]
+    comparisons: tuple[Comparison, ...]
+    ranker_config: RankerConfig
+    algorithm_config_json: str
+
+    @property
+    def fingerprint(self) -> tuple[object, ...]:
+        return _full_input_fingerprint(self.context, self.anchors)
+
+
+@dataclass(frozen=True, slots=True)
 class _CacheEntry:
     state: RuntimeFastState
     expires_at: float
@@ -440,6 +456,7 @@ class RedBlueService:
         self._coordination_lock = threading.Lock()
         self._running_users: set[int] = set()
         self._pending_reasons: dict[int, FullRecalibrationReason] = {}
+        self._running_input_fingerprints: dict[int, tuple[object, ...]] = {}
         self._futures: dict[int, Future[FullRecalibrationResult]] = {}
 
     def close(self) -> None:
@@ -725,12 +742,16 @@ class RedBlueService:
         user_id: int,
         reason: FullRecalibrationReason | str,
     ) -> bool:
-        """请求用户级 Full Ranker；同一用户已有运行时只合并原因。"""
+        """请求用户级 Full；运行期间仅记录相对活动快照有变化的输入。"""
         parsed_reason = FullRecalibrationReason(reason)
         self._recover_stale_runs()
         with self._coordination_lock:
             if user_id in self._running_users:
-                self._pending_reasons[user_id] = parsed_reason
+                running_fingerprint = self._running_input_fingerprints.get(user_id)
+                if running_fingerprint is not None:
+                    current_fingerprint = self._read_current_full_input_fingerprint(user_id)
+                    if current_fingerprint != running_fingerprint:
+                        self._pending_reasons.setdefault(user_id, parsed_reason)
                 return False
             db = self.session_factory()
             try:
@@ -745,7 +766,6 @@ class RedBlueService:
             finally:
                 db.close()
             if running is not None:
-                self._pending_reasons[user_id] = parsed_reason
                 return False
             self._running_users.add(user_id)
             future = self._executor.submit(self._full_worker, user_id, parsed_reason)
@@ -765,36 +785,73 @@ class RedBlueService:
         user_id: int,
         reason: FullRecalibrationReason | str,
     ) -> FullRecalibrationResult:
-        """同步执行一次 Full Ranker；后台 coordinator 使用同一入口。"""
+        """在短一致性读事务内冻结输入，再于事务外计算并校验当前版本。"""
         snapshot_db = self.session_factory()
         try:
+            _begin_consistent_read(snapshot_db)
             context = self._read_context_for_user(snapshot_db, user_id)
-            candidates, anchors, comparisons = self._read_full_inputs(snapshot_db, user_id)
-            run = PreferenceModelRun(
-                user_id=user_id,
-                algorithm_version=context.algorithm_version,
-                status=PreferenceModelRunStatus.RUNNING,
-                input_comparison_max_id=context.comparison_max_id,
-                input_comparison_state_version=context.comparison_state_version,
-                input_revoke_version=context.revoke_version,
-                input_rating_revision_max_id=context.anchor_revision_max_id,
-                algorithm_config_json=self.config.ranker_config.to_json(),
-                started_at=datetime.now(UTC),
+            candidates, anchors, comparisons = self._read_full_inputs(
+                snapshot_db,
+                user_id,
+                max_comparison_id=context.comparison_max_id or 0,
             )
-            snapshot_db.add(run)
+            if tuple(candidate.content_id for candidate in candidates) != context.candidate_ids:
+                raise RuntimeError('Full Ranker 候选输入与快照 watermark 不一致')
+            ranker_config = self.config.ranker_config
+            algorithm_config_json = ranker_config.to_json()
+            if _config_fingerprint(algorithm_config_json) != context.algorithm_config_fingerprint:
+                raise RuntimeError('Full Ranker 配置在快照读取期间发生变化')
+            snapshot = _FullRankerInputSnapshot(
+                context=context,
+                candidates=tuple(candidates),
+                anchors=tuple(anchors),
+                comparisons=tuple(comparisons),
+                ranker_config=ranker_config,
+                algorithm_config_json=algorithm_config_json,
+            )
             snapshot_db.commit()
-            snapshot_db.refresh(run)
-            run_id = run.id
         except Exception as exc:  # noqa: BLE001
             snapshot_db.rollback()
-            snapshot_db.close()
-            return FullRecalibrationResult(None, PreferenceModelRunStatus.FAILED, False, True, str(exc))
+            return FullRecalibrationResult(None, PreferenceModelRunStatus.FAILED, False, False, str(exc))
         finally:
-            if snapshot_db.is_active:
-                snapshot_db.close()
+            snapshot_db.close()
+
+        with self._coordination_lock:
+            if user_id in self._running_users:
+                self._running_input_fingerprints[user_id] = snapshot.fingerprint
+                # 本快照会包含其开始前已提交的全部更新。
+                self._pending_reasons.pop(user_id, None)
+
+        run_db = self.session_factory()
+        try:
+            run = PreferenceModelRun(
+                user_id=user_id,
+                algorithm_version=snapshot.context.algorithm_version,
+                status=PreferenceModelRunStatus.RUNNING,
+                input_comparison_max_id=snapshot.context.comparison_max_id,
+                input_comparison_state_version=snapshot.context.comparison_state_version,
+                input_revoke_version=snapshot.context.revoke_version,
+                input_rating_revision_max_id=snapshot.context.anchor_revision_max_id,
+                algorithm_config_json=snapshot.algorithm_config_json,
+                started_at=datetime.now(UTC),
+            )
+            run_db.add(run)
+            run_db.commit()
+            run_db.refresh(run)
+            run_id = run.id
+        except Exception as exc:  # noqa: BLE001
+            run_db.rollback()
+            return FullRecalibrationResult(None, PreferenceModelRunStatus.FAILED, False, False, str(exc))
+        finally:
+            run_db.close()
 
         try:
-            pure_output = rank_preferences(candidates, anchors, comparisons, self.config.ranker_config)
+            pure_output = rank_preferences(
+                snapshot.candidates,
+                snapshot.anchors,
+                snapshot.comparisons,
+                snapshot.ranker_config,
+            )
             save_db = self.session_factory()
             try:
                 run = save_db.query(PreferenceModelRun).filter(PreferenceModelRun.id == run_id).one()
@@ -836,48 +893,70 @@ class RedBlueService:
                 run_id,
                 PreferenceModelRunStatus.FAILED,
                 False,
-                True,
+                False,
                 f'{type(exc).__name__}: {exc}',
             )
 
         final_db = self.session_factory()
         try:
+            _begin_consistent_read(final_db)
             with self.cache.user_lock(user_id):
                 final_context = self._read_context_for_user(final_db, user_id)
+                final_candidates, final_anchors = self._read_candidate_anchors(final_db, user_id)
+                live_fingerprint = _full_input_fingerprint(final_context, final_anchors)
                 compatible = (
-                    final_context.anchor_revision_max_id == context.anchor_revision_max_id
-                    and final_context.revoke_version == context.revoke_version
-                    and final_context.candidate_ids == tuple(candidate.content_id for candidate in candidates)
-                    and final_context.algorithm_version == context.algorithm_version
-                    and final_context.algorithm_config_fingerprint == context.algorithm_config_fingerprint
+                    final_context.anchor_revision_max_id == snapshot.context.anchor_revision_max_id
+                    and final_context.revoke_version == snapshot.context.revoke_version
+                    and final_context.candidate_ids == snapshot.context.candidate_ids
+                    and tuple(final_candidates) == snapshot.candidates
+                    and tuple(final_anchors) == snapshot.anchors
+                    and final_context.algorithm_version == snapshot.context.algorithm_version
+                    and final_context.algorithm_config_fingerprint
+                    == snapshot.context.algorithm_config_fingerprint
+                    and (final_context.comparison_max_id or 0)
+                    >= (snapshot.context.comparison_max_id or 0)
+                    and final_context.comparison_state_version
+                    >= snapshot.context.comparison_state_version
                 )
+                state: RuntimeFastState | None = None
                 if compatible:
                     run_row = final_db.query(PreferenceModelRun).filter(PreferenceModelRun.id == run_id).one()
                     state = self._state_from_completed_run(
                         final_db,
                         user_id=user_id,
                         run=run_row,
-                        candidates=candidates,
-                        anchors=anchors,
+                        candidates=snapshot.candidates,
+                        anchors=snapshot.anchors,
                     )
                     state = self._replay_new_comparisons_locked(final_db, state, final_context)
+                final_db.commit()
+                if state is not None:
                     self.cache.put(state)
-                    # 建议是可丢弃派生缓存；校准失败不能把已经完成且可重建的
-                    # Full Ranker run 降级为 FAILED。
-                    self._refresh_score_suggestions_locked(final_db, state)
-                    follow_up = state.requires_full_ranker or (
-                        state.fast_updates_since_full >= self.config.max_fast_updates_before_full
-                    )
-                else:
-                    follow_up = True
+                    try:
+                        self._refresh_score_suggestions_locked(final_db, state)
+                    except Exception:  # noqa: BLE001
+                        logger.exception('Full Ranker 已完成，但评分建议缓存刷新失败 user_id=%s', user_id)
             return FullRecalibrationResult(
                 run_id,
                 PreferenceModelRunStatus.COMPLETED,
                 compatible,
-                follow_up,
+                live_fingerprint != snapshot.fingerprint,
             )
         finally:
             final_db.close()
+
+    def _read_current_full_input_fingerprint(self, user_id: int) -> tuple[object, ...]:
+        """读取运行中 Full 的当前 watermark 与锚点，用于过滤重复 polling 请求。"""
+        db = self.session_factory()
+        try:
+            _begin_consistent_read(db)
+            context = self._read_context_for_user(db, user_id)
+            _candidates, anchors = self._read_candidate_anchors(db, user_id)
+            fingerprint = _full_input_fingerprint(context, anchors)
+            db.commit()
+            return fingerprint
+        finally:
+            db.close()
 
     def recover_stale_runs(self, db: Session) -> int:
         """把服务重启后遗留的 RUNNING 标记为 FAILED。"""
@@ -904,15 +983,30 @@ class RedBlueService:
         user_id: int,
         reason: FullRecalibrationReason,
     ) -> FullRecalibrationResult:
-        """后台线程入口；线程只使用自己创建的 Session。"""
+        """串行完成输入变化所需的 Full；相同输入 polling 不会排队。"""
+        next_reason = reason
         try:
-            return self.run_full_recalibration(user_id, reason)
-        finally:
+            while True:
+                result = self.run_full_recalibration(user_id, next_reason)
+                if result.status is not PreferenceModelRunStatus.COMPLETED:
+                    with self._coordination_lock:
+                        self._running_users.discard(user_id)
+                        self._running_input_fingerprints.pop(user_id, None)
+                        self._pending_reasons.pop(user_id, None)
+                    return result
+                with self._coordination_lock:
+                    pending = self._pending_reasons.pop(user_id, None)
+                    if not result.follow_up_required and pending is None:
+                        self._running_users.discard(user_id)
+                        self._running_input_fingerprints.pop(user_id, None)
+                        return result
+                    next_reason = pending or reason
+        except Exception:
             with self._coordination_lock:
                 self._running_users.discard(user_id)
-                pending = self._pending_reasons.pop(user_id, None)
-            if pending is not None:
-                self.request_full_recalibration(user_id, pending)
+                self._running_input_fingerprints.pop(user_id, None)
+                self._pending_reasons.pop(user_id, None)
+            raise
 
     def _get_or_build_state_locked(self, db: Session, *, user_id: int) -> RuntimeFastState:
         """在调用者已持有 per-user lock 时取得兼容缓存或完成重建。"""
@@ -938,7 +1032,11 @@ class RedBlueService:
         context: _DatabaseContext,
     ) -> RuntimeFastState:
         """加载最近兼容 Full Snapshot；没有时只用 Score Prior bootstrap。"""
-        candidates, anchors, _ = self._read_full_inputs(db, user_id)
+        candidates, anchors, _ = self._read_full_inputs(
+            db,
+            user_id,
+            max_comparison_id=context.comparison_max_id or 0,
+        )
         run = self._latest_compatible_run(db, user_id, context)
         if run is None:
             return self._build_bootstrap_state(db, user_id, context, candidates, anchors)
@@ -1290,12 +1388,12 @@ class RedBlueService:
             latest_completed_model_run_id=latest_completed_model_run_id,
         )
 
-    def _read_full_inputs(
+    def _read_candidate_anchors(
         self,
         db: Session,
         user_id: int,
-    ) -> tuple[list[Candidate], list[ScoreAnchor], list[Comparison]]:
-        """读取 Full Ranker 的完整纯输入。"""
+    ) -> tuple[list[Candidate], list[ScoreAnchor]]:
+        """读取按 content_id 稳定排序的候选与评分锚点。"""
         rows = (
             db.query(Rating)
             .join(ContentItem, Rating.content_id == ContentItem.id)
@@ -1309,9 +1407,22 @@ class RedBlueService:
             .order_by(Rating.content_id.asc())
             .all()
         )
-        candidates = [Candidate(row.content_id) for row in rows]
-        anchors = [ScoreAnchor(row.content_id, row.score_anchor) for row in rows]
-        return candidates, anchors, self._read_comparisons(db, user_id)
+        return (
+            [Candidate(row.content_id) for row in rows],
+            [ScoreAnchor(row.content_id, row.score_anchor) for row in rows],
+        )
+
+    def _read_full_inputs(
+        self,
+        db: Session,
+        user_id: int,
+        *,
+        max_comparison_id: int,
+    ) -> tuple[list[Candidate], list[ScoreAnchor], list[Comparison]]:
+        """读取 Full Ranker 输入，并限制在已捕获 comparison watermark 内。"""
+        candidates, anchors = self._read_candidate_anchors(db, user_id)
+        comparisons = self._read_comparisons(db, user_id, max_id=max_comparison_id)
+        return candidates, anchors, comparisons
 
     def _read_comparisons(
         self,
@@ -1659,6 +1770,33 @@ def _parse_outcome(value: RedBlueOutcome | str) -> RedBlueOutcome:
         return RedBlueOutcome(value)
     except (TypeError, ValueError) as exc:
         raise ValueError('comparison outcome 无效') from exc
+
+
+def _full_input_fingerprint(
+    context: _DatabaseContext,
+    anchors: Sequence[ScoreAnchor],
+) -> tuple[object, ...]:
+    """比较 Full 完成时的完整输入版本，含排序候选与评分锚点。"""
+    return (
+        context.comparison_max_id or 0,
+        context.comparison_state_version,
+        context.revoke_version,
+        context.anchor_revision_max_id or 0,
+        context.candidate_ids,
+        tuple((anchor.content_id, anchor.score) for anchor in anchors),
+        context.algorithm_version,
+        context.algorithm_config_fingerprint,
+    )
+
+
+def _begin_consistent_read(db: Session) -> None:
+    """显式开启数据库读事务；SQLite 默认延迟 BEGIN，需建立物理快照。"""
+    db.begin()
+    if db.get_bind().dialect.name == 'sqlite':
+        connection = db.connection()
+        driver_connection = connection.connection.driver_connection
+        if not driver_connection.in_transaction:
+            connection.exec_driver_sql('BEGIN')
 
 
 def _config_fingerprint(config_json: str) -> str:

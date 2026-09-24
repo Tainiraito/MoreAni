@@ -112,7 +112,7 @@ test.describe('红蓝合战真实后端烟测', () => {
     await expect(page.getByTestId('red-blue-focus-status')).toHaveCount(0)
     await page.evaluate(() => document.documentElement.classList.remove('dark'))
 
-    const stateResponsePromise = page.waitForResponse(response => response.request().method() === 'GET' && response.url().endsWith('/api/v1/red-blue/state'))
+    const stateResponsePromise = page.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === '/api/v1/red-blue/state')
     await page.reload()
     await expect(page.getByRole('heading', { name: '红蓝合战' })).toBeVisible()
     const stateResponse = await stateResponsePromise

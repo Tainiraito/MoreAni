@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import random
 import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from rating_constants import MIN_POSITIVE_RATING_SCORE
 from services.red_blue_ranker import RankerStability
 from services.red_blue_score_calibration import (
     CalibrationAction,
@@ -128,6 +130,77 @@ def test_pava_is_monotonic_and_allows_plateaus():
     predicted = [model.predict(value) for value in (0.0, 0.5, 1.0, 1.5)]
     assert predicted == sorted(predicted)
     assert predicted[1] == predicted[2] == 85.0
+
+
+@pytest.mark.parametrize('duplicate_count', [2, 3, 10])
+def test_equal_preference_pava_is_invariant_to_content_ids_and_input_order(duplicate_count):
+    duplicate_scores = [float((index * 37 + 11) % 101) for index in range(duplicate_count)]
+    points = [(0.5, score, index + 1) for index, score in enumerate(duplicate_scores)]
+    points.extend([(0.0, 90.0, 100), (1.0, 20.0, 101), (2.0, 80.0, 102)])
+    probe_values = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0)
+    expected = tuple(_fit_pava(points).predict(value) for value in probe_values)
+
+    for seed in range(8):
+        shuffled = list(points)
+        rng = random.Random(seed)
+        rng.shuffle(shuffled)
+        labels = rng.sample(range(1000, 1000 + len(points)), len(points))
+        relabeled = [(x_value, score, label) for (x_value, score, _old_id), label in zip(shuffled, labels)]
+        actual = tuple(_fit_pava(relabeled).predict(value) for value in probe_values)
+        assert actual == expected
+
+
+def test_leave_one_out_excludes_target_before_equal_preference_aggregation():
+    preferences = [0.5, 0.5, 0.5, 0.5]
+    config = _config(
+        min_calibration_samples=3,
+        min_comparisons_for_suggestion=0,
+        min_local_support=1,
+        confidence_threshold=0.0,
+        fast_confidence_threshold=0.0,
+        hysteresis_confidence_threshold=0.0,
+    )
+    first = _generate(
+        current_scores=[90, 50, 50, 50],
+        anchors=[10, 20, 40, 60],
+        preferences=preferences,
+        config=config,
+    )
+    changed_target_anchor = _generate(
+        current_scores=[90, 50, 50, 50],
+        anchors=[100, 20, 40, 60],
+        preferences=preferences,
+        config=config,
+    )
+    first_target = next(item for item in first.evaluations if item.content_id == 1)
+    changed_target = next(item for item in changed_target_anchor.evaluations if item.content_id == 1)
+    assert first_target.calibration_sample_count == 3
+    assert first_target.predicted_score == changed_target.predicted_score == 40.0
+
+
+def test_near_zero_down_prediction_is_not_an_actionable_suggestion():
+    result = _generate(
+        current_scores=[5, 60, 60, 60, 60],
+        anchors=[5, 1, 1, 1, 1],
+        preferences=[0.0, 1.0, 2.0, 3.0, 4.0],
+        config=_config(
+            min_calibration_samples=3,
+            min_comparisons_for_suggestion=0,
+            local_preference_band_width=1.1,
+            min_local_support=1,
+            min_score_delta=1.0,
+            confidence_threshold=0.0,
+            fast_confidence_threshold=0.0,
+            hysteresis_confidence_threshold=0.0,
+        ),
+    )
+    target = next(item for item in result.evaluations if item.content_id == 1)
+    assert target.predicted_score is not None and target.predicted_score <= 1.0
+    assert target.direction is ScoreCalibrationDirection.DOWN
+    assert target.recommended_score == 0
+    assert target.eligible is False
+    assert target.exclusion_reason == 'NO_POSITIVE_RECOMMENDED_SCORE'
+    assert all(item.recommended_score >= MIN_POSITIVE_RATING_SCORE for item in result.suggestions)
 
 
 def test_same_score_with_different_rank_does_not_create_artificial_suggestions():

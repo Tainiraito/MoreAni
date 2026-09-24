@@ -26,6 +26,7 @@ from enum import StrEnum
 from statistics import NormalDist
 from typing import cast
 
+from rating_constants import MIN_POSITIVE_RATING_SCORE
 from services.red_blue_ranker import RankerStability
 
 
@@ -65,6 +66,7 @@ class CalibrationExclusionReason(StrEnum):
     SCORE_DELTA_INSUFFICIENT = 'SCORE_DELTA_INSUFFICIENT'
     CONFIDENCE_INSUFFICIENT = 'CONFIDENCE_INSUFFICIENT'
     ACTION_SUPPRESSED = 'ACTION_SUPPRESSED'
+    NO_POSITIVE_RECOMMENDED_SCORE = 'NO_POSITIVE_RECOMMENDED_SCORE'
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,13 +405,25 @@ def _fit_pava(
     *,
     assume_sorted: bool = False,
 ) -> _PavaModel:
-    """使用加权 Pool Adjacent Violators Algorithm 拟合非递减曲线。"""
+    """先按精确相等的 preference 聚合，再运行加权 PAVA。"""
     if not points:
         raise ValueError('PAVA 至少需要一个训练点')
     ordered = list(points) if assume_sorted else sorted(points, key=lambda item: (item[0], item[2]))
+    aggregated: list[tuple[float, float, int]] = []
+    index = 0
+    while index < len(ordered):
+        x_value = ordered[index][0]
+        group: list[tuple[float, float, int]] = []
+        while index < len(ordered) and ordered[index][0] == x_value:
+            group.append(ordered[index])
+            index += 1
+        # count 保留重复观测的权重；稳定求和避免输入顺序影响结果。
+        score_sum = math.fsum(sorted(point[1] for point in group))
+        aggregated.append((x_value, score_sum / len(group), len(group)))
+
     mutable_blocks: list[list[float | int]] = []
-    for x_value, y_value, _content_id in ordered:
-        mutable_blocks.append([x_value, x_value, y_value, 1.0, 1])
+    for x_value, y_value, weight in aggregated:
+        mutable_blocks.append([x_value, x_value, y_value, float(weight), weight])
         while len(mutable_blocks) >= 2 and mutable_blocks[-2][2] > mutable_blocks[-1][2]:
             right = mutable_blocks.pop()
             left = mutable_blocks.pop()
@@ -717,6 +731,8 @@ def _evaluate_target(
             config=config,
         ):
             exclusion_reason = CalibrationExclusionReason.ACTION_SUPPRESSED.value
+    if exclusion_reason is None and recommended < MIN_POSITIVE_RATING_SCORE:
+        exclusion_reason = CalibrationExclusionReason.NO_POSITIVE_RECOMMENDED_SCORE.value
     if exclusion_reason is not None:
         base['exclusion_reason'] = exclusion_reason
         timings['filter'] += time.perf_counter() - filtering_started
@@ -762,6 +778,7 @@ def generate_score_calibrations(
         key=lambda item: (item[0], item[2]),
     )
     for target_id in candidate_ids:
+        # 先逐 target 做 LOO；_fit_pava 随后只聚合剩余训练点的 exact-x。
         training_by_target[target_id] = [point for point in valid_training if point[2] != target_id]
     calibration_sample_count = len(valid_training)
     timings = {'fit': 0.0, 'prediction': 0.0, 'filter': 0.0}

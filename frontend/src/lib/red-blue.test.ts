@@ -101,7 +101,7 @@ describe('red-blue query cache patching', () => {
 
     expect(changes[1]).toEqual({ old_rank: 10, new_rank: 4, direction: 'UP', amount: 6 })
     expect(changes[2]).toEqual({ old_rank: 4, new_rank: 10, direction: 'DOWN', amount: 6 })
-    expect(changes[3]).toEqual({ old_rank: 4, new_rank: 4, direction: 'UNCHANGED', amount: 0 })
+    expect(changes[3]).toBeUndefined()
   })
 
   it('calculates only display-rank drift for a Full recalibration', () => {

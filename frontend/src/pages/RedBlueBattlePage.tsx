@@ -148,7 +148,6 @@ export function RedBlueBattlePage() {
   const [retryComparison, setRetryComparison] = useState<RetryComparison | null>(null)
   const [lastComparisonRankingDelta, setLastComparisonRankingDelta] = useState<Record<number, RedBlueRankingChange>>({})
   const [fullRecalibrationDelta, setFullRecalibrationDelta] = useState<Record<number, RedBlueRecalibrationChange>>({})
-  const [fullRecalibrationAdjustedCount, setFullRecalibrationAdjustedCount] = useState<number | null>(null)
   const [actionPendingId, setActionPendingId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'ranking' | 'history'>('ranking')
   const [rankingPage, setRankingPage] = useState(1)
@@ -209,10 +208,8 @@ export function RedBlueBattlePage() {
       : undefined
     if (previousState !== undefined && isFullRecalibrationCompletion(previousState, nextState)) {
       const delta = buildRedBlueRecalibrationChanges(previousState.ranking, nextState.ranking)
-      const adjustedCount = Object.keys(delta).length
-      if (adjustedCount > 0) {
+      if (Object.keys(delta).length > 0) {
         setFullRecalibrationDelta(delta)
-        setFullRecalibrationAdjustedCount(adjustedCount)
       }
     }
     lastObservedStateRef.current = { queryKey: stateQueryKey, state: nextState }
@@ -246,7 +243,6 @@ export function RedBlueBattlePage() {
 
   const clearRecalibrationFeedback = useCallback(() => {
     setFullRecalibrationDelta({})
-    setFullRecalibrationAdjustedCount(null)
   }, [])
 
   const reloadState = useCallback(async () => {
@@ -462,7 +458,7 @@ export function RedBlueBattlePage() {
           ) : undefined}
         />
 
-        {fullRecalibrationAdjustedCount !== null && (
+        {Object.keys(fullRecalibrationDelta).length > 0 && (
           <div
             className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
             style={{ background: 'rgba(251,113,167,0.08)', border: '1px solid rgba(251,113,167,0.22)', color: 'var(--text-secondary)' }}
@@ -473,7 +469,6 @@ export function RedBlueBattlePage() {
             <RefreshCw size={16} style={{ color: 'var(--brand)' }} />
             <span>
               排名已重新校准
-              {fullRecalibrationAdjustedCount > 0 && ` · ${fullRecalibrationAdjustedCount} 个位置有所调整`}
             </span>
           </div>
         )}

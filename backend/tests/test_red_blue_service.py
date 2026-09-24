@@ -286,6 +286,54 @@ def test_stale_running_recovery(db, session_factory, make_user):
         service.close()
 
 
+def test_comparison_committed_before_snapshot_is_included_once(
+    db,
+    session_factory,
+    make_user,
+    monkeypatch,
+):
+    import services.red_blue as red_blue_module
+
+    user = make_user('red-blue-snapshot-before')
+    _rated_set(db, user.id, count=3)
+    service = _service(session_factory)
+    try:
+        assert service.run_full_recalibration(user.id, FullRecalibrationReason.MANUAL).applied_to_cache
+        state = service.get_battle_state(db, user_id=user.id)
+        assert state.next_pair is not None
+        comparison = service.record_comparison(
+            db,
+            user_id=user.id,
+            left_content_id=state.next_pair.left_content_id,
+            right_content_id=state.next_pair.right_content_id,
+            outcome=RedBlueOutcome.LEFT_WIN,
+            client_event_id='snapshot-before-comparison',
+        )
+        assert comparison.comparison_id is not None
+
+        captured: list[tuple[int, ...]] = []
+        original_rank_preferences = red_blue_module.rank_preferences
+
+        def observe_snapshot(candidates, anchors, comparisons, config):
+            captured.append(tuple(item.id for item in comparisons))
+            return original_rank_preferences(candidates, anchors, comparisons, config)
+
+        monkeypatch.setattr(red_blue_module, 'rank_preferences', observe_snapshot)
+        assert service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        result = service.wait_for_recalibration(user.id, timeout=30)
+
+        assert result is not None
+        assert result.status is PreferenceModelRunStatus.COMPLETED
+        assert result.applied_to_cache is True
+        assert result.follow_up_required is False
+        assert captured == [(comparison.comparison_id,)]
+        run = db.query(PreferenceModelRun).filter_by(id=result.model_run_id).one()
+        assert run.input_comparison_max_id == comparison.comparison_id
+        assert run.input_comparison_state_version == 1
+    finally:
+        service.close()
+
+
 def test_full_run_replays_comparisons_added_while_cpu_is_running(
     db,
     session_factory,
@@ -299,11 +347,15 @@ def test_full_run_replays_comparisons_added_while_cpu_is_running(
     service = _service(session_factory)
     started = threading.Event()
     release = threading.Event()
+    captured_comparison_ids: list[tuple[int, ...]] = []
     original_rank_preferences = red_blue_module.rank_preferences
 
     def blocked_rank_preferences(*args, **kwargs):
-        started.set()
-        assert release.wait(timeout=5)
+        comparisons = args[2]
+        captured_comparison_ids.append(tuple(item.id for item in comparisons))
+        if len(captured_comparison_ids) == 1:
+            started.set()
+            assert release.wait(timeout=5)
         return original_rank_preferences(*args, **kwargs)
 
     monkeypatch.setattr(red_blue_module, 'rank_preferences', blocked_rank_preferences)
@@ -312,31 +364,230 @@ def test_full_run_replays_comparisons_added_while_cpu_is_running(
         assert initial.next_pair is not None
         assert started.wait(timeout=5)
 
-        inserted = service.record_comparison(
-            db,
-            user_id=user.id,
-            left_content_id=initial.next_pair.left_content_id,
-            right_content_id=initial.next_pair.right_content_id,
-            outcome=RedBlueOutcome.LEFT_WIN,
-            client_event_id='race-comparison-1',
-        )
-        assert inserted.comparison_id is not None
+        comparison_ids: list[int] = []
+        for index in range(3):
+            inserted = service.record_comparison(
+                db,
+                user_id=user.id,
+                left_content_id=initial.next_pair.left_content_id,
+                right_content_id=initial.next_pair.right_content_id,
+                outcome=RedBlueOutcome.LEFT_WIN,
+                client_event_id=f'race-comparison-{index + 1}',
+            )
+            assert inserted.comparison_id is not None
+            comparison_ids.append(inserted.comparison_id)
+            service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        # Repeated state requests during A must coalesce with the one newer input set.
+        for _ in range(10):
+            service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+
         release.set()
         full = service.wait_for_recalibration(user.id, timeout=30)
         assert full is not None
         assert full.status is PreferenceModelRunStatus.COMPLETED
         assert full.applied_to_cache is True
+        assert full.follow_up_required is False
+        assert captured_comparison_ids == [(), tuple(comparison_ids)]
+        assert db.query(PreferenceModelRun).filter_by(user_id=user.id).count() == 2
+
         cached = service.cache.get(user.id)
         assert cached is not None
-        assert cached.last_applied_comparison_id == inserted.comparison_id
-        assert cached.fast_updates_since_full == 1
-        assert cached.freshness is ModelFreshness.FAST
+        assert cached.last_applied_comparison_id == comparison_ids[-1]
+        assert cached.fast_updates_since_full == 0
+        assert cached.freshness is ModelFreshness.FULL
+        user_state = db.query(RedBlueUserState).filter_by(user_id=user.id).one()
+        assert cached.comparison_state_version == user_state.comparison_state_version == 3
+
+        fresh = original_rank_preferences(
+            cached.algorithm_state.candidates,
+            cached.algorithm_state.score_anchors,
+            service._read_comparisons(db, user.id, max_id=comparison_ids[-1]),
+            service.config.ranker_config,
+        )
+        assert {item.content_id: item for item in cached.algorithm_state.authoritative_results} == {
+            item.content_id: item for item in fresh.results
+        }
     finally:
         release.set()
         service.close()
 
 
-def test_anchor_change_during_full_run_cannot_replace_current_cache(
+def test_full_state_polling_with_unchanged_inputs_does_not_queue_another_run(
+    db,
+    session_factory,
+    make_user,
+    monkeypatch,
+):
+    import services.red_blue as red_blue_module
+
+    user = make_user('red-blue-poll-no-change')
+    _rated_set(db, user.id, count=3)
+    service = _service(session_factory)
+    started = threading.Event()
+    release = threading.Event()
+    calls = 0
+    original_rank_preferences = red_blue_module.rank_preferences
+
+    def blocked_rank_preferences(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            started.set()
+            assert release.wait(timeout=5)
+        return original_rank_preferences(*args, **kwargs)
+
+    monkeypatch.setattr(red_blue_module, 'rank_preferences', blocked_rank_preferences)
+    try:
+        assert service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        assert started.wait(timeout=5)
+        for _ in range(10):
+            service.get_battle_state(db, user_id=user.id)
+        release.set()
+        result = service.wait_for_recalibration(user.id, timeout=30)
+        assert result is not None
+        assert result.status is PreferenceModelRunStatus.COMPLETED
+        assert calls == 1
+        assert db.query(PreferenceModelRun).filter_by(user_id=user.id).count() == 1
+    finally:
+        release.set()
+        service.close()
+
+
+def test_comparison_committed_between_snapshot_watermark_and_input_read_is_only_applied_once(
+    db,
+    db_engine,
+    session_factory,
+    make_user,
+    monkeypatch,
+):
+    import services.red_blue as red_blue_module
+
+    with db_engine.connect() as connection:
+        connection.exec_driver_sql('PRAGMA journal_mode=WAL')
+
+    user = make_user('red-blue-snapshot-interleaving')
+    _rated_set(db, user.id, count=3)
+    service = _service(session_factory)
+    context_read = threading.Event()
+    continue_snapshot = threading.Event()
+    original_read_context = service._read_context_for_user
+    original_rank_preferences = red_blue_module.rank_preferences
+
+    def pause_after_context(db_session, user_id):
+        context = original_read_context(db_session, user_id)
+        if (
+            threading.current_thread().name.startswith('moreani-red-blue-full')
+            and not context_read.is_set()
+        ):
+            context_read.set()
+            assert continue_snapshot.wait(timeout=5)
+        return context
+
+    monkeypatch.setattr(service, '_read_context_for_user', pause_after_context)
+    # The ranker observer records the immutable inputs passed for A and B.
+    ranked_ids: list[tuple[int, ...]] = []
+
+    def record_ranker_inputs(candidates, anchors, comparisons, config):
+        ranked_ids.append(tuple(item.id for item in comparisons))
+        return original_rank_preferences(candidates, anchors, comparisons, config)
+
+    monkeypatch.setattr(red_blue_module, 'rank_preferences', record_ranker_inputs)
+    try:
+        assert service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        assert context_read.wait(timeout=5)
+        # Submit a real comparison from another session while the read transaction holds its snapshot.
+        state = service.get_battle_state(db, user_id=user.id)
+        assert state.next_pair is not None
+        inserted = service.record_comparison(
+            db,
+            user_id=user.id,
+            left_content_id=state.next_pair.left_content_id,
+            right_content_id=state.next_pair.right_content_id,
+            outcome=RedBlueOutcome.LEFT_WIN,
+            client_event_id='snapshot-concurrent-comparison',
+        )
+        assert inserted.comparison_id is not None
+        continue_snapshot.set()
+
+        result = service.wait_for_recalibration(user.id, timeout=30)
+        assert result is not None
+        assert result.status is PreferenceModelRunStatus.COMPLETED
+        assert result.applied_to_cache is True
+        assert ranked_ids == [(), (inserted.comparison_id,)]
+        assert db.query(PreferenceModelRun).filter_by(user_id=user.id).count() == 2
+        cached = service.cache.get(user.id)
+        assert cached is not None
+        assert cached.comparison_state_version == 1
+        assert cached.last_applied_comparison_id == inserted.comparison_id
+    finally:
+        continue_snapshot.set()
+        service.close()
+
+
+def test_revoke_during_full_run_rejects_old_snapshot_and_recalibrates_once(
+    db,
+    session_factory,
+    make_user,
+    monkeypatch,
+):
+    import services.red_blue as red_blue_module
+
+    user = make_user('red-blue-revoke-during-full')
+    _rated_set(db, user.id, count=3)
+    service = _service(session_factory)
+    initial = service.run_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+    assert initial.applied_to_cache is True
+    state = service.get_battle_state(db, user_id=user.id)
+    assert state.next_pair is not None
+    comparison = service.record_comparison(
+        db,
+        user_id=user.id,
+        left_content_id=state.next_pair.left_content_id,
+        right_content_id=state.next_pair.right_content_id,
+        outcome=RedBlueOutcome.LEFT_WIN,
+        client_event_id='revoke-during-full-comparison',
+    )
+    assert comparison.comparison_id is not None
+
+    started = threading.Event()
+    release = threading.Event()
+    captured_revoked: list[bool] = []
+    original_rank_preferences = red_blue_module.rank_preferences
+
+    def blocked_rank_preferences(candidates, anchors, comparisons, config):
+        captured_revoked.append(comparisons[0].revoked)
+        if len(captured_revoked) == 1:
+            started.set()
+            assert release.wait(timeout=5)
+        return original_rank_preferences(candidates, anchors, comparisons, config)
+
+    monkeypatch.setattr(red_blue_module, 'rank_preferences', blocked_rank_preferences)
+    try:
+        service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        assert started.wait(timeout=5)
+        service.revoke_comparison(db, user_id=user.id, comparison_id=comparison.comparison_id)
+        release.set()
+
+        result = service.wait_for_recalibration(user.id, timeout=30)
+        assert result is not None
+        assert result.status is PreferenceModelRunStatus.COMPLETED
+        assert result.applied_to_cache is True
+        assert result.follow_up_required is False
+        assert captured_revoked == [False, True]
+        assert db.query(PreferenceModelRun).filter_by(user_id=user.id).count() == 3
+        latest_run = db.query(PreferenceModelRun).filter_by(id=result.model_run_id).one()
+        assert latest_run.input_revoke_version == 1
+        cached = service.cache.get(user.id)
+        assert cached is not None
+        assert cached.revoke_version == 1
+        assert cached.freshness is ModelFreshness.FULL
+        assert all(item.comparison_count == 0 for item in cached.algorithm_state.authoritative_results)
+    finally:
+        release.set()
+        service.close()
+
+
+def test_anchor_change_during_full_run_applies_only_newer_snapshot(
     db,
     session_factory,
     make_user,
@@ -349,24 +600,42 @@ def test_anchor_change_during_full_run_cannot_replace_current_cache(
     service = _service(session_factory)
     started = threading.Event()
     release = threading.Event()
+    captured_anchors: list[tuple[tuple[int, int], ...]] = []
     original_rank_preferences = red_blue_module.rank_preferences
 
-    def blocked_rank_preferences(*args, **kwargs):
-        started.set()
-        assert release.wait(timeout=5)
-        return original_rank_preferences(*args, **kwargs)
+    def blocked_rank_preferences(candidates, anchors, comparisons, config):
+        captured_anchors.append(tuple((anchor.content_id, anchor.score) for anchor in anchors))
+        if len(captured_anchors) == 1:
+            started.set()
+            assert release.wait(timeout=5)
+        return original_rank_preferences(candidates, anchors, comparisons, config)
 
     monkeypatch.setattr(red_blue_module, 'rank_preferences', blocked_rank_preferences)
     try:
         service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
         assert started.wait(timeout=5)
+        first_run = (
+            db.query(PreferenceModelRun)
+            .filter_by(user_id=user.id, status=PreferenceModelRunStatus.RUNNING)
+            .one()
+        )
         upsert_rating(db, user_id=user.id, content_id=contents[0].id, score=99)
         release.set()
         full = service.wait_for_recalibration(user.id, timeout=30)
         assert full is not None
         assert full.status is PreferenceModelRunStatus.COMPLETED
-        assert full.applied_to_cache is False
-        assert full.follow_up_required is True
+        assert full.applied_to_cache is True
+        assert full.follow_up_required is False
+        assert len(captured_anchors) == 2
+        assert captured_anchors[0] != captured_anchors[1]
+        assert full.model_run_id != first_run.id
+        assert db.query(PreferenceModelRun).filter_by(user_id=user.id).count() == 2
+        cached = service.cache.get(user.id)
+        assert cached is not None
+        assert cached.base_model_run_id == full.model_run_id
+        assert (contents[0].id, 99) in {
+            (anchor.content_id, anchor.score) for anchor in cached.algorithm_state.score_anchors
+        }
     finally:
         release.set()
         service.close()

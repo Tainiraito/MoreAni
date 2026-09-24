@@ -8,6 +8,8 @@ from conftest import auth_cookie
 from fastapi.testclient import TestClient
 
 from main import app
+from rating_constants import MIN_POSITIVE_RATING_SCORE
+from schemas import RatingCreate
 from models import (
     ContentItem,
     PreferenceModelRun,
@@ -370,6 +372,60 @@ def test_full_state_attaches_visible_suggestion_to_matching_ranking_content(
         )
         assert target_suggestion.current_score == 20
         assert target_suggestion.recommended_score >= 50
+    finally:
+        service.close()
+
+
+def test_every_generated_pending_suggestion_can_be_accepted(
+    db,
+    session_factory,
+    make_user,
+):
+    user = make_user('score-suggestion-all-accepted')
+    contents = [_content(db, user.id, f'接受建议作品 {index}') for index in range(6)]
+    for index, content in enumerate(contents):
+        upsert_rating(db, user_id=user.id, content_id=content.id, score=50 + index * 8)
+    target_rating = db.query(Rating).filter_by(user_id=user.id, content_id=contents[0].id).one()
+    target_rating.score = 20
+    db.commit()
+
+    service = RedBlueService(
+        session_factory=session_factory,
+        config=RedBlueServiceConfig(
+            max_fast_updates_before_full=100,
+            score_calibration_config=ScoreCalibrationConfig(
+                min_calibration_samples=3,
+                min_comparisons_for_suggestion=0,
+                min_stability='UNCALIBRATED',
+                local_preference_band_width=2.0,
+                min_local_support=1,
+                confidence_threshold=0.0,
+                fast_confidence_threshold=0.0,
+                hysteresis_confidence_threshold=0.0,
+            ),
+        ),
+    )
+    try:
+        full = service.run_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
+        assert full.applied_to_cache is True
+        state = service.get_battle_state(db, user_id=user.id)
+        pending = state.score_suggestions
+        assert pending
+        for view in pending:
+            assert MIN_POSITIVE_RATING_SCORE <= view.recommended_score <= 100
+            RatingCreate(content_id=view.content_id, score=view.recommended_score)
+            suggestion = db.query(ScoreSuggestion).filter_by(id=view.id).one()
+            accepted = service.score_suggestion_service.apply_action(
+                db,
+                user_id=user.id,
+                suggestion_id=suggestion.id,
+                suggestion_key=suggestion.suggestion_key,
+                action='ACCEPTED',
+                client_event_id=str(uuid4()),
+            )
+            assert accepted.updated_score == view.recommended_score
+            db.refresh(suggestion)
+            assert suggestion.status is ScoreSuggestionStatus.ACCEPTED
     finally:
         service.close()
 

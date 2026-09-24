@@ -120,6 +120,22 @@ def test_low_coverage_content_receives_underexplored_bonus():
     assert 3 in _pair_key(result.selected_pair)
 
 
+def test_normal_mode_pairs_undercovered_candidates_before_overcovered_ones():
+    candidates = [
+        _candidate(1, mean=0.0, expected_rank=1, count=20),
+        _candidate(2, mean=0.01, expected_rank=2, count=0),
+        _candidate(3, mean=0.02, expected_rank=3, count=0),
+        _candidate(4, mean=0.03, expected_rank=4, count=1),
+    ]
+    result = select_pair(
+        candidates,
+        [],
+        config=SelectorConfig(exploration_rate=0, random_seed=2),
+    )
+
+    assert _pair_key(result.selected_pair) in {(2, 3), (2, 4), (3, 4)}
+
+
 def test_normal_pair_lifetime_ceiling_skips_repeated_pair_when_alternatives_exist():
     candidates = [_candidate(1, count=8), _candidate(2, count=8), _candidate(3, count=8)]
     history = [

@@ -244,7 +244,8 @@ describe('RedBlueBattlePage', () => {
     await waitFor(() => expect(view.getByTestId('battle-card-red')).toHaveTextContent('左作品'))
     fireEvent.click(view.getByRole('button', { name: '更喜欢红方' }))
 
-    await waitFor(() => expect(view.getByTestId('red-blue-recalibration-notice')).toHaveTextContent('2 个位置有所调整'), { timeout: 3000 })
+    await waitFor(() => expect(view.getByTestId('red-blue-recalibration-notice')).toHaveTextContent('排名已重新校准'), { timeout: 3000 })
+    expect(view.getByTestId('red-blue-recalibration-notice').textContent).toBe('排名已重新校准')
     expect(view.getByTestId('ranking-change-1')).toHaveTextContent('1')
     expect(view.getByTestId('ranking-change-2')).toHaveTextContent('1')
     expect(view.getByTestId('ranking-recalibration-1')).toHaveTextContent('校准调整')
@@ -361,7 +362,8 @@ describe('RedBlueBattlePage', () => {
     fireEvent.change(view.getByRole('textbox', { name: '搜索作品' }), { target: { value: '' } })
     fireEvent.click(view.getByRole('button', { name: '更喜欢蓝方' }))
     await waitFor(() => expect(api.createRedBlueComparison).toHaveBeenCalledTimes(3))
-    await waitFor(() => expect(view.getByTestId('ranking-change-1')).toHaveTextContent('0'))
+    await waitFor(() => expect(view.getByTestId('ranking-change-2')).toHaveTextContent('4'))
+    expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument()
     expect(view.getByTestId('ranking-change-2')).toHaveTextContent('4')
   })
 

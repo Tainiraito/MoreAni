@@ -1508,6 +1508,23 @@ def select_pair(
     full_acquisition_scoring_seconds = time.perf_counter() - score_started_at
 
     focus_requested = active_context.focus_content_id in candidate_ids
+    if not focus_requested:
+        coverage_target = _coverage_target(len(candidate_list), active_config)
+        undercovered_ids = {
+            content_id
+            for content_id, feature in features.items()
+            if feature.comparison_count < coverage_target
+        }
+        coverage_pairs = tuple(
+            pair
+            for pair in eligible_pairs
+            if pair.low_content_id in undercovered_ids and pair.high_content_id in undercovered_ids
+        )
+        if coverage_pairs:
+            # 普通模式先把低于目标的作品彼此配对，避免高曝光作品只因能搭配
+            # 一个新作品，就持续从 new_content / coverage_floor 得到加分。
+            eligible_pairs = coverage_pairs
+
     fallback_used = False
     fallback_reason = SelectionReason.NORMAL
     if not eligible_pairs and len(candidate_list) > 2:

@@ -32,6 +32,7 @@ export function RankingRow({
   focused = false,
   onFocusContent,
 }: RankingRowProps) {
+  const visibleRankChange = rankChange?.direction === 'UNCHANGED' ? undefined : rankChange
   const rankIntervalVisible = ['UNCALIBRATED', 'CALIBRATING', 'RELATIVELY_STABLE', 'STABLE', 'ORDER_UNCERTAIN'].includes(item.stability)
   const rankIntervalText = rankIntervalVisible && item.rank_low !== null && item.rank_high !== null && item.rank_low !== item.rank_high
     ? (() => {
@@ -57,13 +58,13 @@ export function RankingRow({
   }
   const rowBackground = focused
     ? 'rgba(251,113,167,0.08)'
-    : (rankChange !== undefined || recalibrationChange !== undefined)
+    : (visibleRankChange !== undefined || recalibrationChange !== undefined)
       ? 'rgba(251,113,167,0.055)'
       : 'transparent'
 
   return (
     <div
-      className={`group grid cursor-pointer rounded-xl border bg-[var(--red-blue-row-background)] px-3 py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] sm:px-4 lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${rankChange && !recalibrationChange && !focused ? 'red-blue-rank-moved' : ''} ${recalibrationChange && !focused ? 'red-blue-rank-recalibrated' : ''}`}
+      className={`group grid cursor-pointer rounded-xl border bg-[var(--red-blue-row-background)] px-3 py-3 transition-colors duration-300 hover:bg-[rgba(251,113,167,0.045)] sm:px-4 lg:grid-cols-[4rem_minmax(0,1fr)_auto] lg:items-stretch ${visibleRankChange && !recalibrationChange && !focused ? 'red-blue-rank-moved' : ''} ${recalibrationChange && !focused ? 'red-blue-rank-recalibrated' : ''}`}
       style={{ '--red-blue-row-background': rowBackground, borderColor: 'var(--border-line)', boxShadow: focused ? 'inset 3px 0 0 var(--brand)' : 'none' } as CSSProperties}
       data-testid={`ranking-row-${item.content.content_id}`}
       data-focused={focused ? 'true' : 'false'}
@@ -75,19 +76,19 @@ export function RankingRow({
     >
       <div className="flex items-center gap-1 self-center lg:flex-col lg:items-start lg:gap-0.5">
         <span className="text-xl font-semibold leading-6" style={{ color: 'var(--text-primary)' }}>#{formatRank(item.rank)}</span>
-        {rankChange !== undefined && (
+        {visibleRankChange !== undefined && (
           <span
             className="inline-flex items-center text-xs font-semibold"
-            style={{ color: rankChange.direction === 'UP' ? 'var(--brand)' : 'var(--text-muted)' }}
+            style={{ color: visibleRankChange.direction === 'UP' ? 'var(--brand)' : 'var(--text-muted)' }}
             data-testid={`ranking-change-${item.content.content_id}`}
-            data-direction={rankChange.direction}
+            data-direction={visibleRankChange.direction}
           >
-            {rankChange.direction === 'UP'
+            {visibleRankChange.direction === 'UP'
               ? <ArrowUp size={12} />
-              : rankChange.direction === 'DOWN'
+              : visibleRankChange.direction === 'DOWN'
                 ? <ArrowDown size={12} />
                 : <Minus size={12} />}
-            {rankChange.amount}
+            {visibleRankChange.amount}
           </span>
         )}
         {recalibrationChange !== undefined && (

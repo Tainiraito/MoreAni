@@ -139,7 +139,7 @@ describe('RankingList filters and intervals', () => {
     expect(view.getByText('#—')).toBeInTheDocument()
   })
 
-  it('shows unchanged and one-position ranking changes', () => {
+  it('shows moved ranks and omits unchanged rank markers', () => {
     const rankChanges: Record<number, RedBlueRankingChange> = {
       1: { old_rank: 1, new_rank: 1, direction: 'UNCHANGED', amount: 0 },
       2: { old_rank: 2, new_rank: 1, direction: 'UP', amount: 1 },
@@ -154,8 +154,7 @@ describe('RankingList filters and intervals', () => {
       />,
     )
 
-    expect(view.getByTestId('ranking-change-1')).toHaveTextContent('0')
-    expect(view.getByTestId('ranking-change-1')).toHaveAttribute('data-direction', 'UNCHANGED')
+    expect(view.queryByTestId('ranking-change-1')).not.toBeInTheDocument()
     expect(view.getByTestId('ranking-change-2')).toHaveTextContent('1')
     expect(view.getByTestId('ranking-change-2')).toHaveAttribute('data-direction', 'UP')
   })

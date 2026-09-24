@@ -15,6 +15,8 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from rating_constants import MIN_POSITIVE_RATING_SCORE
+
 from models import (
     Rating,
     RedBlueComparison,
@@ -241,8 +243,11 @@ class ScoreSuggestionService:
         if rating.score != suggestion.current_score:
             raise ScoreSuggestionConflictError('当前评分已发生变化，请刷新红蓝合战状态')
 
-        if normalized_action == ScoreSuggestionActionType.ACCEPTED.value and suggestion.recommended_score <= 0:
-            raise ScoreSuggestionConflictError('评分建议推荐值必须大于 0')
+        if (
+            normalized_action == ScoreSuggestionActionType.ACCEPTED.value
+            and suggestion.recommended_score < MIN_POSITIVE_RATING_SCORE
+        ):
+            raise ScoreSuggestionConflictError('评分建议推荐值低于最低正分')
 
         state = (
             db.query(RedBlueUserState)
