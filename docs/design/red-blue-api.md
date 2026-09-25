@@ -1,5 +1,7 @@
 # 红蓝合战阶段 4C：HTTP API 契约
 
+> 本文记录阶段 4C 的 API 契约和早期性能数据；当前完整字段、建议动作、部署限制与阶段 8 性能结果见[综合设计](red-blue-battle.md)。
+
 阶段 4C 只把阶段 4B 的 `RedBlueService` 暴露为普通 HTTP API；阶段 7 在不改变事实模型的前提下，为连续 PK 增加了临时 Focus 上下文字段。
 
 ## Endpoint
@@ -29,7 +31,7 @@
   "current_pair": {
     "left": {"content_id": 101, "title": "番剧 A", "cover_url": null, "content_type": "anime"},
     "right": {"content_id": 202, "title": "番剧 B", "cover_url": null, "content_type": "anime"},
-    "selector_version": "selector-v1",
+    "selector_version": "selector-v2",
     "selection_reason": "UNCERTAIN_PAIR"
   },
   "ranking": [],
@@ -139,7 +141,7 @@ V1 不使用 WebSocket/SSE。每次 POST 和 GET 都读取当前可用 Fast Stat
   -> GET /state 完整恢复
 ```
 
-API 不提前返回 Score Suggestion 字段；后续评分校准阶段通过向后兼容字段扩展。
+当前 `GET /state` 在对应 Ranking Row 返回 `score_suggestion`（无活跃建议时为 `null`）；Comparison POST 返回 `score_suggestion_delta`，建议动作由独立 Action endpoint 处理。
 
 ## OpenAPI 与性能实测
 

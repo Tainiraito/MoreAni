@@ -1,5 +1,7 @@
 # 红蓝合战评分校准算法
 
+> 本文记录阶段 5 的纯评分校准算法；当前阈值、持久化与前端展示以[阶段 8 综合设计](red-blue-battle.md)为准。
+
 阶段 5 只实现从个人偏好模型生成评分校准建议的纯算法。实现位于
 `backend/services/red_blue_score_calibration.py`，不访问数据库、不写入
 `Rating`、`RatingRevision`、`ScoreSuggestion` 或 `ScoreSuggestionAction`。

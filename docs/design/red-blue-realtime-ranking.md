@@ -1,5 +1,7 @@
 # 红蓝合战阶段 4A：实时排名快速路径技术验证
 
+> 本文记录阶段 4A 的 Fast 算法比较；当前实际调用路径、Fast/Full 校准策略和测得限制见[阶段 8 综合设计](red-blue-battle.md)。
+
 ## 结论
 
 阶段 4A 验证了三种来自现有 Davidson / Bayesian Ranker 的快速路径：

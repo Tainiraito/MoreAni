@@ -1,7 +1,7 @@
 """红蓝 Selector 覆盖/重复 Pair 的合成模拟。
 
 用于比较本阶段改动前后的正常模式和 Focus 模式，不读取或写入 MoreAni 数据库。
-运行：``backend/venv/bin/python backend/scripts/red_blue_selector_simulation.py``。
+运行：``cd backend && PYTHONPATH=. venv/bin/python scripts/red_blue_selector_simulation.py``。
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import math
 import statistics
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
 
 from services.red_blue_pair_selector import (
     SelectorCandidate,
@@ -19,6 +20,8 @@ from services.red_blue_pair_selector import (
     SelectorOutcome,
     select_pair,
 )
+
+CHECKPOINTS = {50: (100, 300, 500), 100: (300, 500, 1000), 500: (500, 1000, 3000)}
 
 
 def _percentile(values: list[int], probability: float) -> float:
@@ -85,12 +88,14 @@ def _metrics(
 
 
 def _run(candidate_count: int, *, before: bool, focus: bool) -> list[dict[str, object]]:
-    """一次运行到 1000 次，并在四个 checkpoint 汇总，避免重复重跑前缀。"""
+    """按候选规模运行指定 checkpoint，并以步进种子模拟独立随机选择。"""
     counts = [0] * candidate_count
     comparisons: list[SelectorComparison] = []
     pair_counts: Counter[tuple[int, int]] = Counter()
     config = _config(before=before)
-    checkpoints = {100, 300, 500, 1000}
+    checkpoints = set(CHECKPOINTS[candidate_count])
+    focus_selected_count = 0
+    focus_available_count = 0
     snapshots: list[dict[str, object]] = []
     for comparison_id in range(1, max(checkpoints) + 1):
         candidates = [
@@ -110,9 +115,14 @@ def _run(candidate_count: int, *, before: bool, focus: bool) -> list[dict[str, o
             candidates,
             # 生产 Service 默认只把最近 200 条历史交给 Selector。
             comparisons[-200:],
-            context=SelectorContext(focus_content_id=1 if focus else None),
-            config=config,
+            context=SelectorContext(
+                focus_content_id=1 if focus else None,
+                pair_comparison_counts=pair_counts,
+            ),
+            config=replace(config, random_seed=17 + comparison_id),
         )
+        focus_available_count += int(result.diagnostics.focus_available)
+        focus_selected_count += int(result.diagnostics.focus_selected)
         if result.selected_pair is None:
             break
         pair = tuple(sorted((result.selected_pair.left_content_id, result.selected_pair.right_content_id)))
@@ -131,7 +141,18 @@ def _run(candidate_count: int, *, before: bool, focus: bool) -> list[dict[str, o
         counts[left_id - 1] += 1
         counts[right_id - 1] += 1
         if comparison_id in checkpoints:
-            snapshots.append(_metrics(counts, pair_counts, candidate_count, comparison_id))
+            snapshot = _metrics(counts, pair_counts, candidate_count, comparison_id)
+            snapshot['focus_selected_count'] = focus_selected_count
+            snapshot['focus_available_count'] = focus_available_count
+            snapshot['focus_selection_rate'] = round(
+                focus_selected_count / focus_available_count,
+                3,
+            ) if focus_available_count else 0.0
+            snapshot['configured_focus_probability'] = config.focus_probability if focus else None
+            snapshot['focus_content_comparisons'] = sum(
+                amount for pair, amount in pair_counts.items() if focus and 1 in pair
+            )
+            snapshots.append(snapshot)
     return snapshots
 
 

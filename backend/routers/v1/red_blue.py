@@ -264,6 +264,7 @@ def create_comparison(
             right_content_id=body.right_content_id,
             outcome=body.outcome,
             client_event_id=str(body.client_event_id),
+            selector_version=service.config.selector_config.selector_version,
             focus_content_id=body.focus_content_id,
         )
     except ValueError as error:

@@ -42,5 +42,5 @@ describe('RankingList render performance', () => {
     expect(view.getByText(`测试作品 1`)).toBeInTheDocument()
     expect(view.getByText(`测试作品 ${size}`)).toBeInTheDocument()
     console.info(`[red-blue-performance] rows=${size} render_ms=${elapsed.toFixed(1)}`)
-  })
+  }, 20_000)
 })

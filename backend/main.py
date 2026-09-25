@@ -239,33 +239,60 @@ def _migrate_airing_calendar_failure_tracking() -> None:
 
 def _migrate_rating_revisions() -> None:
     """Create a baseline snapshot for existing positive ratings, once."""
+    from sqlalchemy import text
+
     try:
-        with SessionLocal() as db:
-            ratings = db.query(Rating).filter(Rating.score > 0).all()
-            if not ratings:
+        with engine.begin() as conn:
+            rating_columns = {
+                row[1] for row in conn.execute(text('PRAGMA table_info(ratings)'))
+            }
+            revision_columns = {
+                row[1] for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))
+            }
+            if not rating_columns or not revision_columns:
                 return
-            rating_ids = {revision.rating_id for revision in db.query(RatingRevision.rating_id).all()}
-            now = datetime.now(UTC)
-            snapshots = [
-                RatingRevision(
-                    rating_id=rating.id,
-                    content_id=rating.content_id,
-                    user_id=rating.user_id,
-                    previous_score=0,
-                    new_score=rating.score,
-                    changed_at=now,
-                    source=RatingRevisionSource.MIGRATION_SNAPSHOT.value,
-                )
-                for rating in ratings
-                if rating.id not in rating_ids
-            ]
-            if snapshots:
-                db.add_all(snapshots)
-                db.commit()
-                print(f'[migrate] rating revisions baseline snapshots: {len(snapshots)}')
+
+            required_rating_columns = {'id', 'content_id', 'user_id', 'score'}
+            required_revision_columns = {
+                'rating_id',
+                'content_id',
+                'user_id',
+                'previous_score',
+                'new_score',
+                'changed_at',
+                'source',
+            }
+            if not required_rating_columns <= rating_columns:
+                raise RuntimeError('ratings 表缺少建立历史评分基线所需字段')
+            if not required_revision_columns <= revision_columns:
+                raise RuntimeError('rating_revisions 表缺少建立历史评分基线所需字段')
+
+            revision_values = {
+                'rating_id': 'ratings.id',
+                'content_id': 'ratings.content_id',
+                'user_id': 'ratings.user_id',
+                'previous_score': '0',
+                'new_score': 'ratings.score',
+                'changed_at': 'CURRENT_TIMESTAMP',
+                'source': "'migration_snapshot'",
+            }
+            columns = [column for column in revision_values if column in revision_columns]
+            inserted = conn.execute(
+                text(
+                    'INSERT INTO rating_revisions ('
+                    + ', '.join(columns)
+                    + ') SELECT '
+                    + ', '.join(revision_values[column] for column in columns)
+                    + ' FROM ratings WHERE ratings.score > 0 '
+                    'AND NOT EXISTS (SELECT 1 FROM rating_revisions '
+                    'WHERE rating_revisions.rating_id = ratings.id)',
+                ),
+            )
+            snapshot_count = max(inserted.rowcount, 0)
+        if snapshot_count:
+            print(f'[migrate] rating revisions baseline snapshots: {snapshot_count}')
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f'[migrate] rating revisions 迁移失败: {exc}') from exc
-
 
 def _migrate_red_blue_preference_foundation() -> None:
     """建立红蓝合战事实、模型运行、排名快照和评分建议基础结构。"""
@@ -602,6 +629,83 @@ def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
         raise RuntimeError(f'[migrate] 评分建议 suggestion_key 唯一语义迁移失败: {exc}') from exc
 
 
+def _migrate_interrupted_resource_subscription_cleanup() -> None:
+    """恢复旧订阅表迁移中断后留下的 legacy 表，且先验证行已保留。"""
+    from sqlalchemy import text
+
+    table_name = ResourceSubscription.__tablename__
+    legacy_table = f'{table_name}_legacy'
+    try:
+        with engine.begin() as conn:
+            legacy_columns = {
+                row[1] for row in conn.execute(text(f'PRAGMA table_info("{legacy_table}")'))
+            }
+            if not legacy_columns:
+                return
+            target_columns = {
+                row[1] for row in conn.execute(text(f'PRAGMA table_info("{table_name}")'))
+            }
+            required = {
+                'id', 'user_id', 'content_id', 'subject_id', 'source', 'fansub_key',
+                'fansub_name', 'fansub_id', 'active', 'last_seen_created_at',
+                'last_seen_resource_key', 'created_at', 'updated_at',
+            }
+            if not required <= target_columns:
+                raise RuntimeError('resource_subscriptions 当前表结构尚未完成')
+            copy_columns = [
+                'id', 'user_id', 'content_id', 'subject_id', 'source', 'fansub_key',
+                'fansub_name', 'fansub_id', 'active', 'last_seen_created_at',
+                'last_seen_resource_key', 'created_at', 'updated_at',
+            ]
+            select_expressions = [
+                column if column in legacy_columns else (
+                    "'animegarden'" if column == 'source' else
+                    'NULL' if column == 'fansub_id' else
+                    column
+                )
+                for column in copy_columns
+            ]
+            conn.execute(
+                text(
+                    f'INSERT OR IGNORE INTO "{table_name}" ('
+                    + ', '.join(copy_columns)
+                    + ') SELECT '
+                    + ', '.join(select_expressions)
+                    + f' FROM "{legacy_table}"',
+                ),
+            )
+            unresolved = conn.execute(
+                text(
+                    f'SELECT COUNT(*) FROM "{legacy_table}" AS legacy '
+                    f'LEFT JOIN "{table_name}" AS current ON current.id = legacy.id '
+                    'WHERE current.id IS NULL',
+                ),
+            ).scalar_one()
+            if unresolved:
+                raise RuntimeError(f'resource_subscriptions 仍有 {unresolved} 条 legacy 行未安全合并')
+            conn.execute(text(f'DROP TABLE "{legacy_table}"'))
+        print('[migrate] resource_subscriptions legacy 中断状态已清理')
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f'[migrate] 旧订阅迁移中断状态恢复失败: {exc}') from exc
+
+
+def _migrate_red_blue_order_uncertainty() -> None:
+    """持久化与 stability 独立的 Full 后验顺序不确定标记。"""
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        columns = {row[1] for row in conn.execute(text('PRAGMA table_info(preference_results)'))}
+        if not columns or 'order_uncertain' in columns:
+            return
+        conn.execute(
+            text(
+                'ALTER TABLE preference_results '
+                'ADD COLUMN order_uncertain BOOLEAN NOT NULL DEFAULT 0'
+            ),
+        )
+    print('[migrate] preference_results.order_uncertain 已添加')
+
+
 MIGRATIONS = (
     Migration(
         '0001-invite-codes-expires-and-user-avatar',
@@ -642,6 +746,16 @@ MIGRATIONS = (
         '0012-red-blue-score-suggestion-key-uniqueness',
         '允许同一模型运行下按 suggestion_key 保存建议语义变化',
         _migrate_red_blue_score_suggestion_key_uniqueness,
+    ),
+    Migration(
+        '0013-red-blue-posterior-order-uncertainty',
+        '独立保存 Full 后验顺序不确定标记',
+        _migrate_red_blue_order_uncertainty,
+    ),
+    Migration(
+        '0014-resource-subscription-interrupted-migration-cleanup',
+        '恢复并清理旧订阅表迁移中断残留',
+        _migrate_interrupted_resource_subscription_cleanup,
     ),
 )
 

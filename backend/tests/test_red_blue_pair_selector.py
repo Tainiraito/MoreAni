@@ -136,6 +136,35 @@ def test_normal_mode_pairs_undercovered_candidates_before_overcovered_ones():
     assert _pair_key(result.selected_pair) in {(2, 3), (2, 4), (3, 4)}
 
 
+def test_normal_coverage_envelope_remains_active_after_static_target_is_met():
+    candidates = [
+        _candidate(1, mean=0.0, expected_rank=1, count=40),
+        _candidate(2, mean=0.01, expected_rank=2, count=9),
+        _candidate(3, mean=0.02, expected_rank=3, count=10),
+        _candidate(4, mean=0.03, expected_rank=4, count=9),
+    ]
+    result = select_pair(
+        candidates,
+        [],
+        config=SelectorConfig(exploration_rate=0, random_seed=2),
+    )
+
+    assert result.selected_pair is not None
+    assert 1 not in _pair_key(result.selected_pair)
+
+
+def test_all_time_pair_count_survives_a_missing_recent_history_window():
+    candidates = [_candidate(1, count=9), _candidate(2, count=9), _candidate(3, count=9)]
+    result = select_pair(
+        candidates,
+        [],
+        context=SelectorContext(pair_comparison_counts={(2, 1): 5}),
+        config=SelectorConfig(exploration_rate=0, pair_cooldown_count=0, skip_cooldown_count=0),
+    )
+
+    assert _pair_key(result.selected_pair) != (1, 2)
+
+
 def test_normal_pair_lifetime_ceiling_skips_repeated_pair_when_alternatives_exist():
     candidates = [_candidate(1, count=8), _candidate(2, count=8), _candidate(3, count=8)]
     history = [
@@ -276,6 +305,26 @@ def test_isolated_low_coverage_content_is_found_by_exploration():
     )
 
     assert 4 in _pair_key(result.selected_pair)
+
+
+def test_focus_respects_the_all_time_pair_ceiling():
+    candidates = [_candidate(1), _candidate(2), _candidate(3)]
+    result = select_pair(
+        candidates,
+        [],
+        context=SelectorContext(focus_content_id=1, pair_comparison_counts={(1, 2): 8}),
+        config=SelectorConfig(
+            focus_probability=1,
+            exploration_rate=0,
+            pair_cooldown_count=0,
+            skip_cooldown_count=0,
+            random_seed=0,
+        ),
+    )
+
+    assert _pair_key(result.selected_pair) == (1, 3)
+    assert result.diagnostics.focus_available is True
+    assert result.diagnostics.focus_selected is True
 
 
 def test_focus_content_has_nearby_rank_opponent():

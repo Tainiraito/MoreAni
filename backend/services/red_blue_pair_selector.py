@@ -17,7 +17,8 @@ import math
 import random
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from types import MappingProxyType
 from datetime import UTC, datetime
 from enum import StrEnum
 from itertools import combinations
@@ -97,6 +98,8 @@ class SelectorContext:
     tie_strength: float | None = None
     # 配置了 seconds cooldown 时必须由上游提供 now，避免 Selector 隐式读取系统时间。
     now: datetime | None = None
+    # 近期历史窗口之外仍需保留的全历史无序 Pair 次数，防止滑窗后绕过重复上限。
+    pair_comparison_counts: Mapping[tuple[int, int], int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """将可迭代输入规范化为不可变集合。"""
@@ -107,13 +110,22 @@ class SelectorContext:
         )
         if self.tie_strength is not None:
             validate_tie_strength(self.tie_strength)
+        pair_counts: dict[tuple[int, int], int] = {}
+        for raw_pair, raw_count in self.pair_comparison_counts.items():
+            if len(raw_pair) != 2 or raw_pair[0] == raw_pair[1]:
+                raise ValueError('pair_comparison_counts 必须使用两个不同作品组成的无序 Pair')
+            count = int(raw_count)
+            if count < 0:
+                raise ValueError('pair_comparison_counts 不能为负数')
+            pair_counts[tuple(sorted((int(raw_pair[0]), int(raw_pair[1]))))] = count
+        object.__setattr__(self, 'pair_comparison_counts', MappingProxyType(pair_counts))
 
 
 @dataclass(frozen=True, slots=True)
 class SelectorConfig:
     """Selector 的完整、可序列化配置。"""
 
-    selector_version: str = 'selector-v1'
+    selector_version: str = 'selector-v2'
 
     # Acquisition components
     exploration_rate: float = 0.12
@@ -300,6 +312,7 @@ class SelectorDiagnostics:
     fallback_used: bool
     exploration_used: bool
     focus_requested: bool
+    focus_available: bool
     focus_selected: bool
     shortlist_used: bool
     pair_evaluation_count: int
@@ -1162,8 +1175,11 @@ def _score_pair(
             for position in positions
         ),
         max(
-            (interactions[position].pair_comparison_count for position in positions),
-            default=0,
+            max(
+                (interactions[position].pair_comparison_count for position in positions),
+                default=0,
+            ),
+            context.pair_comparison_counts.get(pair, 0),
         ),
     )
     pair_limit = (
@@ -1303,8 +1319,11 @@ def _pair_hard_blocked(
             for position in pair_positions
         ),
         max(
-            (interactions[position].pair_comparison_count for position in pair_positions),
-            default=0,
+            max(
+                (interactions[position].pair_comparison_count for position in pair_positions),
+                default=0,
+            ),
+            context.pair_comparison_counts.get(pair, 0),
         ),
     )
     pair_limit = (
@@ -1389,6 +1408,7 @@ def _diagnostics(
     score_seconds: float,
     selection_seconds: float,
     total_seconds: float,
+    focus_available: bool = False,
 ) -> SelectorDiagnostics:
     """集中生成有限诊断值。"""
     return SelectorDiagnostics(
@@ -1401,6 +1421,7 @@ def _diagnostics(
         fallback_used=fallback_used,
         exploration_used=exploration_used,
         focus_requested=focus_requested,
+        focus_available=focus_available,
         focus_selected=focus_selected,
         shortlist_used=shortlist_used,
         pair_evaluation_count=pair_evaluation_count,
@@ -1508,25 +1529,69 @@ def select_pair(
     full_acquisition_scoring_seconds = time.perf_counter() - score_started_at
 
     focus_requested = active_context.focus_content_id in candidate_ids
+    coverage_fallback_used = False
     if not focus_requested:
         coverage_target = _coverage_target(len(candidate_list), active_config)
-        undercovered_ids = {
+        minimum_comparisons = min(feature.comparison_count for feature in features.values())
+        balanced_ids = {
             content_id
             for content_id, feature in features.items()
-            if feature.comparison_count < coverage_target
+            if feature.comparison_count <= minimum_comparisons + coverage_target
         }
         coverage_pairs = tuple(
             pair
             for pair in eligible_pairs
-            if pair.low_content_id in undercovered_ids and pair.high_content_id in undercovered_ids
+            if pair.low_content_id in balanced_ids and pair.high_content_id in balanced_ids
         )
         if coverage_pairs:
-            # 普通模式先把低于目标的作品彼此配对，避免高曝光作品只因能搭配
-            # 一个新作品，就持续从 new_content / coverage_floor 得到加分。
+            # 普通模式持续在当前最低覆盖附近选择，避免达到静态目标后少数热点作品
+            # 继续累积比较；Focus 请求则保留目标作品优先行为。
             eligible_pairs = coverage_pairs
+        elif len(balanced_ids) >= 2:
+            # 有限 shortlist 可能漏掉全部低覆盖组合。此时只扫描低覆盖池，
+            # 避免因为高分热点组合占满 shortlist 而放弃普通模式的覆盖上限。
+            coverage_keys = _fallback_pair_keys(
+                set(shortlist.pair_keys),
+                features,
+                tuple(sorted(balanced_ids)),
+                interactions,
+                positions_by_pair,
+                exposure_by_content,
+                active_context,
+                active_config,
+                tie_strength,
+            )
+            coverage_scores = tuple(
+                _score_pair(
+                    features[first_content_id],
+                    features[second_content_id],
+                    interactions,
+                    positions_by_pair,
+                    exposure_by_content,
+                    active_context,
+                    active_config,
+                    tie_strength,
+                    len(candidate_list),
+                )
+                for first_content_id, second_content_id in coverage_keys
+            )
+            coverage_eligible = tuple(
+                pair
+                for pair in coverage_scores
+                if not pair.pair_cooldown_blocked
+                and not pair.skip_cooldown_blocked
+                and not pair.excessive_exposure
+                and not pair.repeat_ceiling_blocked
+            )
+            if coverage_eligible:
+                scored_pairs = (*scored_pairs, *coverage_scores)
+                eligible_pairs = coverage_eligible
+                coverage_fallback_used = True
+                shortlist_source_counts = dict(shortlist.source_counts)
+                shortlist_source_counts['coverage_fallback'] = len(coverage_scores)
 
-    fallback_used = False
-    fallback_reason = SelectionReason.NORMAL
+    fallback_used = coverage_fallback_used
+    fallback_reason = SelectionReason.UNDEREXPLORED if coverage_fallback_used else SelectionReason.NORMAL
     if not eligible_pairs and len(candidate_list) > 2:
         fallback_pairs = _fallback_pair_keys(
             set(shortlist.pair_keys),
@@ -1604,6 +1669,7 @@ def select_pair(
                 score_seconds=full_acquisition_scoring_seconds,
                 selection_seconds=selection_seconds,
                 total_seconds=time.perf_counter() - started_at,
+                focus_available=bool(focus_pairs),
             )
             return PairSelectionResult(
                 selected_pair=None,
@@ -1678,6 +1744,7 @@ def select_pair(
         score_seconds=full_acquisition_scoring_seconds,
         selection_seconds=selection_seconds,
         total_seconds=time.perf_counter() - started_at,
+        focus_available=bool(focus_pairs),
     )
     return PairSelectionResult(
         selected_pair=selected_pair,

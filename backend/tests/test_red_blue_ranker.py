@@ -85,7 +85,16 @@ def test_config_round_trip_is_json_serializable():
     restored = RankerConfig.from_json(config.to_json())
 
     assert restored == config
-    assert json.loads(config.to_json())['algorithm_version'] == 'ranker-v1'
+    assert json.loads(config.to_json())['algorithm_version'] == 'ranker-v2'
+
+
+def test_baseline_prior_precision_scales_with_candidate_pool_size():
+    config = RankerConfig()
+    expected = {50: 0.001, 100: 0.00025, 500: 0.00001}
+
+    for candidate_count, precision in expected.items():
+        priors = build_score_priors(_candidates(candidate_count), [], config)
+        assert math.isclose(priors[1].precision, precision, rel_tol=1e-12)
 
 
 def test_empty_single_and_score_only_inputs_are_finite():
@@ -341,6 +350,34 @@ def test_stable_base_state_can_keep_order_uncertain_flag():
     )
     assert normalized[0].stability is RankerStability.STABLE
     assert normalized[0].order_uncertain is True
+
+
+def test_order_uncertain_uses_posterior_order_not_davidson_game_probability():
+    candidates = _candidates(2)
+    config = RankerConfig(posterior_sample_count=128)
+    decisive = rank_preferences(
+        candidates,
+        [],
+        [
+            Comparison(index, 1, 2, ComparisonOutcome.LEFT_WIN)
+            for index in range(1, 9)
+        ],
+        config,
+    )
+    unresolved = rank_preferences(
+        candidates,
+        [],
+        [
+            Comparison(index, 1, 2, ComparisonOutcome.TIE)
+            for index in range(1, 9)
+        ],
+        config,
+    )
+
+    assert all(result.stability is RankerStability.STABLE for result in decisive.results)
+    assert all(result.order_uncertain is False for result in decisive.results)
+    assert all(result.stability is RankerStability.STABLE for result in unresolved.results)
+    assert all(result.order_uncertain is True for result in unresolved.results)
 
 
 def test_extreme_inputs_do_not_return_nan_or_infinity():

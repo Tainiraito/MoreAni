@@ -1,5 +1,7 @@
 # 红蓝合战阶段 2：纯偏好 Ranker
 
+> 本文记录阶段 2 的 Ranker 设计和实验；当前字段语义、阈值与持久快照恢复见[阶段 8 综合设计](red-blue-battle.md)。
+
 ## 范围
 
 Ranker 是与 SQLAlchemy 解耦的纯算法模块，入口为：

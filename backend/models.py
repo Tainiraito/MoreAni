@@ -481,6 +481,7 @@ class PreferenceResult(Base):
         default=PreferenceStability.UNCALIBRATED,
     )
     comparison_count = Column(Integer, nullable=False, default=0)
+    order_uncertain = Column(Boolean, nullable=False, default=False, server_default='0')
     computed_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
 
     model_run = relationship('PreferenceModelRun', back_populates='results')

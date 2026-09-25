@@ -616,3 +616,72 @@ def test_state_serialization_scale(client, db, make_user, api_service, count):
     assert len(response.content) > 0
     # 4C 记录实际测量值但不把机器相关的绝对耗时写死为硬门槛。
     print(f'RED_BLUE_STATE_BENCH count={count} seconds={elapsed:.6f} bytes={len(response.content)}')
+
+
+@pytest.mark.parametrize('count', [100, 500, 1000])
+def test_http_read_write_latency_distribution_scale(client, db, make_user, api_service, count):
+    """记录重复 state 读取与 comparison 写入的 P50/P95 和实际响应体大小。"""
+    user = make_user(f'red-blue-http-latency-{count}')
+    _seed_contents(db, user.id, count)
+    cookies = auth_cookie(user)
+    warm_state = client.get('/api/v1/red-blue/state', cookies=cookies)
+    assert warm_state.status_code == 200
+    pair = warm_state.json()['current_pair']
+    assert pair is not None
+    warm_write = client.post(
+        '/api/v1/red-blue/comparisons',
+        cookies=cookies,
+        json={
+            'left_content_id': pair['left']['content_id'],
+            'right_content_id': pair['right']['content_id'],
+            'outcome': 'LEFT_WIN',
+            'client_event_id': str(uuid4()),
+        },
+    )
+    assert warm_write.status_code == 200
+    pair = warm_write.json()['next_pair']
+    assert pair is not None
+
+    read_seconds: list[float] = []
+    read_sizes: list[int] = []
+    write_seconds: list[float] = []
+    write_sizes: list[int] = []
+    for _ in range(20):
+        started = time.perf_counter()
+        state = client.get('/api/v1/red-blue/state', cookies=cookies)
+        read_seconds.append(time.perf_counter() - started)
+        assert state.status_code == 200
+        read_sizes.append(len(state.content))
+
+        started = time.perf_counter()
+        response = client.post(
+            '/api/v1/red-blue/comparisons',
+            cookies=cookies,
+            json={
+                'left_content_id': pair['left']['content_id'],
+                'right_content_id': pair['right']['content_id'],
+                'outcome': 'LEFT_WIN',
+                'client_event_id': str(uuid4()),
+            },
+        )
+        write_seconds.append(time.perf_counter() - started)
+        assert response.status_code == 200, response.text
+        write_sizes.append(len(response.content))
+        pair = response.json()['next_pair']
+        assert pair is not None
+
+    def percentile(values: list[float], fraction: float) -> float:
+        ordered = sorted(values)
+        index = max(0, min(len(ordered) - 1, int((len(ordered) - 1) * fraction + 0.5)))
+        return ordered[index]
+
+    print(
+        'RED_BLUE_HTTP_LATENCY_BENCH '
+        f'candidates={count} samples={len(read_seconds)} '
+        f'read_p50_ms={percentile(read_seconds, 0.50) * 1000:.3f} '
+        f'read_p95_ms={percentile(read_seconds, 0.95) * 1000:.3f} '
+        f'read_bytes={int(sum(read_sizes) / len(read_sizes))} '
+        f'write_p50_ms={percentile(write_seconds, 0.50) * 1000:.3f} '
+        f'write_p95_ms={percentile(write_seconds, 0.95) * 1000:.3f} '
+        f'write_bytes={int(sum(write_sizes) / len(write_sizes))}',
+    )

@@ -90,14 +90,15 @@ class ScorePrior:
 class RankerConfig:
     """所有影响 Ranker 的参数，能够直接序列化到 algorithm_config_json。"""
 
-    algorithm_version: str = 'ranker-v1'
+    algorithm_version: str = 'ranker-v2'
 
     # Score Anchor prior
     score_prior_strength: float = 0.65
     score_prior_scale: float = 1.50
     score_percentile_clip: float = 0.02
     score_prior_shrinkage: float = 6.0
-    baseline_prior_precision: float = 0.05
+    baseline_prior_precision: float = 0.001
+    baseline_prior_reference_candidates: int = 50
 
     # Davidson tie likelihood
     tie_strength: float = DEFAULT_TIE_STRENGTH
@@ -128,8 +129,7 @@ class RankerConfig:
     stable_min_comparisons: int = 8
     stable_max_interval_width: int = 2
     order_uncertain_min_comparisons: int = 2
-    order_uncertain_pairwise_confidence: float = 0.60
-    order_uncertain_tie_probability: float = 0.25
+    order_uncertain_posterior_confidence: float = 0.60
     order_uncertain_neighbor_rank_distance: float = 2.0
 
     def __post_init__(self) -> None:
@@ -146,6 +146,8 @@ class RankerConfig:
             raise ValueError('score_prior_shrinkage 不能为负数')
         if self.baseline_prior_precision <= 0:
             raise ValueError('baseline_prior_precision 必须大于 0')
+        if self.baseline_prior_reference_candidates < 1:
+            raise ValueError('baseline_prior_reference_candidates 必须至少为 1')
         validate_tie_strength(self.tie_strength)
         if not 0 < self.repeat_pair_exponent <= 1:
             raise ValueError('repeat_pair_exponent 必须位于 (0, 1]')
@@ -177,10 +179,8 @@ class RankerConfig:
             raise ValueError('稳定性区间宽度不能为负数')
         if self.order_uncertain_min_comparisons < 1:
             raise ValueError('order_uncertain_min_comparisons 必须至少为 1')
-        if not 0.5 <= self.order_uncertain_pairwise_confidence <= 1:
-            raise ValueError('order_uncertain_pairwise_confidence 必须位于 [0.5, 1]')
-        if not 0 <= self.order_uncertain_tie_probability <= 1:
-            raise ValueError('order_uncertain_tie_probability 必须位于 [0, 1]')
+        if not 0.5 <= self.order_uncertain_posterior_confidence <= 1:
+            raise ValueError('order_uncertain_posterior_confidence 必须位于 [0.5, 1]')
         if self.order_uncertain_neighbor_rank_distance < 0:
             raise ValueError('order_uncertain_neighbor_rank_distance 不能为负数')
 
@@ -305,6 +305,10 @@ def build_score_priors(
     }
     positive_scores = sorted(score for score in representative_scores.values() if score > 0)
     sample_count = len(positive_scores)
+    candidate_count = max(len(candidate_ids), 1)
+    baseline_precision = active_config.baseline_prior_precision * (
+        active_config.baseline_prior_reference_candidates / candidate_count
+    ) ** 2
     prior_by_id: dict[int, ScorePrior] = {}
 
     for content_id in candidate_ids:
@@ -312,7 +316,7 @@ def build_score_priors(
         if score is None or score <= 0 or sample_count == 0:
             prior_by_id[content_id] = ScorePrior(
                 mean=0.0,
-                precision=active_config.baseline_prior_precision,
+                precision=baseline_precision,
                 percentile=None,
                 anchor_count=0,
             )
@@ -331,12 +335,12 @@ def build_score_priors(
             else 1.0
         )
         prior_mean = active_config.score_prior_scale * _normal_quantile(clipped)
-        prior_precision = active_config.baseline_prior_precision + (
+        prior_precision = baseline_precision + (
             effective_strength / (active_config.score_prior_scale**2)
         )
         prior_by_id[content_id] = ScorePrior(
             mean=_finite(prior_mean),
-            precision=_finite(prior_precision, active_config.baseline_prior_precision),
+            precision=_finite(prior_precision, baseline_precision),
             percentile=_finite(percentile, 0.5),
             anchor_count=1,
         )
@@ -654,6 +658,7 @@ def _sample_rank_distribution(
 
 def _ambiguous_candidates(
     mean: np.ndarray,
+    covariance: np.ndarray,
     expected_rank: np.ndarray,
     rank_low: np.ndarray,
     rank_high: np.ndarray,
@@ -661,13 +666,13 @@ def _ambiguous_candidates(
     candidate_ids: Sequence[int],
     config: RankerConfig,
 ) -> set[int]:
-    """找出后验上难以与邻近作品分先后的候选。"""
+    """按后验潜在偏好顺序置信度找出邻近排序不确定的候选。"""
     ambiguous: set[int] = set()
     for first_index, first_id in enumerate(candidate_ids):
-        if comparison_counts[first_id] < config.order_uncertain_min_comparisons:
-            continue
         for second_index in range(first_index + 1, len(candidate_ids)):
             second_id = candidate_ids[second_index]
+            if min(comparison_counts[first_id], comparison_counts[second_id]) < config.order_uncertain_min_comparisons:
+                continue
             intervals_overlap = not (
                 rank_high[first_index] < rank_low[second_index]
                 or rank_high[second_index] < rank_low[first_index]
@@ -677,16 +682,22 @@ def _ambiguous_candidates(
             )
             if not intervals_overlap and not rank_neighbors:
                 continue
-            probability = pairwise_probability(
-                float(mean[first_index]),
-                float(mean[second_index]),
-                config.tie_strength,
+            difference = float(mean[first_index] - mean[second_index])
+            difference_variance = max(
+                float(
+                    covariance[first_index, first_index]
+                    + covariance[second_index, second_index]
+                    - 2.0 * covariance[first_index, second_index]
+                ),
+                0.0,
             )
-            strongest_direction = max(probability.win_a, probability.win_b)
-            if (
-                strongest_direction < config.order_uncertain_pairwise_confidence
-                or probability.tie >= config.order_uncertain_tie_probability
-            ):
+            if difference_variance <= config.covariance_eigenvalue_floor:
+                posterior_order_confidence = 1.0 if difference != 0.0 else 0.5
+            else:
+                posterior_order_confidence = NormalDist().cdf(
+                    abs(difference) / math.sqrt(difference_variance),
+                )
+            if posterior_order_confidence < config.order_uncertain_posterior_confidence:
                 ambiguous.add(first_id)
                 ambiguous.add(second_id)
     return ambiguous
@@ -735,16 +746,6 @@ def normalize_preference_results(
     if not results:
         return ()
     ordered = tuple(sorted(results, key=lambda result: result.content_id))
-    candidate_ids = tuple(result.content_id for result in ordered)
-    ambiguous_ids = _ambiguous_candidates(
-        np.asarray([result.preference_mean for result in ordered], dtype=float),
-        np.asarray([result.expected_rank for result in ordered], dtype=float),
-        np.asarray([result.rank_low for result in ordered], dtype=int),
-        np.asarray([result.rank_high for result in ordered], dtype=int),
-        {result.content_id: result.comparison_count for result in ordered},
-        candidate_ids,
-        active_config,
-    )
     return tuple(
         replace(
             result,
@@ -757,7 +758,6 @@ def normalize_preference_results(
                 result.order_uncertain
                 or str(getattr(result.stability, 'value', result.stability))
                 == RankerStability.ORDER_UNCERTAIN.value
-                or result.content_id in ambiguous_ids
             ),
         )
         for result in ordered
@@ -837,6 +837,7 @@ def rank_preferences(
     rank_low = np.minimum(rank_low, rank_high)
     ambiguous_ids = _ambiguous_candidates(
         fit.mean,
+        covariance,
         expected_rank,
         rank_low,
         rank_high,

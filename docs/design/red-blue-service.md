@@ -1,5 +1,7 @@
 # 红蓝合战阶段 4B：领域 Service 与 Fast State 生命周期
 
+> 本文记录阶段 4B 的 Service 实现过程；后续 API、评分建议、页面行为及阶段 8 最终参数以[综合设计](red-blue-battle.md)为准。
+
 ## 范围
 
 阶段 4B 只实现后端领域层，不注册 HTTP Router、不修改前端、不实现 Score Suggestion，也不引入 WebSocket、SSE、Redis 或 Celery。

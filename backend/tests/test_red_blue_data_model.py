@@ -402,6 +402,29 @@ def test_pk_suggestion_revision_has_distinct_provenance(db, make_user):
     assert revision.score_suggestion_action_id == action.id
 
 
+def test_order_uncertainty_migration_adds_independent_flag_and_is_idempotent(tmp_path, monkeypatch):
+    database_engine = create_engine(f'sqlite:///{tmp_path / "order-uncertainty.db"}')
+    with database_engine.begin() as connection:
+        connection.exec_driver_sql(
+            'CREATE TABLE preference_results (id INTEGER PRIMARY KEY, stability VARCHAR(32) NOT NULL)'
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO preference_results (id, stability) VALUES (1, 'STABLE')"
+        )
+
+    monkeypatch.setattr(main_module, 'engine', database_engine)
+    main_module._migrate_red_blue_order_uncertainty()
+    columns = {column['name'] for column in inspect(database_engine).get_columns('preference_results')}
+    assert 'order_uncertain' in columns
+    with database_engine.connect() as connection:
+        assert connection.execute(text("SELECT order_uncertain FROM preference_results WHERE id = 1")).scalar_one() == 0
+    with database_engine.begin() as connection:
+        connection.execute(text('UPDATE preference_results SET order_uncertain = 1 WHERE id = 1'))
+    main_module._migrate_red_blue_order_uncertainty()
+    with database_engine.connect() as connection:
+        assert connection.execute(text("SELECT order_uncertain FROM preference_results WHERE id = 1")).scalar_one() == 1
+
+
 def test_red_blue_foundation_migration_backfills_existing_scores_and_is_idempotent(tmp_path, monkeypatch):
     """旧数据库只把当前 Rating.score 作为一次性 anchor 基线，不改写旧历史。"""
     database_engine = create_engine(f'sqlite:///{tmp_path / "legacy.db"}')
@@ -482,3 +505,60 @@ def test_red_blue_foundation_migration_backfills_existing_scores_and_is_idempote
         'score_suggestions',
         'score_suggestion_actions',
     } <= table_names
+
+
+def test_score_suggestion_uniqueness_migration_recovers_interrupted_legacy_table(tmp_path, monkeypatch):
+    """0012 在新表已建成、旧表尚未删除时应恢复并保留建议行。"""
+    from database import Base
+
+    database_engine = create_engine(f'sqlite:///{tmp_path / "suggestion-migration-recovery.db"}')
+    Base.metadata.create_all(database_engine)
+    monkeypatch.setattr(main_module, 'engine', database_engine)
+    with database_engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users (id, username, nickname, password_hash, role) "
+                "VALUES (1, 'migration-user', 'Migration User', 'unused', 'user')",
+            ),
+        )
+        connection.execute(
+            text(
+                "INSERT INTO content_items (id, title, content_type, created_by) "
+                "VALUES (1, 'Interrupted suggestion', 'anime', 1)",
+            ),
+        )
+        connection.execute(
+            text(
+                "INSERT INTO preference_model_runs "
+                "(id, user_id, algorithm_version, status, algorithm_config_json) "
+                "VALUES (1, 1, 'ranker-v2', 'COMPLETED', '{}')",
+            ),
+        )
+        connection.execute(text('CREATE TABLE score_suggestions_legacy AS SELECT * FROM score_suggestions WHERE 0'))
+        connection.execute(
+            text(
+                "INSERT INTO score_suggestions_legacy "
+                '(id, user_id, content_id, model_run_id, suggestion_key, current_score, '
+                'suggested_score_low, suggested_score_high, recommended_score, direction, '
+                'confidence, severity, reason_code, status, created_at) '
+                "VALUES (5, 1, 1, 1, 'recovery-key', 70, 80, 85, 85, 'UP', "
+                "0.9, 0.8, 'OUTLIER', 'PENDING', CURRENT_TIMESTAMP)",
+            ),
+        )
+
+    main_module._migrate_red_blue_score_suggestion_key_uniqueness()
+    main_module._migrate_red_blue_score_suggestion_key_uniqueness()
+
+    with database_engine.connect() as connection:
+        restored = connection.execute(
+            text('SELECT suggestion_key, recommended_score, status FROM score_suggestions WHERE id = 5'),
+        ).one()
+        legacy_table_count = connection.execute(
+            text("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'score_suggestions_legacy'"),
+        ).scalar_one()
+        indexes = {row[1] for row in connection.execute(text('PRAGMA index_list(score_suggestions)'))}
+
+    assert tuple(restored) == ('recovery-key', 85, 'PENDING')
+    assert legacy_table_count == 0
+    assert 'ix_score_suggestions_user_content_key' in indexes
+    database_engine.dispose()

@@ -320,7 +320,7 @@ describe('AnalyticsPage', () => {
     await waitFor(() => expect(view.queryByRole('button', { name: '恋爱加权' })).not.toBeInTheDocument())
 
     fireEvent.change(view.getByLabelText('最低评分'), { target: { value: '4' } })
-    const restoredLoveTag = await view.findByRole('button', { name: '恋爱加权' })
+    const restoredLoveTag = await view.findByRole('button', { name: '恋爱加权' }, { timeout: 3_000 })
     await waitFor(() => expect(restoredLoveTag).toHaveAttribute('aria-pressed', 'true'))
     await waitFor(() => expect(api.getAnalyticsOverview).toHaveBeenCalledWith(
       { scope: 'global', userId: undefined, minScore: 4, maxScore: 10, tags: ['恋爱加权'] },

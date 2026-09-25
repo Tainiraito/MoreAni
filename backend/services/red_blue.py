@@ -750,7 +750,13 @@ class RedBlueService:
                 running_fingerprint = self._running_input_fingerprints.get(user_id)
                 if running_fingerprint is not None:
                     current_fingerprint = self._read_current_full_input_fingerprint(user_id)
-                    if current_fingerprint != running_fingerprint:
+                    comparison_only_change = (
+                        current_fingerprint[:2] != running_fingerprint[:2]
+                        and current_fingerprint[2:] == running_fingerprint[2:]
+                    )
+                    if current_fingerprint != running_fingerprint and not (
+                        parsed_reason is FullRecalibrationReason.FIRST_SNAPSHOT and comparison_only_change
+                    ):
                         self._pending_reasons.setdefault(user_id, parsed_reason)
                 return False
             db = self.session_factory()
@@ -868,6 +874,7 @@ class RedBlueService:
                             rank_high=result.rank_high,
                             stability=PreferenceStability(result.stability.value),
                             comparison_count=result.comparison_count,
+                            order_uncertain=result.order_uncertain,
                         )
                         for result in pure_output.results
                     ],
@@ -940,7 +947,7 @@ class RedBlueService:
                 run_id,
                 PreferenceModelRunStatus.COMPLETED,
                 compatible,
-                live_fingerprint != snapshot.fingerprint,
+                not compatible,
             )
         finally:
             final_db.close()
@@ -1148,6 +1155,7 @@ class RedBlueService:
                 rank_high=row.rank_high,
                 stability=RankerStability(row.stability.value),
                 comparison_count=row.comparison_count,
+                order_uncertain=row.order_uncertain,
             )
             for row in sorted(run.results, key=lambda item: item.content_id)
         )
@@ -1158,7 +1166,7 @@ class RedBlueService:
         results = normalize_preference_results(raw_results, snapshot_ranker_config)
         if {result.content_id for result in results} != {candidate.content_id for candidate in candidates}:
             raise ValueError('Full Snapshot candidates 与当前候选集合不一致')
-        base_comparisons = self._read_comparisons(db, user_id, max_id=run.input_comparison_max_id)
+        base_comparisons = self._read_comparisons(db, user_id, max_id=run.input_comparison_max_id or 0)
         from services.red_blue_ranker import RankerDiagnostics, RankerOutput
 
         algorithm_state = create_fast_preference_state(
@@ -1617,13 +1625,14 @@ class RedBlueService:
     ) -> BattleState:
         """将运行时状态和最近 Selector history 组合为领域结果。"""
         selector_candidates = to_selector_candidates(state.algorithm_state)
-        selector_history = self._selector_history(db, state.user_id)
+        selector_history, pair_counts = self._selector_history(db, state.user_id)
         selection = select_pair(
             selector_candidates,
             selector_history,
             context=SelectorContext(
                 focus_content_id=focus_content_id,
                 tie_strength=self.config.ranker_config.tie_strength,
+                pair_comparison_counts=pair_counts,
             ),
             config=self.config.selector_config,
         )
@@ -1703,8 +1712,12 @@ class RedBlueService:
         ):
             raise RedBlueComparisonConflictError('client_event_id 已用于不同 Comparison payload')
 
-    def _selector_history(self, db: Session, user_id: int) -> tuple[SelectorComparison, ...]:
-        """读取近期 Selector 历史，并补充全历史 Pair 次数用于硬上限。"""
+    def _selector_history(
+        self,
+        db: Session,
+        user_id: int,
+    ) -> tuple[tuple[SelectorComparison, ...], dict[tuple[int, int], int]]:
+        """读取近期 history，并单独返回全历史 Pair 次数用于硬上限。"""
         rows = (
             db.query(RedBlueComparison)
             .filter(RedBlueComparison.user_id == user_id)
@@ -1727,7 +1740,7 @@ class RedBlueService:
         ):
             pair = tuple(sorted((left_content_id, right_content_id)))
             pair_counts[pair] = pair_counts.get(pair, 0) + 1
-        return tuple(
+        recent_history = tuple(
             SelectorComparison(
                 id=row.id,
                 left_content_id=row.left_content_id,
@@ -1743,6 +1756,7 @@ class RedBlueService:
             )
             for row in reversed(rows)
         )
+        return recent_history, pair_counts
 
     def _reason_for_state(self, state: RuntimeFastState) -> FullRecalibrationReason:
         """为状态过期选择可解释的调度原因。"""

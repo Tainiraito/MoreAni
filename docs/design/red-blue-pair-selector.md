@@ -1,5 +1,7 @@
 # 红蓝合战阶段 3.1：纯 Pair Selector 收尾
 
+> 本文记录阶段 3.1 的 Selector 设计和实验；当前 coverage 参数、Focus 行为与系统边界见[阶段 8 综合设计](red-blue-battle.md)。
+
 ## 范围与边界
 
 实现位置：`backend/services/red_blue_pair_selector.py`。
@@ -231,7 +233,7 @@ rank_boundary = exp(-minimum_distance_to_boundary / rank_boundary_scale)
 
 `SelectorConfig` 包括：
 
-- 版本：`selector-v1`；
+- 版本：`selector-v2`；
 - 探索：`exploration_rate=0.12`；
 - 正向权重：uncertainty 1.30、overlap 1.10、proximity 0.80、underexplored 1.00、
   new content 1.20、graph 0.90、boundary 0.55、anchor changed 0.75、focus 1.00；
@@ -241,6 +243,7 @@ rank_boundary = exp(-minimum_distance_to_boundary / rank_boundary_scale)
   cross component 6、exploration seed 24、exploration Pair 64、boundary window 6；
 - Davidson：由 `SelectorContext.tie_strength` 接收当前 Ranker/Model Run 的值；缺失时只使用
   `red_blue_math.DEFAULT_TIE_STRENGTH=0.80` 作为无完整模型状态的 fallback；
+- 普通 coverage：目标按候选数的 `ceil(log2(N))` 伸缩并限制在 4–8 次；候选曝光差距超过当前最低值加目标时暂停入选。若有限 shortlist 漏掉所有低覆盖合法 Pair，只在低覆盖候选池补选；Focus 保留目标优先且仍遵守 Pair 上限。
 - Focus：`focus_probability=0.80`；
 - cooldown：Pair 最近 2 条，SKIP 最近 5 条；
 - 曝光：最近 8 条、默认连续曝光上限 2；
@@ -300,7 +303,7 @@ minimum = 1.0000
 
 1. Selector 不持有完整 posterior covariance，因此 acquisition score 不是严格 Expected Information Gain。
 2. shortlist 是高质量启发式候选集，不保证任意数据分布下 100% 复现 exhaustive 最优 Pair；
-   fallback 只在 shortlist 没有合法 Pair 时触发。
+   低覆盖 fallback 在 shortlist 没有低覆盖合法 Pair 时触发；通用 cooldown fallback 只在 shortlist 没有合法 Pair 时触发。
 3. 当前曝光控制基于输入 comparison 历史的最近顺序，不保存 Selector 自己的会话状态。
 4. `pair_cooldown_seconds` 和 `skip_cooldown_seconds` 需要上游提供 `SelectorContext.now`，
    以保持纯函数和可重放性。
