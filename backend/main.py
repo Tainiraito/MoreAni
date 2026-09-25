@@ -7,7 +7,6 @@ rate limit middleware, and creates tables on startup.
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,9 +21,6 @@ from models import (
     ContentItem,
     PreferenceModelRun,
     PreferenceResult,
-    Rating,
-    RatingRevision,
-    RatingRevisionSource,
     RedBlueComparison,
     RedBlueUserState,
     ResourceSubscription,
@@ -243,12 +239,8 @@ def _migrate_rating_revisions() -> None:
 
     try:
         with engine.begin() as conn:
-            rating_columns = {
-                row[1] for row in conn.execute(text('PRAGMA table_info(ratings)'))
-            }
-            revision_columns = {
-                row[1] for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))
-            }
+            rating_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(ratings)'))}
+            revision_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))}
             if not rating_columns or not revision_columns:
                 return
 
@@ -294,6 +286,7 @@ def _migrate_rating_revisions() -> None:
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f'[migrate] rating revisions 迁移失败: {exc}') from exc
 
+
 def _migrate_red_blue_preference_foundation() -> None:
     """建立红蓝合战事实、模型运行、排名快照和评分建议基础结构。"""
     from sqlalchemy import text
@@ -311,16 +304,12 @@ def _migrate_red_blue_preference_foundation() -> None:
             ):
                 table.create(bind=conn, checkfirst=True)
 
-            rating_columns = {
-                row[1]
-                for row in conn.execute(text('PRAGMA table_info(ratings)'))
-            }
+            rating_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(ratings)'))}
             score_anchor_added = 'score_anchor' not in rating_columns
             if score_anchor_added:
                 conn.execute(
                     text(
-                        'ALTER TABLE ratings '
-                        'ADD COLUMN score_anchor INTEGER NOT NULL DEFAULT 0',
+                        'ALTER TABLE ratings ADD COLUMN score_anchor INTEGER NOT NULL DEFAULT 0',
                     ),
                 )
                 # 只在首次补列时初始化；若未来迁移已存在该列，绝不覆盖用户
@@ -329,15 +318,11 @@ def _migrate_red_blue_preference_foundation() -> None:
 
             conn.execute(
                 text(
-                    'CREATE INDEX IF NOT EXISTS ix_ratings_user_score_anchor '
-                    'ON ratings (user_id, score_anchor)',
+                    'CREATE INDEX IF NOT EXISTS ix_ratings_user_score_anchor ON ratings (user_id, score_anchor)',
                 ),
             )
 
-            revision_columns = {
-                row[1]
-                for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))
-            }
+            revision_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(rating_revisions)'))}
             if 'score_suggestion_id' not in revision_columns:
                 conn.execute(
                     text(
@@ -380,24 +365,19 @@ def _migrate_preference_model_run_input_metadata() -> None:
 
     try:
         with engine.begin() as conn:
-            columns = {
-                row[1]
-                for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))
-            }
+            columns = {row[1] for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))}
             if not columns:
                 return
             if 'input_rating_revision_max_id' not in columns:
                 conn.execute(
                     text(
-                        'ALTER TABLE preference_model_runs '
-                        'ADD COLUMN input_rating_revision_max_id INTEGER',
+                        'ALTER TABLE preference_model_runs ADD COLUMN input_rating_revision_max_id INTEGER',
                     ),
                 )
             if 'algorithm_config_json' not in columns:
                 conn.execute(
                     text(
-                        "ALTER TABLE preference_model_runs "
-                        "ADD COLUMN algorithm_config_json TEXT NOT NULL DEFAULT '{}'",
+                        "ALTER TABLE preference_model_runs ADD COLUMN algorithm_config_json TEXT NOT NULL DEFAULT '{}'",
                     ),
                 )
             conn.execute(
@@ -419,10 +399,7 @@ def _migrate_red_blue_realtime_state() -> None:
     try:
         with engine.begin() as conn:
             RedBlueUserState.__table__.create(bind=conn, checkfirst=True)
-            columns = {
-                row[1]
-                for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))
-            }
+            columns = {row[1] for row in conn.execute(text('PRAGMA table_info(preference_model_runs)'))}
             if columns:
                 if 'input_comparison_state_version' not in columns:
                     conn.execute(
@@ -474,9 +451,7 @@ def _migrate_red_blue_score_suggestion_actions() -> None:
 
     try:
         with engine.begin() as conn:
-            suggestion_columns = {
-                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))
-            }
+            suggestion_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))}
             if suggestion_columns:
                 additions = {
                     'direction': 'VARCHAR(16)',
@@ -491,9 +466,7 @@ def _migrate_red_blue_score_suggestion_actions() -> None:
                             ),
                         )
 
-            action_columns = {
-                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestion_actions)'))
-            }
+            action_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestion_actions)'))}
             if action_columns:
                 additions = {
                     'comparison_state_version_at_action': 'INTEGER NOT NULL DEFAULT 0',
@@ -532,9 +505,7 @@ def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
 
     try:
         with engine.begin() as conn:
-            table_columns = {
-                row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))
-            }
+            table_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions)'))}
             if not table_columns:
                 return
 
@@ -559,17 +530,12 @@ def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
 
             def copy_legacy_rows(source_table: str) -> None:
                 """把中断迁移留下的旧表数据补回当前表。"""
-                source_columns = {
-                    row[1] for row in conn.execute(text(f'PRAGMA table_info("{source_table}")'))
-                }
+                source_columns = {row[1] for row in conn.execute(text(f'PRAGMA table_info("{source_table}")'))}
                 copied_columns = [column for column in current_columns if column in source_columns]
                 missing_optional = set(current_columns) - set(copied_columns)
                 if missing_optional - {'direction', 'severity', 'reason_code'}:
                     raise RuntimeError(f'评分建议旧表缺少不可选字段: {sorted(missing_optional)}')
-                select_columns = [
-                    column if column in copied_columns else 'NULL'
-                    for column in current_columns
-                ]
+                select_columns = [column if column in copied_columns else 'NULL' for column in current_columns]
                 conn.execute(
                     text(
                         'INSERT OR IGNORE INTO score_suggestions ('
@@ -580,10 +546,7 @@ def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
                     ),
                 )
 
-            legacy_table_columns = {
-                row[1]
-                for row in conn.execute(text('PRAGMA table_info(score_suggestions_legacy)'))
-            }
+            legacy_table_columns = {row[1] for row in conn.execute(text('PRAGMA table_info(score_suggestions_legacy)'))}
             if legacy_table_columns:
                 # 上一次启动在创建新表索引时失败后，SQLite 会保留新表和旧表。
                 # 先补数据、再删除旧表释放同名索引，最后只补当前模型声明的索引。
@@ -600,15 +563,11 @@ def _migrate_red_blue_score_suggestion_key_uniqueness() -> None:
                 is_unique = bool(row[2])
                 if not is_unique:
                     continue
-                columns = [
-                    index_row[2]
-                    for index_row in conn.execute(text(f'PRAGMA index_info("{index_name}")'))
-                ]
+                columns = [index_row[2] for index_row in conn.execute(text(f'PRAGMA index_info("{index_name}")'))]
                 unique_indexes.append((index_name, columns))
 
             has_legacy_unique = any(
-                columns == ['model_run_id', 'user_id', 'content_id']
-                for _index_name, columns in unique_indexes
+                columns == ['model_run_id', 'user_id', 'content_id'] for _index_name, columns in unique_indexes
             )
             if not has_legacy_unique:
                 return
@@ -637,32 +596,46 @@ def _migrate_interrupted_resource_subscription_cleanup() -> None:
     legacy_table = f'{table_name}_legacy'
     try:
         with engine.begin() as conn:
-            legacy_columns = {
-                row[1] for row in conn.execute(text(f'PRAGMA table_info("{legacy_table}")'))
-            }
+            legacy_columns = {row[1] for row in conn.execute(text(f'PRAGMA table_info("{legacy_table}")'))}
             if not legacy_columns:
                 return
-            target_columns = {
-                row[1] for row in conn.execute(text(f'PRAGMA table_info("{table_name}")'))
-            }
+            target_columns = {row[1] for row in conn.execute(text(f'PRAGMA table_info("{table_name}")'))}
             required = {
-                'id', 'user_id', 'content_id', 'subject_id', 'source', 'fansub_key',
-                'fansub_name', 'fansub_id', 'active', 'last_seen_created_at',
-                'last_seen_resource_key', 'created_at', 'updated_at',
+                'id',
+                'user_id',
+                'content_id',
+                'subject_id',
+                'source',
+                'fansub_key',
+                'fansub_name',
+                'fansub_id',
+                'active',
+                'last_seen_created_at',
+                'last_seen_resource_key',
+                'created_at',
+                'updated_at',
             }
             if not required <= target_columns:
                 raise RuntimeError('resource_subscriptions 当前表结构尚未完成')
             copy_columns = [
-                'id', 'user_id', 'content_id', 'subject_id', 'source', 'fansub_key',
-                'fansub_name', 'fansub_id', 'active', 'last_seen_created_at',
-                'last_seen_resource_key', 'created_at', 'updated_at',
+                'id',
+                'user_id',
+                'content_id',
+                'subject_id',
+                'source',
+                'fansub_key',
+                'fansub_name',
+                'fansub_id',
+                'active',
+                'last_seen_created_at',
+                'last_seen_resource_key',
+                'created_at',
+                'updated_at',
             ]
             select_expressions = [
-                column if column in legacy_columns else (
-                    "'animegarden'" if column == 'source' else
-                    'NULL' if column == 'fansub_id' else
-                    column
-                )
+                column
+                if column in legacy_columns
+                else ("'animegarden'" if column == 'source' else 'NULL' if column == 'fansub_id' else column)
                 for column in copy_columns
             ]
             conn.execute(
@@ -698,10 +671,7 @@ def _migrate_red_blue_order_uncertainty() -> None:
         if not columns or 'order_uncertain' in columns:
             return
         conn.execute(
-            text(
-                'ALTER TABLE preference_results '
-                'ADD COLUMN order_uncertain BOOLEAN NOT NULL DEFAULT 0'
-            ),
+            text('ALTER TABLE preference_results ADD COLUMN order_uncertain BOOLEAN NOT NULL DEFAULT 0'),
         )
     print('[migrate] preference_results.order_uncertain 已添加')
 

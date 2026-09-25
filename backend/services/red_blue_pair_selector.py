@@ -18,10 +18,10 @@ import random
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from types import MappingProxyType
 from datetime import UTC, datetime
 from enum import StrEnum
 from itertools import combinations
+from types import MappingProxyType
 from typing import cast
 
 from services.red_blue_math import (
@@ -532,9 +532,7 @@ def _fallback_ranks(candidates: Sequence[SelectorCandidate]) -> dict[int, float]
         order = sorted(
             candidates,
             key=lambda candidate: (
-                -_finite(float(candidate.score_anchor), -math.inf)
-                if candidate.score_anchor is not None
-                else math.inf,
+                -_finite(float(candidate.score_anchor), -math.inf) if candidate.score_anchor is not None else math.inf,
                 candidate.content_id,
             ),
         )
@@ -566,16 +564,11 @@ def _candidate_features(
             if candidate.preference_mean is not None
             else (
                 _finite((float(candidate.score_anchor) - 50.0) / 25.0)
-                if candidate.score_anchor is not None
-                and math.isfinite(float(candidate.score_anchor))
+                if candidate.score_anchor is not None and math.isfinite(float(candidate.score_anchor))
                 else 0.0
             )
         )
-        preference_std = (
-            _finite(float(candidate.preference_std), 1.0)
-            if candidate.preference_std is not None
-            else 1.0
-        )
+        preference_std = _finite(float(candidate.preference_std), 1.0) if candidate.preference_std is not None else 1.0
         features[candidate.content_id] = _CandidateFeatures(
             content_id=candidate.content_id,
             preference_mean=preference_mean,
@@ -617,8 +610,7 @@ def _boundary_score(
     if not boundaries:
         return 0.0
     distances = [
-        min(abs(first.expected_rank - boundary), abs(second.expected_rank - boundary))
-        for boundary in boundaries
+        min(abs(first.expected_rank - boundary), abs(second.expected_rank - boundary)) for boundary in boundaries
     ]
     return _clamp(math.exp(-min(distances) / scale))
 
@@ -634,10 +626,7 @@ def _primary_reason(components: Mapping[str, float]) -> SelectionReason:
         ('underexplored', SelectionReason.UNDEREXPLORED, 1),
         ('anchor_changed', SelectionReason.UNDEREXPLORED, 0),
     )
-    candidates = [
-        (components.get(name, 0.0), priority, reason)
-        for name, reason, priority in reason_by_component
-    ]
+    candidates = [(components.get(name, 0.0), priority, reason) for name, reason, priority in reason_by_component]
     best_value, _, best_reason = max(candidates, key=lambda item: (item[0], item[1]))
     if best_value <= 0:
         return SelectionReason.NORMAL
@@ -850,11 +839,17 @@ def _preliminary_pair_score(
     )
     minimum_comparisons = min(first.comparison_count, second.comparison_count)
     underexplored = _clamp(1.0 / (1.0 + minimum_comparisons / config.underexplored_scale))
-    coverage_target = _coverage_target(candidate_count or max(first.comparison_count, second.comparison_count, 2), config)
+    coverage_target = _coverage_target(
+        candidate_count or max(first.comparison_count, second.comparison_count, 2), config
+    )
     coverage_floor = _clamp((coverage_target - minimum_comparisons) / max(coverage_target, 1))
     new_content = float(minimum_comparisons == 0)
-    graph = 1.0 if first.graph_component != second.graph_component else _clamp(
-        1.0 - min(first.graph_degree, second.graph_degree) / max(first.graph_degree, second.graph_degree, 1),
+    graph = (
+        1.0
+        if first.graph_component != second.graph_component
+        else _clamp(
+            1.0 - min(first.graph_degree, second.graph_degree) / max(first.graph_degree, second.graph_degree, 1),
+        )
     )
     boundary = _boundary_score(first, second, config.important_rank_boundaries, config.rank_boundary_scale)
     anchor_changed = float(
@@ -862,8 +857,7 @@ def _preliminary_pair_score(
         or second.content_id in context.recently_anchor_changed_content_ids,
     )
     focus = float(
-        context.focus_content_id is not None
-        and context.focus_content_id in (first.content_id, second.content_id),
+        context.focus_content_id is not None and context.focus_content_id in (first.content_id, second.content_id),
     )
     return _finite(
         config.uncertainty_weight * uncertainty
@@ -958,9 +952,7 @@ def _build_pair_shortlist(
         )
 
     changed_ids = tuple(
-        content_id
-        for content_id in sorted(context.recently_anchor_changed_content_ids)
-        if content_id in features
+        content_id for content_id in sorted(context.recently_anchor_changed_content_ids) if content_id in features
     )[: config.anchor_changed_content_count]
     _add_seed_opponents(
         pair_sources,
@@ -1059,11 +1051,7 @@ def _cooldown_blocked(
     count_limit = config.skip_cooldown_count if skip_only else config.pair_cooldown_count
     seconds_limit = config.skip_cooldown_seconds if skip_only else config.pair_cooldown_seconds
     if skip_only:
-        positions = [
-            position
-            for position in positions
-            if interactions[position].outcome is SelectorOutcome.SKIP
-        ]
+        positions = [position for position in positions if interactions[position].outcome is SelectorOutcome.SKIP]
         skip_streak = 0
         for interaction in interactions:
             if interaction.pair != pair or interaction.outcome is not SelectorOutcome.SKIP:
@@ -1148,8 +1136,7 @@ def _score_pair(
         or second.content_id in context.recently_anchor_changed_content_ids,
     )
     focus = float(
-        context.focus_content_id is not None
-        and context.focus_content_id in pair,
+        context.focus_content_id is not None and context.focus_content_id in pair,
     )
 
     positions = positions_by_pair.get(pair, ())
@@ -1170,10 +1157,7 @@ def _score_pair(
         skip_only=True,
     )
     effective_pair_count = max(
-        sum(
-            interactions[position].outcome is not SelectorOutcome.SKIP
-            for position in positions
-        ),
+        sum(interactions[position].outcome is not SelectorOutcome.SKIP for position in positions),
         max(
             max(
                 (interactions[position].pair_comparison_count for position in positions),
@@ -1182,11 +1166,7 @@ def _score_pair(
             context.pair_comparison_counts.get(pair, 0),
         ),
     )
-    pair_limit = (
-        config.focus_max_pair_comparisons
-        if context.focus_content_id in pair
-        else config.max_pair_comparisons
-    )
+    pair_limit = config.focus_max_pair_comparisons if context.focus_content_id in pair else config.max_pair_comparisons
     repeat_ceiling_blocked = effective_pair_count >= pair_limit
     repeat_pressure = _clamp(effective_pair_count / max(pair_limit, 1))
     pair_window = max(config.max_recent_exposure, config.pair_cooldown_count, 1)
@@ -1213,8 +1193,7 @@ def _score_pair(
         and context.focus_content_id not in pair
     )
     excessive_repeat = _clamp(
-        max(first_consecutive, second_consecutive)
-        / max(config.max_consecutive_content_exposure, 1),
+        max(first_consecutive, second_consecutive) / max(config.max_consecutive_content_exposure, 1),
     )
 
     positive_components = {
@@ -1248,9 +1227,7 @@ def _score_pair(
     )
     total_score = _finite(total_score, -1e9)
     exploration_denominator = (
-        config.exploration_graph_weight
-        + config.exploration_underexplored_weight
-        + config.exploration_distance_weight
+        config.exploration_graph_weight + config.exploration_underexplored_weight + config.exploration_distance_weight
     )
     long_range = _clamp(rank_distance / max(component_count - 1, 1))
     exploration_score = _clamp(
@@ -1314,10 +1291,7 @@ def _pair_hard_blocked(
         return True
     pair_positions = positions_by_pair.get(pair, ())
     effective_pair_count = max(
-        sum(
-            interactions[position].outcome is not SelectorOutcome.SKIP
-            for position in pair_positions
-        ),
+        sum(interactions[position].outcome is not SelectorOutcome.SKIP for position in pair_positions),
         max(
             max(
                 (interactions[position].pair_comparison_count for position in pair_positions),
@@ -1326,11 +1300,7 @@ def _pair_hard_blocked(
             context.pair_comparison_counts.get(pair, 0),
         ),
     )
-    pair_limit = (
-        config.focus_max_pair_comparisons
-        if context.focus_content_id in pair
-        else config.max_pair_comparisons
-    )
+    pair_limit = config.focus_max_pair_comparisons if context.focus_content_id in pair else config.max_pair_comparisons
     if effective_pair_count >= pair_limit:
         return True
     _, first_consecutive = exposure_by_content.get(first.content_id, (0, 0))
@@ -1447,8 +1417,7 @@ def select_pair(
     active_config = config or SelectorConfig()
     started_at = time.perf_counter()
     unique_candidates = {
-        candidate.content_id: candidate
-        for candidate in sorted(candidates, key=lambda item: item.content_id)
+        candidate.content_id: candidate for candidate in sorted(candidates, key=lambda item: item.content_id)
     }
     candidate_list = tuple(unique_candidates.values())
     candidate_ids = set(unique_candidates)
@@ -1490,9 +1459,7 @@ def select_pair(
         active_config,
     )
     tie_strength = validate_tie_strength(
-        active_context.tie_strength
-        if active_context.tie_strength is not None
-        else DEFAULT_TIE_STRENGTH,
+        active_context.tie_strength if active_context.tie_strength is not None else DEFAULT_TIE_STRENGTH,
     )
     shortlist = _build_pair_shortlist(
         features,
@@ -1726,9 +1693,7 @@ def select_pair(
         candidate_count=len(candidate_list),
         pair_count=len(scored_pairs),
         eligible_pair_count=len(eligible_pairs),
-        valid_comparison_count=sum(
-            interaction.outcome is not SelectorOutcome.SKIP for interaction in interactions
-        ),
+        valid_comparison_count=sum(interaction.outcome is not SelectorOutcome.SKIP for interaction in interactions),
         ignored=ignored,
         fallback_used=fallback_used,
         exploration_used=exploration_used,

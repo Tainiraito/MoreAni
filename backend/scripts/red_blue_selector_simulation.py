@@ -144,10 +144,14 @@ def _run(candidate_count: int, *, before: bool, focus: bool) -> list[dict[str, o
             snapshot = _metrics(counts, pair_counts, candidate_count, comparison_id)
             snapshot['focus_selected_count'] = focus_selected_count
             snapshot['focus_available_count'] = focus_available_count
-            snapshot['focus_selection_rate'] = round(
-                focus_selected_count / focus_available_count,
-                3,
-            ) if focus_available_count else 0.0
+            snapshot['focus_selection_rate'] = (
+                round(
+                    focus_selected_count / focus_available_count,
+                    3,
+                )
+                if focus_available_count
+                else 0.0
+            )
             snapshot['configured_focus_probability'] = config.focus_probability if focus else None
             snapshot['focus_content_comparisons'] = sum(
                 amount for pair, amount in pair_counts.items() if focus and 1 in pair

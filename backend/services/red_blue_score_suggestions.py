@@ -15,8 +15,6 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from rating_constants import MIN_POSITIVE_RATING_SCORE
-
 from models import (
     Rating,
     RedBlueComparison,
@@ -27,6 +25,7 @@ from models import (
     ScoreSuggestionActionType,
     ScoreSuggestionStatus,
 )
+from rating_constants import MIN_POSITIVE_RATING_SCORE
 from services import rating as rating_service
 from services.red_blue_score_calibration import (
     CalibrationAction,
@@ -249,11 +248,7 @@ class ScoreSuggestionService:
         ):
             raise ScoreSuggestionConflictError('评分建议推荐值低于最低正分')
 
-        state = (
-            db.query(RedBlueUserState)
-            .filter(RedBlueUserState.user_id == user_id)
-            .one_or_none()
-        )
+        state = db.query(RedBlueUserState).filter(RedBlueUserState.user_id == user_id).one_or_none()
         state_version = state.comparison_state_version if state is not None else 0
         effective_max_id = self._effective_comparison_max_id(db, user_id=user_id)
         now = datetime.now(UTC)
@@ -358,10 +353,7 @@ class ScoreSuggestionService:
         content_ids: Sequence[int],
     ) -> tuple[ScoreSuggestionView, ...]:
         """读取当前仍处于 PENDING 的派生建议。"""
-        return tuple(
-            _suggestion_view(row)
-            for row in self._pending_rows(db, user_id=user_id, content_ids=content_ids)
-        )
+        return tuple(_suggestion_view(row) for row in self._pending_rows(db, user_id=user_id, content_ids=content_ids))
 
     @staticmethod
     def _pending_rows(db: Session, *, user_id: int, content_ids: Sequence[int]) -> list[ScoreSuggestion]:
@@ -408,10 +400,7 @@ class ScoreSuggestionService:
             if content_ids
             else []
         )
-        reusable_by_key = {
-            (row.content_id, row.suggestion_key): row
-            for row in reusable_rows
-        }
+        reusable_by_key = {(row.content_id, row.suggestion_key): row for row in reusable_rows}
         seen_ids: set[int] = set()
         added: list[ScoreSuggestionView] = []
         updated: list[ScoreSuggestionView] = []
@@ -489,11 +478,15 @@ class ScoreSuggestionService:
 
     @staticmethod
     def _effective_comparison_max_id(db: Session, *, user_id: int) -> int | None:
-        return db.query(func.max(RedBlueComparison.id)).filter(
-            RedBlueComparison.user_id == user_id,
-            RedBlueComparison.outcome != RedBlueOutcome.SKIP,
-            RedBlueComparison.revoked_at.is_(None),
-        ).scalar()
+        return (
+            db.query(func.max(RedBlueComparison.id))
+            .filter(
+                RedBlueComparison.user_id == user_id,
+                RedBlueComparison.outcome != RedBlueOutcome.SKIP,
+                RedBlueComparison.revoked_at.is_(None),
+            )
+            .scalar()
+        )
 
     @staticmethod
     def _action_result(
@@ -507,11 +500,7 @@ class ScoreSuggestionService:
             .filter(Rating.user_id == action.user_id, Rating.content_id == action.content_id)
             .one_or_none()
         )
-        state = (
-            db.query(RedBlueUserState)
-            .filter(RedBlueUserState.user_id == action.user_id)
-            .one_or_none()
-        )
+        state = db.query(RedBlueUserState).filter(RedBlueUserState.user_id == action.user_id).one_or_none()
         return ScoreSuggestionActionResult(
             action_id=action.id,
             suggestion_id=action.score_suggestion_id or 0,
@@ -520,9 +509,7 @@ class ScoreSuggestionService:
             current_score=action.current_score,
             updated_score=rating.score if rating is not None else action.recommended_score,
             comparison_state_version=(
-                state.comparison_state_version
-                if state is not None
-                else action.comparison_state_version_at_action
+                state.comparison_state_version if state is not None else action.comparison_state_version_at_action
             ),
             idempotent_replay=idempotent_replay,
         )

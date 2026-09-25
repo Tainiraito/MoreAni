@@ -4,12 +4,13 @@ import json
 from datetime import UTC, datetime
 
 import pytest
+from conftest import auth_cookie
 from sqlalchemy import create_engine, func, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 import main as main_module
-from conftest import auth_cookie
 from models import (
+    SCORE_ANCHOR_REVISION_SOURCES,
     ContentItem,
     PreferenceModelRun,
     PreferenceModelRunStatus,
@@ -20,7 +21,6 @@ from models import (
     RatingRevisionSource,
     RedBlueComparison,
     RedBlueOutcome,
-    SCORE_ANCHOR_REVISION_SOURCES,
     ScoreSuggestion,
     ScoreSuggestionAction,
     ScoreSuggestionActionType,
@@ -408,21 +408,19 @@ def test_order_uncertainty_migration_adds_independent_flag_and_is_idempotent(tmp
         connection.exec_driver_sql(
             'CREATE TABLE preference_results (id INTEGER PRIMARY KEY, stability VARCHAR(32) NOT NULL)'
         )
-        connection.exec_driver_sql(
-            "INSERT INTO preference_results (id, stability) VALUES (1, 'STABLE')"
-        )
+        connection.exec_driver_sql("INSERT INTO preference_results (id, stability) VALUES (1, 'STABLE')")
 
     monkeypatch.setattr(main_module, 'engine', database_engine)
     main_module._migrate_red_blue_order_uncertainty()
     columns = {column['name'] for column in inspect(database_engine).get_columns('preference_results')}
     assert 'order_uncertain' in columns
     with database_engine.connect() as connection:
-        assert connection.execute(text("SELECT order_uncertain FROM preference_results WHERE id = 1")).scalar_one() == 0
+        assert connection.execute(text('SELECT order_uncertain FROM preference_results WHERE id = 1')).scalar_one() == 0
     with database_engine.begin() as connection:
         connection.execute(text('UPDATE preference_results SET order_uncertain = 1 WHERE id = 1'))
     main_module._migrate_red_blue_order_uncertainty()
     with database_engine.connect() as connection:
-        assert connection.execute(text("SELECT order_uncertain FROM preference_results WHERE id = 1")).scalar_one() == 1
+        assert connection.execute(text('SELECT order_uncertain FROM preference_results WHERE id = 1')).scalar_one() == 1
 
 
 def test_red_blue_foundation_migration_backfills_existing_scores_and_is_idempotent(tmp_path, monkeypatch):
@@ -456,8 +454,8 @@ def test_red_blue_foundation_migration_backfills_existing_scores_and_is_idempote
         )
         connection.execute(
             text(
-                "INSERT INTO rating_revisions "
-                "(id, rating_id, content_id, user_id, previous_score, new_score, changed_at, source, comparison_id) "
+                'INSERT INTO rating_revisions '
+                '(id, rating_id, content_id, user_id, previous_score, new_score, changed_at, source, comparison_id) '
                 "VALUES (1, 1, 10, 1, 80, 90, CURRENT_TIMESTAMP, 'comparison', 'legacy-batch')",
             ),
         )
@@ -478,8 +476,8 @@ def test_red_blue_foundation_migration_backfills_existing_scores_and_is_idempote
     with database_engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO preference_model_runs "
-                "(id, user_id, algorithm_version, status, input_comparison_max_id) "
+                'INSERT INTO preference_model_runs '
+                '(id, user_id, algorithm_version, status, input_comparison_max_id) '
                 "VALUES (1, 1, 'v1', 'COMPLETED', 10)",
             ),
         )
@@ -517,27 +515,27 @@ def test_score_suggestion_uniqueness_migration_recovers_interrupted_legacy_table
     with database_engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO users (id, username, nickname, password_hash, role) "
+                'INSERT INTO users (id, username, nickname, password_hash, role) '
                 "VALUES (1, 'migration-user', 'Migration User', 'unused', 'user')",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO content_items (id, title, content_type, created_by) "
+                'INSERT INTO content_items (id, title, content_type, created_by) '
                 "VALUES (1, 'Interrupted suggestion', 'anime', 1)",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO preference_model_runs "
-                "(id, user_id, algorithm_version, status, algorithm_config_json) "
+                'INSERT INTO preference_model_runs '
+                '(id, user_id, algorithm_version, status, algorithm_config_json) '
                 "VALUES (1, 1, 'ranker-v2', 'COMPLETED', '{}')",
             ),
         )
         connection.execute(text('CREATE TABLE score_suggestions_legacy AS SELECT * FROM score_suggestions WHERE 0'))
         connection.execute(
             text(
-                "INSERT INTO score_suggestions_legacy "
+                'INSERT INTO score_suggestions_legacy '
                 '(id, user_id, content_id, model_run_id, suggestion_key, current_score, '
                 'suggested_score_low, suggested_score_high, recommended_score, direction, '
                 'confidence, severity, reason_code, status, created_at) '

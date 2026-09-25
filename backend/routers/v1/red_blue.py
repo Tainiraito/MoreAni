@@ -31,7 +31,6 @@ from services.red_blue import (
     ComparisonHistoryItem,
     ComparisonResult,
     ContentSnapshot,
-    ModelFreshness,
     RedBlueComparisonConflictError,
     RedBlueComparisonNotFoundError,
     RedBlueService,
@@ -118,15 +117,12 @@ def _state_response(
 ) -> RedBlueStateResponse:
     """将领域状态转换为当前排名页和可恢复的页面状态。"""
     ranking_total = len(state.items)
-    ranking_items = state.items[(page - 1) * size:page * size]
+    ranking_items = state.items[(page - 1) * size : page * size]
     content_ids = [item.content_id for item in ranking_items]
     if state.next_pair is not None:
         content_ids.extend((state.next_pair.left_content_id, state.next_pair.right_content_id))
     snapshots = service.get_content_snapshots(db, user_id=state.user_id, content_ids=content_ids)
-    suggestions_by_content = {
-        view.content_id: _suggestion_response(view)
-        for view in state.score_suggestions
-    }
+    suggestions_by_content = {view.content_id: _suggestion_response(view) for view in state.score_suggestions}
 
     ranking: list[RedBlueRankingItemResponse] = []
     for item in ranking_items:

@@ -161,11 +161,7 @@ def upsert_rating(
     Also bumps the parent content's updated_at so it sorts to top.
     """
     now = datetime.now(UTC)
-    normalized_source = (
-        revision_source.value
-        if isinstance(revision_source, RatingRevisionSource)
-        else revision_source
-    )
+    normalized_source = revision_source.value if isinstance(revision_source, RatingRevisionSource) else revision_source
     should_update_anchor = (
         normalized_source != RatingRevisionSource.PK_SUGGESTION.value
         if update_score_anchor is None

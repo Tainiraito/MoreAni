@@ -62,26 +62,26 @@ def test_pre_red_blue_database_upgrades_with_legacy_rating_and_revision_rows(tmp
         )
         connection.execute(
             text(
-                "INSERT INTO users (id, username, nickname, password_hash, role) "
+                'INSERT INTO users (id, username, nickname, password_hash, role) '
                 "VALUES (1, 'stage8-user', 'Stage 8 User', 'unused', 'user')",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO content_items (id, title, content_type, created_by) "
+                'INSERT INTO content_items (id, title, content_type, created_by) '
                 "VALUES (1, 'Legacy comparison rated', 'anime', 1), "
                 "(2, 'Legacy rating without revision', 'anime', 1)",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO ratings (id, content_id, user_id, score, review) "
+                'INSERT INTO ratings (id, content_id, user_id, score, review) '
                 "VALUES (1, 1, 1, 83, 'preserve me'), (2, 2, 1, 72, 'baseline me')",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO rating_revisions "
+                'INSERT INTO rating_revisions '
                 '(id, rating_id, content_id, user_id, previous_score, new_score, changed_at, source, comparison_id) '
                 "VALUES (1, 1, 1, 1, 80, 83, CURRENT_TIMESTAMP, 'comparison', 'legacy-cmp-7')",
             ),
@@ -96,8 +96,7 @@ def test_pre_red_blue_database_upgrades_with_legacy_rating_and_revision_rows(tmp
         ).all()
         revisions = connection.execute(
             text(
-                'SELECT rating_id, previous_score, new_score, source, comparison_id '
-                'FROM rating_revisions ORDER BY id',
+                'SELECT rating_id, previous_score, new_score, source, comparison_id FROM rating_revisions ORDER BY id',
             ),
         ).all()
         applied = connection.execute(text('SELECT COUNT(*) FROM schema_migrations')).scalar_one()
@@ -114,7 +113,6 @@ def test_pre_red_blue_database_upgrades_with_legacy_rating_and_revision_rows(tmp
     engine.dispose()
 
 
-
 def test_interrupted_resource_subscription_migration_recovers_and_drops_legacy_table(tmp_path, monkeypatch):
     """旧表迁移中断后，新表已复制的行应保留且 legacy 表可安全删除。"""
     import main
@@ -126,19 +124,19 @@ def test_interrupted_resource_subscription_migration_recovers_and_drops_legacy_t
     with engine.begin() as connection:
         connection.execute(
             text(
-                "INSERT INTO users (id, username, nickname, password_hash, role) "
+                'INSERT INTO users (id, username, nickname, password_hash, role) '
                 "VALUES (1, 'subscription-stage8', 'Stage 8', 'unused', 'user')",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO content_items (id, title, content_type, created_by) "
+                'INSERT INTO content_items (id, title, content_type, created_by) '
                 "VALUES (1, 'Subscription row', 'anime', 1)",
             ),
         )
         connection.execute(
             text(
-                "INSERT INTO resource_subscriptions "
+                'INSERT INTO resource_subscriptions '
                 '(id, user_id, content_id, subject_id, source, fansub_key, fansub_name, active) '
                 "VALUES (7, 1, 1, 100, 'animegarden', 'fansub-a', 'Fansub A', 1)",
             ),

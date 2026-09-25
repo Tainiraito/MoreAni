@@ -8,9 +8,9 @@ from services.red_blue_ranker import (
     Candidate,
     Comparison,
     ComparisonOutcome,
+    PreferenceResult,
     RankerConfig,
     RankerStability,
-    PreferenceResult,
     ScoreAnchor,
     base_stability_for,
     build_score_priors,
@@ -186,10 +186,7 @@ def test_repeated_pair_has_concave_total_weight_and_conflicts_balance():
 
 
 def test_many_lower_anchor_wins_can_overturn_high_anchor_prior():
-    comparisons = [
-        Comparison(index, 2, 1, ComparisonOutcome.LEFT_WIN)
-        for index in range(1, 161)
-    ]
+    comparisons = [Comparison(index, 2, 1, ComparisonOutcome.LEFT_WIN) for index in range(1, 161)]
     output = rank_preferences(
         _candidates(2),
         [ScoreAnchor(1, 95), ScoreAnchor(2, 80)],
@@ -358,19 +355,13 @@ def test_order_uncertain_uses_posterior_order_not_davidson_game_probability():
     decisive = rank_preferences(
         candidates,
         [],
-        [
-            Comparison(index, 1, 2, ComparisonOutcome.LEFT_WIN)
-            for index in range(1, 9)
-        ],
+        [Comparison(index, 1, 2, ComparisonOutcome.LEFT_WIN) for index in range(1, 9)],
         config,
     )
     unresolved = rank_preferences(
         candidates,
         [],
-        [
-            Comparison(index, 1, 2, ComparisonOutcome.TIE)
-            for index in range(1, 9)
-        ],
+        [Comparison(index, 1, 2, ComparisonOutcome.TIE) for index in range(1, 9)],
         config,
     )
 
@@ -383,10 +374,7 @@ def test_order_uncertain_uses_posterior_order_not_davidson_game_probability():
 def test_extreme_inputs_do_not_return_nan_or_infinity():
     candidates = _candidates(8)
     anchors = [ScoreAnchor(index, 100 if index % 2 else 1) for index in range(1, 9)]
-    comparisons = [
-        Comparison(index, 1, 2, ComparisonOutcome.LEFT_WIN)
-        for index in range(1, 200)
-    ]
+    comparisons = [Comparison(index, 1, 2, ComparisonOutcome.LEFT_WIN) for index in range(1, 200)]
     output = rank_preferences(
         candidates,
         anchors,

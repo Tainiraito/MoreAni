@@ -551,12 +551,7 @@ def _confidence(
     uncertainty = math.exp(-prediction_std / config.confidence_uncertainty_scale)
     support = _clamp(local_support / config.local_support_saturation)
     sample_support = _clamp(calibration_sample_count / max(config.min_calibration_samples * 2, 1))
-    return _clamp(
-        0.45 * disagreement
-        + 0.25 * uncertainty
-        + 0.20 * support
-        + 0.10 * sample_support
-    )
+    return _clamp(0.45 * disagreement + 0.25 * uncertainty + 0.20 * support + 0.10 * sample_support)
 
 
 def _evaluate_target(
@@ -645,9 +640,7 @@ def _evaluate_target(
         else ScoreCalibrationReasonCode.PREFERENCE_LOWER_THAN_SCORE
     )
     direction = (
-        ScoreCalibrationDirection.UP
-        if predicted_score > rating.current_score
-        else ScoreCalibrationDirection.DOWN
+        ScoreCalibrationDirection.UP if predicted_score > rating.current_score else ScoreCalibrationDirection.DOWN
     )
     confidence = _confidence(
         current_score=rating.current_score,
@@ -714,10 +707,7 @@ def _evaluate_target(
         if extreme_outlier:
             threshold = config.extreme_outlier_confidence_threshold
         if any(
-            item.content_id == target_id
-            and item.active
-            and item.suggestion_key == key
-            for item in previous_suggestions
+            item.content_id == target_id and item.active and item.suggestion_key == key for item in previous_suggestions
         ):
             threshold = min(threshold, config.hysteresis_confidence_threshold)
         if confidence < threshold:
@@ -771,9 +761,9 @@ def generate_score_calibrations(
     training_by_target: dict[int, list[tuple[float, float, int]]] = {}
     valid_training = sorted(
         [
-        (preference_map[content_id].preference_mean, rating_map[content_id].score_anchor, content_id)
-        for content_id in candidate_ids
-        if rating_map[content_id].score_anchor > 0
+            (preference_map[content_id].preference_mean, rating_map[content_id].score_anchor, content_id)
+            for content_id in candidate_ids
+            if rating_map[content_id].score_anchor > 0
         ],
         key=lambda item: (item[0], item[2]),
     )
@@ -846,9 +836,7 @@ def generate_score_calibrations(
     diagnostics = ScoreCalibrationDiagnostics(
         candidate_count=len(candidate_ids),
         calibration_sample_count=calibration_sample_count,
-        fitted_target_count=sum(
-            evaluation.predicted_score is not None for evaluation in evaluations
-        ),
+        fitted_target_count=sum(evaluation.predicted_score is not None for evaluation in evaluations),
         suggestion_count=len(suggestions),
         model_freshness=freshness.value,
         skipped_model_reason=skipped_model_reason,

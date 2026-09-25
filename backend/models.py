@@ -26,7 +26,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class RatingRevisionSource(str, Enum):
+class RatingRevisionSource(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """来源于哪一种用户评分表达。"""
 
     INITIAL = 'initial'
@@ -54,7 +54,7 @@ SCORE_ANCHOR_REVISION_SOURCES: frozenset[str] = frozenset(
 )
 
 
-class RedBlueOutcome(str, Enum):
+class RedBlueOutcome(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """一次红蓝合战比较的用户选择。"""
 
     LEFT_WIN = 'LEFT_WIN'
@@ -63,7 +63,7 @@ class RedBlueOutcome(str, Enum):
     SKIP = 'SKIP'
 
 
-class PreferenceModelRunStatus(str, Enum):
+class PreferenceModelRunStatus(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """偏好模型计算任务状态。"""
 
     PENDING = 'PENDING'
@@ -72,7 +72,7 @@ class PreferenceModelRunStatus(str, Enum):
     FAILED = 'FAILED'
 
 
-class PreferenceStability(str, Enum):
+class PreferenceStability(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """排名结果的稳定性标签；本阶段只定义语义，不判断标签。"""
 
     UNCALIBRATED = 'UNCALIBRATED'
@@ -82,7 +82,7 @@ class PreferenceStability(str, Enum):
     ORDER_UNCERTAIN = 'ORDER_UNCERTAIN'
 
 
-class ScoreSuggestionStatus(str, Enum):
+class ScoreSuggestionStatus(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """评分建议当前状态。"""
 
     PENDING = 'PENDING'
@@ -92,7 +92,7 @@ class ScoreSuggestionStatus(str, Enum):
     EXPIRED = 'EXPIRED'
 
 
-class ScoreSuggestionActionType(str, Enum):
+class ScoreSuggestionActionType(str, Enum):  # noqa: UP042 - preserve mixed Enum stringification
     """用户对评分建议执行的不可丢失操作。"""
 
     ACCEPTED = 'ACCEPTED'

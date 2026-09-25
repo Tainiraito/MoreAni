@@ -354,8 +354,7 @@ def compare_fast_with_full(
     ]
     full_rank_by_id = {result.content_id: index for index, result in enumerate(full_ordered, start=1)}
     rank_errors = [
-        abs(fast_by_id[content_id].provisional_rank - full_rank_by_id[content_id])
-        for content_id in common_ids
+        abs(fast_by_id[content_id].provisional_rank - full_rank_by_id[content_id]) for content_id in common_ids
     ]
     fast_top_order = tuple(sorted(common_ids, key=lambda content_id: fast_by_id[content_id].provisional_rank))
     full_top_order = tuple(sorted(common_ids, key=lambda content_id: full_rank_by_id[content_id]))
@@ -436,9 +435,7 @@ def _make_fast_results_from_arrays(
             content_id=content_id,
             preference_mean=_finite(float(means[index])),
             preference_std=(
-                _finite(float(standard_deviations[index]))
-                if math.isfinite(float(standard_deviations[index]))
-                else None
+                _finite(float(standard_deviations[index])) if math.isfinite(float(standard_deviations[index])) else None
             ),
             provisional_rank=provisional_rank_by_id[content_id],
             comparison_count=counts.get(content_id, 0),
@@ -481,7 +478,8 @@ def _pair_count(comparisons: Sequence[Comparison], target: Comparison) -> int:
         and comparison.revoked_at is None
         and frozenset((comparison.left_content_id, comparison.right_content_id)) == target_pair
         and comparison.left_content_id != comparison.right_content_id
-        and comparison.outcome in {
+        and comparison.outcome
+        in {
             ComparisonOutcome.LEFT_WIN,
             ComparisonOutcome.RIGHT_WIN,
             ComparisonOutcome.TIE,
@@ -542,14 +540,8 @@ def _local_laplace_update(
     active_index_by_id = {content_id: index for index, content_id in enumerate(active_ids)}
     prior_means_array = _means_by_candidate(state)
     prior_stds_array = _stds_by_candidate(state)
-    prior_means_by_id = {
-        content_id: float(prior_means_array[index])
-        for content_id, index in index_by_id.items()
-    }
-    prior_stds_by_id = {
-        content_id: float(prior_stds_array[index])
-        for content_id, index in index_by_id.items()
-    }
+    prior_means_by_id = {content_id: float(prior_means_array[index]) for content_id, index in index_by_id.items()}
+    prior_stds_by_id = {content_id: float(prior_stds_array[index]) for content_id, index in index_by_id.items()}
     prior_mean = np.array([prior_means_by_id[content_id] for content_id in active_ids], dtype=float)
     prior_precision = np.array(
         [1.0 / max(prior_stds_by_id[content_id] ** 2, 1e-10) for content_id in active_ids],
@@ -679,10 +671,7 @@ def _select_active_ids(
         graph_neighbors[comparison.left_content_id].add(comparison.right_content_id)
         graph_neighbors[comparison.right_content_id].add(comparison.left_content_id)
     graph_candidates = {
-        neighbor
-        for target_id in target_ids
-        for neighbor in graph_neighbors[target_id]
-        if neighbor not in selected
+        neighbor for target_id in target_ids for neighbor in graph_neighbors[target_id] if neighbor not in selected
     }
     for content_id in sorted(
         graph_candidates,
@@ -710,7 +699,8 @@ def _incremental_pair_observations(
         and comparison.revoked_at is None
         and frozenset((comparison.left_content_id, comparison.right_content_id)) == pair
         and comparison.left_content_id != comparison.right_content_id
-        and comparison.outcome in {
+        and comparison.outcome
+        in {
             ComparisonOutcome.LEFT_WIN,
             ComparisonOutcome.RIGHT_WIN,
             ComparisonOutcome.TIE,
@@ -971,10 +961,7 @@ def _local_objective_gradient_hessian(
         gradient -= observation.weight * (targets - expected)
         if with_hessian:
             second = sum(
-                (
-                    float(probabilities[index]) * np.outer(tangent, tangent)
-                    for index, tangent in enumerate(tangents)
-                ),
+                (float(probabilities[index]) * np.outer(tangent, tangent) for index, tangent in enumerate(tangents)),
                 start=np.zeros((len(theta), len(theta)), dtype=float),
             )
             hessian += observation.weight * (second - np.outer(expected, expected))

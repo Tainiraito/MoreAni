@@ -113,9 +113,7 @@ def test_empty_and_insufficient_calibration_samples():
 
     result = _generate(current_scores=[80, 85, 90], config=ScoreCalibrationConfig())
     assert result.suggestions == ()
-    assert {
-        evaluation.exclusion_reason for evaluation in result.evaluations
-    } == {'CALIBRATION_SAMPLES_INSUFFICIENT'}
+    assert {evaluation.exclusion_reason for evaluation in result.evaluations} == {'CALIBRATION_SAMPLES_INSUFFICIENT'}
 
 
 def test_config_round_trip_is_json_serializable():
@@ -145,7 +143,7 @@ def test_equal_preference_pava_is_invariant_to_content_ids_and_input_order(dupli
         rng = random.Random(seed)
         rng.shuffle(shuffled)
         labels = rng.sample(range(1000, 1000 + len(points)), len(points))
-        relabeled = [(x_value, score, label) for (x_value, score, _old_id), label in zip(shuffled, labels)]
+        relabeled = [(x_value, score, label) for (x_value, score, _old_id), label in zip(shuffled, labels, strict=True)]
         actual = tuple(_fit_pava(relabeled).predict(value) for value in probe_values)
         assert actual == expected
 
@@ -617,9 +615,7 @@ def test_fast_result_is_conservative_relative_to_full_result():
     }
     full = _generate(**kwargs, freshness=CalibrationFreshness.FULL)
     fast = _generate(**kwargs, freshness=CalibrationFreshness.FAST)
-    assert {item.content_id for item in fast.suggestions} <= {
-        item.content_id for item in full.suggestions
-    }
+    assert {item.content_id for item in fast.suggestions} <= {item.content_id for item in full.suggestions}
 
 
 @pytest.mark.parametrize('count', [50, 100, 500, 1000])

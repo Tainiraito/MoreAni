@@ -910,7 +910,6 @@ class RedBlueService:
             with self.cache.user_lock(user_id):
                 final_context = self._read_context_for_user(final_db, user_id)
                 final_candidates, final_anchors = self._read_candidate_anchors(final_db, user_id)
-                live_fingerprint = _full_input_fingerprint(final_context, final_anchors)
                 compatible = (
                     final_context.anchor_revision_max_id == snapshot.context.anchor_revision_max_id
                     and final_context.revoke_version == snapshot.context.revoke_version
@@ -918,12 +917,9 @@ class RedBlueService:
                     and tuple(final_candidates) == snapshot.candidates
                     and tuple(final_anchors) == snapshot.anchors
                     and final_context.algorithm_version == snapshot.context.algorithm_version
-                    and final_context.algorithm_config_fingerprint
-                    == snapshot.context.algorithm_config_fingerprint
-                    and (final_context.comparison_max_id or 0)
-                    >= (snapshot.context.comparison_max_id or 0)
-                    and final_context.comparison_state_version
-                    >= snapshot.context.comparison_state_version
+                    and final_context.algorithm_config_fingerprint == snapshot.context.algorithm_config_fingerprint
+                    and (final_context.comparison_max_id or 0) >= (snapshot.context.comparison_max_id or 0)
+                    and final_context.comparison_state_version >= snapshot.context.comparison_state_version
                 )
                 state: RuntimeFastState | None = None
                 if compatible:
@@ -968,11 +964,7 @@ class RedBlueService:
     def recover_stale_runs(self, db: Session) -> int:
         """把服务重启后遗留的 RUNNING 标记为 FAILED。"""
         cutoff = datetime.now(UTC) - timedelta(seconds=self.config.stale_running_seconds)
-        rows = (
-            db.query(PreferenceModelRun)
-            .filter(PreferenceModelRun.status == PreferenceModelRunStatus.RUNNING)
-            .all()
-        )
+        rows = db.query(PreferenceModelRun).filter(PreferenceModelRun.status == PreferenceModelRunStatus.RUNNING).all()
         recovered = 0
         for run in rows:
             started_at = _aware_datetime(run.started_at)
@@ -1275,9 +1267,7 @@ class RedBlueService:
         requires_full = state.requires_full_ranker or stale
         if requires_full:
             freshness = (
-                ModelFreshness.STALE_REQUIRES_FULL
-                if state.base_model_run_id is not None
-                else ModelFreshness.BOOTSTRAP
+                ModelFreshness.STALE_REQUIRES_FULL if state.base_model_run_id is not None else ModelFreshness.BOOTSTRAP
             )
         elif state.base_model_run_id is None:
             freshness = ModelFreshness.BOOTSTRAP
@@ -1668,10 +1658,14 @@ class RedBlueService:
         focus_content_id: int | None = None,
     ) -> ComparisonResult:
         battle = self._battle_state(db, state, focus_content_id=focus_content_id)
-        ranking_delta = () if idempotent_replay or comparison.outcome == RedBlueOutcome.SKIP else _ranking_delta(
-            old_state,
-            state,
-            comparison,
+        ranking_delta = (
+            ()
+            if idempotent_replay or comparison.outcome == RedBlueOutcome.SKIP
+            else _ranking_delta(
+                old_state,
+                state,
+                comparison,
+            )
         )
         return ComparisonResult(
             comparison_id=comparison.id,
@@ -1851,9 +1845,7 @@ def _state_items(state: RuntimeFastState) -> tuple[FastStateItem, ...]:
                 else RankerStability.UNCALIBRATED.value
             ),
             authoritative_order_uncertain=(
-                authoritative[result.content_id].order_uncertain
-                if result.content_id in authoritative
-                else False
+                authoritative[result.content_id].order_uncertain if result.content_id in authoritative else False
             ),
             comparison_count=result.comparison_count,
         )
@@ -1881,10 +1873,7 @@ def _ranking_delta(
 ) -> tuple[RankingDelta, ...]:
     """返回所有 rank 发生变化的作品，并保证 A/B 即使同名次也被纳入。"""
     new_results = {result.content_id: result for result in new_state.algorithm_state.fast_results}
-    authoritative_results = {
-        result.content_id: result
-        for result in new_state.algorithm_state.authoritative_results
-    }
+    authoritative_results = {result.content_id: result for result in new_state.algorithm_state.authoritative_results}
     old_results = (
         {result.content_id: result for result in old_state.algorithm_state.fast_results}
         if old_state is not None
@@ -1909,19 +1898,11 @@ def _ranking_delta(
                     else RankerStability.UNCALIBRATED.value
                 ),
                 order_uncertain=(
-                    authoritative_results[content_id].order_uncertain
-                    if content_id in authoritative_results
-                    else False
+                    authoritative_results[content_id].order_uncertain if content_id in authoritative_results else False
                 ),
-                rank_low=(
-                    authoritative_results[content_id].rank_low
-                    if content_id in authoritative_results
-                    else None
-                ),
+                rank_low=(authoritative_results[content_id].rank_low if content_id in authoritative_results else None),
                 rank_high=(
-                    authoritative_results[content_id].rank_high
-                    if content_id in authoritative_results
-                    else None
+                    authoritative_results[content_id].rank_high if content_id in authoritative_results else None
                 ),
             ),
         )

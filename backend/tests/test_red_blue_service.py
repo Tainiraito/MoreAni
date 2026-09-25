@@ -3,10 +3,9 @@
 import threading
 import time
 from dataclasses import replace
-
-import pytest
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sqlalchemy import inspect, text
 
 import main as main_module
@@ -205,7 +204,11 @@ def test_selector_history_returns_all_time_pair_counts_outside_recent_window(db,
     try:
         history, pair_counts = service._selector_history(db, user.id)
         assert len(history) == 2
-        assert all(tuple(sorted((item.left_content_id, item.right_content_id))) == tuple(sorted((contents[0].id, contents[2].id))) for item in history)
+        assert all(
+            tuple(sorted((item.left_content_id, item.right_content_id)))
+            == tuple(sorted((contents[0].id, contents[2].id)))
+            for item in history
+        )
         assert pair_counts[tuple(sorted((contents[0].id, contents[1].id)))] == 3
         assert pair_counts[tuple(sorted((contents[0].id, contents[2].id)))] == 2
     finally:
@@ -526,10 +529,7 @@ def test_comparison_committed_between_snapshot_watermark_and_input_read_is_only_
 
     def pause_after_context(db_session, user_id):
         context = original_read_context(db_session, user_id)
-        if (
-            threading.current_thread().name.startswith('moreani-red-blue-full')
-            and not context_read.is_set()
-        ):
+        if threading.current_thread().name.startswith('moreani-red-blue-full') and not context_read.is_set():
             context_read.set()
             assert continue_snapshot.wait(timeout=5)
         return context
@@ -638,8 +638,6 @@ def test_revoke_during_full_run_rejects_old_snapshot_and_recalibrates_once(
     finally:
         release.set()
         service.close()
-
-
 
 
 @pytest.mark.parametrize('concurrent_comparison_count', [1, 5, 10])
@@ -805,9 +803,7 @@ def test_anchor_change_during_full_run_applies_only_newer_snapshot(
         service.request_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
         assert started.wait(timeout=5)
         first_run = (
-            db.query(PreferenceModelRun)
-            .filter_by(user_id=user.id, status=PreferenceModelRunStatus.RUNNING)
-            .one()
+            db.query(PreferenceModelRun).filter_by(user_id=user.id, status=PreferenceModelRunStatus.RUNNING).one()
         )
         upsert_rating(db, user_id=user.id, content_id=contents[0].id, score=99)
         release.set()
@@ -829,7 +825,6 @@ def test_anchor_change_during_full_run_applies_only_newer_snapshot(
     finally:
         release.set()
         service.close()
-
 
 
 @pytest.mark.parametrize('change_kind', ['candidate_add', 'candidate_remove', 'ranker_config'])
@@ -868,9 +863,7 @@ def test_full_run_rejects_snapshot_after_candidate_or_config_change(
             run_result = service.wait_for_recalibration(user.id, timeout=30)
             pytest.fail(f'Full worker stopped before rank_preferences: result={run_result!r}')
         first_run = (
-            db.query(PreferenceModelRun)
-            .filter_by(user_id=user.id, status=PreferenceModelRunStatus.RUNNING)
-            .one()
+            db.query(PreferenceModelRun).filter_by(user_id=user.id, status=PreferenceModelRunStatus.RUNNING).one()
         )
 
         if change_kind == 'candidate_add':
@@ -903,7 +896,9 @@ def test_full_run_rejects_snapshot_after_candidate_or_config_change(
         cached = service.cache.get(user.id)
         assert cached is not None
         assert cached.base_model_run_id == result.model_run_id
-        assert {item.content_id for item in cached.algorithm_state.authoritative_results} == set(captured_candidate_ids[-1])
+        assert {item.content_id for item in cached.algorithm_state.authoritative_results} == set(
+            captured_candidate_ids[-1]
+        )
     finally:
         release.set()
         service.close()
@@ -955,7 +950,6 @@ def test_fast_cache_rebuilds_from_full_snapshot_after_service_restart(db, sessio
             restarted_service.close()
 
 
-
 def test_realtime_migration_is_idempotent_and_adds_watermarks(tmp_path, monkeypatch):
     from sqlalchemy import create_engine
 
@@ -966,7 +960,7 @@ def test_realtime_migration_is_idempotent_and_adds_watermarks(tmp_path, monkeypa
             'CREATE TABLE preference_model_runs ('
             'id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, algorithm_version VARCHAR(64) NOT NULL, '
             'status VARCHAR(20) NOT NULL, input_comparison_max_id INTEGER, '
-            'input_rating_revision_max_id INTEGER, algorithm_config_json TEXT NOT NULL DEFAULT \'{}\')',
+            "input_rating_revision_max_id INTEGER, algorithm_config_json TEXT NOT NULL DEFAULT '{}')",
         )
         connection.exec_driver_sql(
             'CREATE TABLE red_blue_comparisons ('
@@ -977,8 +971,8 @@ def test_realtime_migration_is_idempotent_and_adds_watermarks(tmp_path, monkeypa
         connection.execute(text('INSERT INTO users (id) VALUES (1)'))
         connection.execute(
             text(
-                "INSERT INTO red_blue_comparisons "
-                "(id, user_id, left_content_id, right_content_id, outcome, client_event_id, selector_version) "
+                'INSERT INTO red_blue_comparisons '
+                '(id, user_id, left_content_id, right_content_id, outcome, client_event_id, selector_version) '
                 "VALUES (1, 1, 10, 11, 'LEFT_WIN', 'migrate-1', 'v1')",
             )
         )
@@ -988,9 +982,6 @@ def test_realtime_migration_is_idempotent_and_adds_watermarks(tmp_path, monkeypa
     columns = {column['name'] for column in inspect(database_engine).get_columns('preference_model_runs')}
     assert {'input_comparison_state_version', 'input_revoke_version'} <= columns
     row = (
-        database_engine.connect()
-        .execute(text('SELECT * FROM red_blue_user_states WHERE user_id = 1'))
-        .mappings()
-        .one()
+        database_engine.connect().execute(text('SELECT * FROM red_blue_user_states WHERE user_id = 1')).mappings().one()
     )
     assert (row['comparison_state_version'], row['revoke_version']) == (1, 0)

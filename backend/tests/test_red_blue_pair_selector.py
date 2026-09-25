@@ -167,10 +167,7 @@ def test_all_time_pair_count_survives_a_missing_recent_history_window():
 
 def test_normal_pair_lifetime_ceiling_skips_repeated_pair_when_alternatives_exist():
     candidates = [_candidate(1, count=8), _candidate(2, count=8), _candidate(3, count=8)]
-    history = [
-        _comparison(index, 1, 2)
-        for index in range(1, 6)
-    ]
+    history = [_comparison(index, 1, 2) for index in range(1, 6)]
     result = select_pair(
         candidates,
         history,
@@ -451,8 +448,10 @@ def test_fixed_seed_repeats_pair_reason_components_and_orientation():
 def test_left_right_orientation_is_randomized_by_seed():
     candidates = [_candidate(1), _candidate(2)]
     orientations = {
-        (select_pair(candidates, [], config=SelectorConfig(random_seed=seed)).selected_pair.left_content_id,
-         select_pair(candidates, [], config=SelectorConfig(random_seed=seed)).selected_pair.right_content_id)
+        (
+            select_pair(candidates, [], config=SelectorConfig(random_seed=seed)).selected_pair.left_content_id,
+            select_pair(candidates, [], config=SelectorConfig(random_seed=seed)).selected_pair.right_content_id,
+        )
         for seed in range(8)
     }
 

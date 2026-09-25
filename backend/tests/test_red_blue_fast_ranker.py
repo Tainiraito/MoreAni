@@ -124,10 +124,7 @@ def test_comparison_below_top_two_does_not_move_top_two_display_ranks():
     ranker_config = RankerConfig(posterior_sample_count=64, random_seed=5)
     authority = rank_preferences(candidates, anchors, [], ranker_config)
     means = {1: 10.0, 2: 5.0, 3: 0.0, 4: -5.0}
-    altered_results = tuple(
-        replace(result, preference_mean=means[result.content_id])
-        for result in authority.results
-    )
+    altered_results = tuple(replace(result, preference_mean=means[result.content_id]) for result in authority.results)
     state = create_fast_preference_state(
         candidates,
         anchors,

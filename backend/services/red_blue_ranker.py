@@ -306,9 +306,10 @@ def build_score_priors(
     positive_scores = sorted(score for score in representative_scores.values() if score > 0)
     sample_count = len(positive_scores)
     candidate_count = max(len(candidate_ids), 1)
-    baseline_precision = active_config.baseline_prior_precision * (
-        active_config.baseline_prior_reference_candidates / candidate_count
-    ) ** 2
+    baseline_precision = (
+        active_config.baseline_prior_precision
+        * (active_config.baseline_prior_reference_candidates / candidate_count) ** 2
+    )
     prior_by_id: dict[int, ScorePrior] = {}
 
     for content_id in candidate_ids:
@@ -335,9 +336,7 @@ def build_score_priors(
             else 1.0
         )
         prior_mean = active_config.score_prior_scale * _normal_quantile(clipped)
-        prior_precision = baseline_precision + (
-            effective_strength / (active_config.score_prior_scale**2)
-        )
+        prior_precision = baseline_precision + (effective_strength / (active_config.score_prior_scale**2))
         prior_by_id[content_id] = ScorePrior(
             mean=_finite(prior_mean),
             precision=_finite(prior_precision, baseline_precision),
@@ -557,9 +556,7 @@ def _fit_map(
                     with_hessian=False,
                 )
                 if candidate_objective <= objective - (
-                    config.optimizer_armijo_coefficient
-                    * step_size
-                    * directional_derivative
+                    config.optimizer_armijo_coefficient * step_size * directional_derivative
                 ):
                     theta = candidate
                     accepted = True
@@ -674,8 +671,7 @@ def _ambiguous_candidates(
             if min(comparison_counts[first_id], comparison_counts[second_id]) < config.order_uncertain_min_comparisons:
                 continue
             intervals_overlap = not (
-                rank_high[first_index] < rank_low[second_index]
-                or rank_high[second_index] < rank_low[first_index]
+                rank_high[first_index] < rank_low[second_index] or rank_high[second_index] < rank_low[first_index]
             )
             rank_neighbors = abs(expected_rank[first_index] - expected_rank[second_index]) <= (
                 config.order_uncertain_neighbor_rank_distance
@@ -756,8 +752,7 @@ def normalize_preference_results(
             ),
             order_uncertain=(
                 result.order_uncertain
-                or str(getattr(result.stability, 'value', result.stability))
-                == RankerStability.ORDER_UNCERTAIN.value
+                or str(getattr(result.stability, 'value', result.stability)) == RankerStability.ORDER_UNCERTAIN.value
             ),
         )
         for result in ordered

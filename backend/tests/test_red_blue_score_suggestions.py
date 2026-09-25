@@ -8,8 +8,6 @@ from conftest import auth_cookie
 from fastapi.testclient import TestClient
 
 from main import app
-from rating_constants import MIN_POSITIVE_RATING_SCORE
-from schemas import RatingCreate
 from models import (
     ContentItem,
     PreferenceModelRun,
@@ -24,7 +22,9 @@ from models import (
     ScoreSuggestionActionType,
     ScoreSuggestionStatus,
 )
+from rating_constants import MIN_POSITIVE_RATING_SCORE
 from routers.v1.red_blue import get_red_blue_service
+from schemas import RatingCreate
 from services.rating import upsert_rating
 from services.red_blue import FullRecalibrationReason, RedBlueService, RedBlueServiceConfig
 from services.red_blue_score_calibration import (
@@ -327,11 +327,15 @@ def test_refresh_reconciles_top_suggestion_from_anchor_without_self_feedback(db,
         ratings=changed_ratings,
     )
     assert persisted.id in changed_delta.removed
-    replacement = db.query(ScoreSuggestion).filter(
-        ScoreSuggestion.user_id == user.id,
-        ScoreSuggestion.content_id == contents[0].id,
-        ScoreSuggestion.status == ScoreSuggestionStatus.PENDING,
-    ).one()
+    replacement = (
+        db.query(ScoreSuggestion)
+        .filter(
+            ScoreSuggestion.user_id == user.id,
+            ScoreSuggestion.content_id == contents[0].id,
+            ScoreSuggestion.status == ScoreSuggestionStatus.PENDING,
+        )
+        .one()
+    )
     assert replacement.id != persisted.id
     assert replacement.suggestion_key.startswith(f'sc-v1:{contents[0].id}:25:')
 
@@ -367,9 +371,7 @@ def test_full_state_attaches_visible_suggestion_to_matching_ranking_content(
         full = service.run_full_recalibration(user.id, FullRecalibrationReason.MANUAL)
         assert full.applied_to_cache is True
         state = service.get_battle_state(db, user_id=user.id)
-        target_suggestion = next(
-            item for item in state.score_suggestions if item.content_id == contents[0].id
-        )
+        target_suggestion = next(item for item in state.score_suggestions if item.content_id == contents[0].id)
         assert target_suggestion.current_score == 20
         assert target_suggestion.recommended_score >= 50
     finally:
@@ -556,10 +558,7 @@ def test_state_api_attaches_suggestion_to_ranking_row(
 
     response = client.get('/api/v1/red-blue/state', cookies=auth_cookie(user))
     assert response.status_code == 200
-    target = next(
-        row for row in response.json()['ranking']
-        if row['content']['content_id'] == contents[0].id
-    )
+    target = next(row for row in response.json()['ranking'] if row['content']['content_id'] == contents[0].id)
     assert target['score_suggestion']['current_score'] == 20
     assert target['score_suggestion']['recommended_score'] >= 50
 
