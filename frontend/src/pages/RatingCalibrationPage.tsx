@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, GripVertical, LoaderCircle, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
 
 import { PageMain } from '@/components/layout/PageContainer'
+import { FeaturePageHeader } from '@/components/layout/FeaturePageHeader'
 import { CoverImage } from '@/components/ui/CoverImage'
 import { StarRating } from '@/components/rating/StarRating'
 import { useToastStore } from '@/stores/toast-store'
@@ -667,15 +668,13 @@ export function RatingCalibrationPage() {
 
   return (
     <PageMain className="py-16 sm:py-20">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-xs uppercase tracking-[0.18em]" style={{ color: 'var(--brand)' }}>Random comparison</p>
-          <h1 className="text-2xl font-bold sm:text-3xl" style={{ color: 'var(--text-primary)' }}>随机比较</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-            把过去打过分的作品放在一起重新排序，调整后的评分只会在保存时更新。空评分拖到有分数的邻位会继承邻位分数，0 分表示保留旧评分并在保存时跳过。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <FeaturePageHeader
+        className="mb-6"
+        eyebrow="Random comparison"
+        title="随机比较"
+        description="把过去打过分的作品放在一起重新排序，调整后的评分只会在保存时更新。空评分拖到有分数的邻位会继承邻位分数，0 分表示保留旧评分并在保存时跳过。"
+        actions={(
+          <>
           <button
             type="button"
             onClick={handleToggleAllOldScores}
@@ -708,8 +707,9 @@ export function RatingCalibrationPage() {
             {redrawing ? <LoaderCircle className="animate-spin" size={14} /> : <RefreshCw size={14} />}
             重新抽取
           </button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       <div className="mb-3 flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
         <span>已抽取 {rows.length} 部 · 可拖动排序，也可以直接修改新评分</span>

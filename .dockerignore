@@ -18,3 +18,8 @@ logs/
 .vscode/
 .idea/
 .pre-commit-config.yaml
+
+# Secrets and local environment files (Git ignore rules do not apply to Docker contexts).
+**/.env
+**/.env.*
+!**/.env.example
